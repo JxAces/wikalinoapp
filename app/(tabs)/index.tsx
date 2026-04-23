@@ -1,111 +1,103 @@
-import { useState } from "react";
+import { router } from "expo-router";
+import { useEffect } from "react";
 import {
+  ImageBackground,
+  SafeAreaView,
   StyleSheet,
   Text,
-  TextInput,
-  TouchableOpacity,
   View,
 } from "react-native";
-import { useUserStore } from "../../store/useUserStore";
 
-export default function App() {
-  const { name, setName, clearName } = useUserStore();
-  const [input, setInput] = useState<string>("");
+const landingBackground = require("../../assets/images/pageBackground/LandingPage.png");
+
+export default function LoadingScreen() {
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      router.replace("/landing");
+    }, 10000);
+
+    return () => clearTimeout(timer);
+  }, []);
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Name Saver</Text>
+    <ImageBackground
+      source={landingBackground}
+      resizeMode="cover"
+      style={styles.background}
+    >
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.overlay}>
+          <View style={styles.spacer} />
 
-      <View style={styles.card}>
-        <Text style={styles.label}>Saved Name</Text>
-        <Text style={styles.name}>{name || "No name saved yet"}</Text>
-      </View>
-
-      <TextInput
-        style={styles.input}
-        placeholder="Enter your name"
-        placeholderTextColor="#888"
-        value={input}
-        onChangeText={setInput}
-      />
-
-      <TouchableOpacity
-        style={styles.button}
-        onPress={() => {
-          setName(input);
-          setInput("");
-        }}
-      >
-        <Text style={styles.buttonText}>Save</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity style={styles.clearButton} onPress={clearName}>
-        <Text style={styles.clearText}>Clear</Text>
-      </TouchableOpacity>
-    </View>
+          <View style={styles.loadingWrap}>
+            <Text style={styles.loadingTitle}>LOADING...</Text>
+            <View style={styles.loadingBarOuter}>
+              <View style={styles.loadingBarInner} />
+            </View>
+            <Text style={styles.loadingSubtitle}>
+              Inihahanda ang WIKALINO...
+            </Text>
+          </View>
+        </View>
+      </SafeAreaView>
+    </ImageBackground>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  background: {
     flex: 1,
-    backgroundColor: "#f5f7fb", // light background
-    justifyContent: "center",
-    padding: 20,
+    backgroundColor: "#d7eefc",
   },
-  title: {
-    fontSize: 28,
-    fontWeight: "bold",
-    marginBottom: 30,
-    textAlign: "center",
-    color: "#222",
+  safeArea: {
+    flex: 1,
   },
-  card: {
-    backgroundColor: "#fff",
-    padding: 20,
-    borderRadius: 12,
-    marginBottom: 20,
-    shadowColor: "#000",
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
-    elevation: 3,
+  overlay: {
+    flex: 1,
+    paddingHorizontal: 28,
+    paddingTop: 16,
+    paddingBottom: 28,
   },
-  label: {
-    fontSize: 14,
-    color: "#777",
+  spacer: {
+    flex: 1,
   },
-  name: {
-    fontSize: 22,
-    fontWeight: "bold",
-    marginTop: 5,
-    color: "#111",
-  },
-  input: {
-    backgroundColor: "#fff",
-    borderRadius: 10,
-    padding: 14,
-    marginBottom: 15,
-    borderWidth: 1,
-    borderColor: "#ddd",
-    color: "#000",
-  },
-  button: {
-    backgroundColor: "#4f46e5",
-    padding: 15,
-    borderRadius: 10,
+  loadingWrap: {
     alignItems: "center",
+    paddingBottom: 36,
   },
-  buttonText: {
-    color: "#fff",
-    fontWeight: "bold",
-    fontSize: 16,
+  loadingTitle: {
+    fontSize: 26,
+    fontWeight: "900",
+    color: "#ffffff",
+    letterSpacing: 1,
+    textShadowColor: "rgba(0,0,0,0.35)",
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
+    marginBottom: 14,
   },
-  clearButton: {
-    marginTop: 10,
-    alignItems: "center",
+  loadingBarOuter: {
+    width: "82%",
+    height: 22,
+    backgroundColor: "#4a2a12",
+    borderRadius: 999,
+    borderWidth: 3,
+    borderColor: "#ffffff",
+    padding: 3,
+    overflow: "hidden",
   },
-  clearText: {
-    color: "#e11d48",
-    fontWeight: "600",
+  loadingBarInner: {
+    width: "68%",
+    height: "100%",
+    backgroundColor: "#58c84d",
+    borderRadius: 999,
+  },
+  loadingSubtitle: {
+    marginTop: 12,
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#ffffff",
+    textShadowColor: "rgba(0,0,0,0.35)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
   },
 });
