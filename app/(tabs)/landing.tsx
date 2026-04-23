@@ -7,9 +7,27 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useUserStore } from "../../store/useUserStore";
 
 export default function LandingScreen() {
   const router = useRouter();
+  const lastPlayed = useUserStore((state) => state.lastPlayed);
+
+  const handleContinue = () => {
+    if (lastPlayed && !lastPlayed.isCompleted) {
+      router.push({
+        pathname: "/challenge-player",
+        params: {
+          markahan: String(lastPlayed.markahan),
+          challengeId: lastPlayed.challengeId,
+          challengeIndex: String(lastPlayed.challengeIndex),
+        },
+      });
+      return;
+    }
+
+    router.push("/markahan");
+  };
 
   return (
     <View style={styles.container}>
@@ -33,7 +51,7 @@ export default function LandingScreen() {
               <HomeButton
                 label="MAGPATULOY"
                 variant="yellow"
-                onPress={() => router.push("/markahan")}
+                onPress={handleContinue}
               />
 
               <HomeButton
@@ -109,7 +127,7 @@ const styles = StyleSheet.create({
   buttonsWrapper: {
     gap: 14,
     paddingBottom: 120,
-    paddingHorizontal: 24, // ✅ moved padding here instead
+    paddingHorizontal: 24,
   },
 
   homeButton: {

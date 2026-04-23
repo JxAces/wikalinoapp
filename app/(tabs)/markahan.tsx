@@ -1,4 +1,3 @@
-import { FontAwesome5, Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import {
   ImageBackground,
@@ -8,20 +7,22 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { markahanUnits } from "../../data/markahan";
+import { useUserStore } from "../../store/useUserStore";
 
 type MarkahanCardProps = {
   title: string;
   color: string;
-  icon: any;
   locked?: boolean;
+  completedText: string;
   onPress: () => void;
 };
 
 function MarkahanCard({
   title,
   color,
-  icon,
   locked = false,
+  completedText,
   onPress,
 }: MarkahanCardProps) {
   return (
@@ -30,20 +31,26 @@ function MarkahanCard({
       style={({ pressed }) => [
         styles.card,
         {
-          backgroundColor: locked ? "#ddd" : color,
+          backgroundColor: locked ? "#d9d2c2" : color,
           opacity: pressed ? 0.9 : 1,
         },
       ]}
     >
       <Text style={styles.cardTitle}>{title}</Text>
-
-      {locked ? <Ionicons name="lock-closed" size={42} color="#888" /> : icon}
+      <Text style={styles.cardSubtext}>
+        {locked ? "Naka-lock" : completedText}
+      </Text>
     </Pressable>
   );
 }
 
 export default function MarkahanScreen() {
   const router = useRouter();
+  const getCompletedCountByMarkahan = useUserStore(
+    (state) => state.getCompletedCountByMarkahan,
+  );
+
+  const colors = ["#7ac74f", "#f3cc4d", "#e07a5f", "#8ecae6"];
 
   return (
     <ImageBackground
@@ -53,7 +60,6 @@ export default function MarkahanScreen() {
     >
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.container}>
-          {/* Top bar */}
           <View style={styles.topBar}>
             <Pressable
               style={styles.backButton}
@@ -63,45 +69,32 @@ export default function MarkahanScreen() {
             </Pressable>
           </View>
 
-          {/* Title */}
           <View style={styles.titleWrapper}>
             <View style={styles.titleBadge}>
               <Text style={styles.titleText}>Piliin ang Markahan</Text>
             </View>
           </View>
 
-          {/* Cards */}
           <View style={styles.grid}>
-            <MarkahanCard
-              title="Unang Markahan"
-              color="#7ac74f"
-              icon={<FontAwesome5 name="flag" size={40} color="#fff" />}
-              onPress={() => router.push("/unit")}
-            />
+            {markahanUnits.map((item, index) => {
+              const done = getCompletedCountByMarkahan(item.markahan);
 
-            <MarkahanCard
-              title="Ikalawang Markahan"
-              color="#f4a261"
-              icon={<FontAwesome5 name="flag" size={40} color="#fff" />}
-              locked
-              onPress={() => {}}
-            />
-
-            <MarkahanCard
-              title="Ikatlong Markahan"
-              color="#e76f51"
-              icon={<FontAwesome5 name="flag" size={40} color="#fff" />}
-              locked
-              onPress={() => {}}
-            />
-
-            <MarkahanCard
-              title="Ikaapat na Markahan"
-              color="#4dabf7"
-              icon={<FontAwesome5 name="flag" size={40} color="#fff" />}
-              locked
-              onPress={() => {}}
-            />
+              return (
+                <MarkahanCard
+                  key={item.id}
+                  title={item.title}
+                  color={colors[index % colors.length]}
+                  locked={item.isLocked}
+                  completedText={`${done}/4 natapos`}
+                  onPress={() =>
+                    router.push({
+                      pathname: "/challenges",
+                      params: { markahan: String(item.markahan) },
+                    })
+                  }
+                />
+              );
+            })}
           </View>
         </View>
       </SafeAreaView>
@@ -112,8 +105,6 @@ export default function MarkahanScreen() {
 const styles = StyleSheet.create({
   background: {
     flex: 1,
-    width: "100%",
-    height: "100%",
   },
   safeArea: {
     flex: 1,
@@ -170,14 +161,15 @@ const styles = StyleSheet.create({
   },
   card: {
     width: "47%",
-    aspectRatio: 0.85,
+    aspectRatio: 0.9,
     borderRadius: 22,
     paddingVertical: 22,
     paddingHorizontal: 16,
     borderWidth: 3,
     borderColor: "rgba(121, 88, 45, 0.35)",
     alignItems: "center",
-    justifyContent: "space-between",
+    justifyContent: "center",
+    gap: 10,
     elevation: 4,
   },
   cardTitle: {
@@ -185,5 +177,11 @@ const styles = StyleSheet.create({
     color: "#5a3d1e",
     fontSize: 18,
     fontWeight: "900",
+  },
+  cardSubtext: {
+    textAlign: "center",
+    color: "#5a3d1e",
+    fontSize: 14,
+    fontWeight: "700",
   },
 });

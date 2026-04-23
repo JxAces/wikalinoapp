@@ -18,7 +18,6 @@ export default function AboutScreen() {
       resizeMode="cover"
     >
       <SafeAreaView style={styles.safeArea}>
-        {/* Top Bar */}
         <View style={styles.topBar}>
           <Pressable
             style={styles.backButton}
@@ -28,21 +27,14 @@ export default function AboutScreen() {
           </Pressable>
         </View>
 
-        {/* Content */}
         <View style={styles.container}>
           <View style={styles.card}>
             <Text style={styles.title}>Tungkol sa WIKALINO</Text>
 
             <Text style={styles.text}>
-              Ang WIKALINO ay isang offline learning app na tumutulong sa mga
-              mag-aaral sa Baitang 9 upang mapalalim ang kanilang kaalaman sa
-              Filipino sa pamamagitan ng mga interaktibong hamon.
-            </Text>
-
-            <Text style={styles.text}>
-              Layunin nito na gawing masaya at madaling matutunan ang wika sa
-              pamamagitan ng mga gawain tulad ng pagpili ng tamang sagot,
-              pagsagot, at pag-aayos ng mga salita.
+              Ang WIKALINO ay isang offline learning app para sa Baitang 9 na
+              may mga hamon sa bawat markahan upang maging masaya at mas malinaw
+              ang pagkatuto sa Filipino.
             </Text>
 
             <Text style={styles.footer}>© 2026 WIKALINO</Text>
@@ -60,7 +52,6 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
   },
-
   topBar: {
     paddingHorizontal: 20,
     marginBottom: 10,
@@ -78,13 +69,11 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: "900",
   },
-
   container: {
     flex: 1,
     justifyContent: "center",
     paddingHorizontal: 24,
   },
-
   card: {
     backgroundColor: "rgba(255, 245, 220, 0.95)",
     borderRadius: 20,
@@ -92,7 +81,6 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: "#c8a96a",
   },
-
   title: {
     fontSize: 22,
     fontWeight: "900",
@@ -100,7 +88,6 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     color: "#5a3d1e",
   },
-
   text: {
     fontSize: 16,
     lineHeight: 22,
@@ -108,7 +95,6 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     color: "#5a3d1e",
   },
-
   footer: {
     marginTop: 10,
     textAlign: "center",

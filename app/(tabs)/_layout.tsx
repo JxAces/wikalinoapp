@@ -6,7 +6,7 @@ export default function TabsLayout() {
       screenOptions={{
         headerShown: false,
         tabBarStyle: {
-          display: "none", // ✅ fully hide tab bar
+          display: "none",
         },
       }}
     >
@@ -16,6 +16,8 @@ export default function TabsLayout() {
       <Tabs.Screen name="challenges" />
       <Tabs.Screen name="challenge-player" />
       <Tabs.Screen name="result" />
+      <Tabs.Screen name="progress" />
+      <Tabs.Screen name="about" />
     </Tabs>
   );
 }
