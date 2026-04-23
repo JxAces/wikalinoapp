@@ -27,13 +27,13 @@ export default function LandingScreen() {
               <HomeButton
                 label="MAGSIMULA"
                 variant="green"
-                onPress={() => router.push("/grade-level")}
+                onPress={() => router.push("/markahan")}
               />
 
               <HomeButton
                 label="MAGPATULOY"
                 variant="yellow"
-                onPress={() => router.push("/progress")}
+                onPress={() => router.push("/markahan")}
               />
 
               <HomeButton

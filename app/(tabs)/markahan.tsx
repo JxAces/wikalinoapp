@@ -1,11 +1,11 @@
 import { FontAwesome5, Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import {
-    ImageBackground,
-    Pressable,
-    StyleSheet,
-    Text,
-    View,
+  ImageBackground,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -55,7 +55,10 @@ export default function MarkahanScreen() {
         <View style={styles.container}>
           {/* Top bar */}
           <View style={styles.topBar}>
-            <Pressable style={styles.backButton} onPress={() => router.back()}>
+            <Pressable
+              style={styles.backButton}
+              onPress={() => router.push("/landing")}
+            >
               <Text style={styles.backText}>←</Text>
             </Pressable>
           </View>
