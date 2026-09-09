@@ -10,7 +10,11 @@
       }
     },
     "production": {
+      "distribution": "store",
       "autoIncrement": true
     }
+  },
+  "submit": {
+    "production": {}
   }
 }
