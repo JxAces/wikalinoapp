@@ -241,7 +241,7 @@ export default function ChallengesScreen() {
                     <ChallengeRow
                       index={index}
                       title={item.title}
-                      subtitle={item.subtitle}
+                      subtitle={item.instruction}
                       icon={item.icon}
                       color={item.color}
                       locked={item.locked}
