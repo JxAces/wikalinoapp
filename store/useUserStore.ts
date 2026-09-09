@@ -14,6 +14,30 @@ import {
   getChallengesByMarkahan,
 } from "../data/markahan";
 
+const USER_STORE_STORAGE_KEY = "wikalino-user-store";
+
+const emptyUserData = () => ({
+  profile: null,
+
+  xp: 0,
+
+  completedStoryIds: [],
+
+  readingCompletedStoryIds: [],
+
+  storySceneIndexes: {},
+
+  activityResults: {},
+
+  unlockedCollectibleIds: [],
+
+  lastStoryId: null,
+
+  completedChallengeIds: [],
+
+  lastPlayed: null,
+});
+
 /*
  * ---------------------------------------------------------
  * LEGACY V1
@@ -166,6 +190,8 @@ type UserStore = {
   clearProgress: () => void;
 
   clearAllData: () => void;
+
+  deleteAccount: () => Promise<void>;
 };
 
 export const useUserStore =
@@ -557,31 +583,19 @@ export const useUserStore =
           }),
 
         clearAllData: () =>
-          set({
-            profile: null,
+          set(emptyUserData()),
 
-            xp: 0,
+        deleteAccount: async () => {
+          set(emptyUserData());
 
-            completedStoryIds: [],
-
-            readingCompletedStoryIds: [],
-
-            storySceneIndexes: {},
-
-            activityResults: {},
-
-            unlockedCollectibleIds: [],
-
-            lastStoryId: null,
-
-            completedChallengeIds: [],
-
-            lastPlayed: null,
-          }),
+          await AsyncStorage.removeItem(
+            USER_STORE_STORAGE_KEY,
+          );
+        },
       }),
 
       {
-        name: "wikalino-user-store",
+        name: USER_STORE_STORAGE_KEY,
 
         version: 2,
 

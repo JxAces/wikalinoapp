@@ -1,6 +1,8 @@
 import {
   MaterialCommunityIcons,
 } from "@expo/vector-icons";
+import { router } from "expo-router";
+import { useState } from "react";
 
 import {
   Alert,
@@ -67,6 +69,15 @@ export default function ProgressScreen() {
         state.clearGameProgress,
     );
 
+  const deleteAccount =
+    useUserStore(
+      (state) =>
+        state.deleteAccount,
+    );
+
+  const [isDeleting, setIsDeleting] =
+    useState(false);
+
   const stories =
     getAllStories();
 
@@ -97,6 +108,44 @@ export default function ProgressScreen() {
           style: "destructive",
           onPress:
             clearGameProgress,
+        },
+      ],
+    );
+  };
+
+  const confirmAccountDeletion =
+    async () => {
+      setIsDeleting(true);
+
+      try {
+        await deleteAccount();
+
+        router.replace("/onboarding");
+      } catch {
+        setIsDeleting(false);
+
+        Alert.alert(
+          "Hindi Nabura ang Account",
+          "Hindi maalis ang naka-save na data. Pakisubukan muli.",
+        );
+      }
+    };
+
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      "Burahin ang Account?",
+      "Permanenteng mabubura ang iyong pangalan, pangkat, XP, progreso, stars, koleksyon, at lahat ng natapos na hamon sa device na ito.",
+      [
+        {
+          text: "Kanselahin",
+          style: "cancel",
+        },
+        {
+          text: "Burahin Lahat",
+          style: "destructive",
+          onPress: () => {
+            void confirmAccountDeletion();
+          },
         },
       ],
     );
@@ -335,6 +384,45 @@ export default function ProgressScreen() {
             I-reset ang Progreso
           </Text>
         </Pressable>
+
+        <View style={styles.accountCard}>
+          <View style={styles.accountCopy}>
+            <Text style={styles.accountTitle}>
+              Account at Data
+            </Text>
+
+            <Text style={styles.accountDescription}>
+              Burahin ang profile at lahat ng naka-save na progreso sa device na ito.
+            </Text>
+          </View>
+
+          <Pressable
+            disabled={isDeleting}
+            onPress={handleDeleteAccount}
+            style={({ pressed }) => [
+              styles.deleteAccountButton,
+              isDeleting &&
+                styles.deleteAccountButtonDisabled,
+              pressed &&
+                !isDeleting &&
+                styles.deleteAccountButtonPressed,
+            ]}
+          >
+            <MaterialCommunityIcons
+              name="delete-forever-outline"
+              size={20}
+              color={Colors.surface}
+            />
+
+            <Text
+              style={styles.deleteAccountButtonText}
+            >
+              {isDeleting
+                ? "BINUBURA…"
+                : "BURAHIN ANG ACCOUNT"}
+            </Text>
+          </Pressable>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -383,7 +471,7 @@ const styles =
     container: {
       paddingHorizontal: 20,
       paddingTop: 22,
-      paddingBottom: 30,
+      paddingBottom: 120,
     },
 
     profileCard: {
@@ -671,5 +759,83 @@ const styles =
       fontSize: 12,
 
       fontWeight: "900",
+    },
+
+    accountCard: {
+      marginTop: 14,
+
+      padding: 16,
+
+      borderRadius: 18,
+
+      borderWidth: 1,
+
+      borderColor: "#E6BDB9",
+
+      backgroundColor: Colors.surface,
+    },
+
+    accountCopy: {
+      marginBottom: 13,
+    },
+
+    accountTitle: {
+      color: Colors.text,
+
+      fontSize: 14,
+
+      fontWeight: "900",
+    },
+
+    accountDescription: {
+      marginTop: 4,
+
+      color: Colors.textMuted,
+
+      fontSize: 10,
+
+      lineHeight: 15,
+    },
+
+    deleteAccountButton: {
+      minHeight: 48,
+
+      paddingHorizontal: 14,
+
+      borderRadius: 14,
+
+      flexDirection: "row",
+
+      alignItems: "center",
+
+      justifyContent: "center",
+
+      gap: 8,
+
+      backgroundColor: Colors.error,
+    },
+
+    deleteAccountButtonPressed: {
+      opacity: 0.86,
+
+      transform: [
+        {
+          scale: 0.98,
+        },
+      ],
+    },
+
+    deleteAccountButtonDisabled: {
+      opacity: 0.55,
+    },
+
+    deleteAccountButtonText: {
+      color: Colors.surface,
+
+      fontSize: 11,
+
+      fontWeight: "900",
+
+      letterSpacing: 0.4,
     },
   });

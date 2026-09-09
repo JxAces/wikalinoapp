@@ -25,6 +25,9 @@ export function getActivityIcon(type: StoryActivity["type"]): IconName {
     case "theme_detective":
       return "compass-outline";
 
+    case "character_race":
+      return "run-fast";
+
     default:
       return "cards-outline";
   }
@@ -43,6 +46,9 @@ export function getGameName(type: StoryActivity["type"]) {
 
     case "theme_detective":
       return "KOMPAS NG TEMA";
+
+    case "character_race":
+      return "KARERA NG MGA TAUHAN";
 
     default:
       return "HAMON NG KWENTO";
@@ -63,6 +69,9 @@ export function getGameInstruction(activity: StoryActivity) {
     case "theme_detective":
       return "Ituro ang kompas sa mensaheng pinakamahusay na sinusuportahan ng kwento.";
 
+    case "character_race":
+      return "Piliin ang tauhang gumawa ng mahalagang kilos, pagkatapos ay simulan ang karera. Ang tamang tauhan ang unang makakarating sa hantungan.";
+
     default:
       return activity.instruction;
   }
@@ -81,6 +90,9 @@ export function getSuccessTitle(type: StoryActivity["type"]) {
 
     case "theme_detective":
       return "Tamang Direksiyon!";
+
+    case "character_race":
+      return "Tamang Tauhan ang Nanalo!";
 
     default:
       return "Tamang Sagot!";

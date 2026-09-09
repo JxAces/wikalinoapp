@@ -1,4 +1,5 @@
 export { DragArcheryGame } from "./archery-game";
+export { CharacterRaceGame } from "./character-race-game";
 export {
   CompassGame,
   LanternGame,

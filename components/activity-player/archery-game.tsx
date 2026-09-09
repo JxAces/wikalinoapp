@@ -1,19 +1,29 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from "expo-haptics";
-import { ComponentProps, useEffect, useMemo, useRef, useState } from "react";
+import { ComponentProps, useEffect, useMemo, useState } from "react";
 import {
   Animated,
-  Easing,
-  PanResponder,
-  Pressable,
   Text,
   View,
 } from "react-native";
+import { Gesture, GestureDetector } from "react-native-gesture-handler";
+import Reanimated, {
+  cancelAnimation,
+  Easing,
+  interpolate,
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+  withTiming,
+} from "react-native-reanimated";
+import { scheduleOnRN } from "react-native-worklets";
 
 import { Colors } from "../../constants/colors";
 import { StoryActivity } from "../../data/stories";
 import styles from "./styles";
+
+const FLIGHT_DURATION_MS = 620;
 
 type IconName = ComponentProps<typeof MaterialCommunityIcons>["name"];
 
@@ -32,13 +42,6 @@ type TargetRect = {
   height: number;
   centerX: number;
   centerY: number;
-};
-
-type FlightPath = {
-  endX: number;
-  endY: number;
-  targetIndex: number | null;
-  rotation: number;
 };
 
 function clamp(value: number, minimum: number, maximum: number) {
@@ -130,12 +133,9 @@ export function DragArcheryGame({
    * =======================================================
    */
 
-  const pull = useRef(
-    new Animated.ValueXY({
-      x: 0,
-      y: 0,
-    }),
-  ).current;
+  const pullX = useSharedValue(0);
+
+  const pullY = useSharedValue(0);
 
   const [aimX, setAimX] = useState(0);
 
@@ -149,9 +149,13 @@ export function DragArcheryGame({
    * =======================================================
    */
 
-  const flightProgress = useRef(new Animated.Value(0)).current;
+  const flightProgress = useSharedValue(0);
 
-  const [flight, setFlight] = useState<FlightPath | null>(null);
+  const flightEndX = useSharedValue(0);
+
+  const flightEndY = useSharedValue(0);
+
+  const flightRotation = useSharedValue(0);
 
   const [isFlying, setIsFlying] = useState(false);
 
@@ -227,21 +231,34 @@ export function DragArcheryGame({
    * =======================================================
    */
 
-  const pullVisualX = pull.x.interpolate({
-    inputRange: [-MAX_PULL_X, MAX_PULL_X],
+  const readyArrowAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [
+      {
+        translateX: interpolate(
+          pullX.get(),
+          [-MAX_PULL_X, MAX_PULL_X],
+          [-31, 31],
+        ),
+      },
+      {
+        translateY: interpolate(pullY.get(), [0, MAX_PULL_Y], [0, 42]),
+      },
+      {
+        rotate: `${interpolate(
+          pullX.get(),
+          [-MAX_PULL_X, MAX_PULL_X],
+          [-8, 8],
+        )}deg`,
+      },
+      {
+        scale: interpolate(pullY.get(), [0, MAX_PULL_Y], [1, 1.12]),
+      },
+    ],
+  }));
 
-    outputRange: [-31, 31],
-
-    extrapolate: "clamp",
-  });
-
-  const pullVisualY = pull.y.interpolate({
-    inputRange: [0, MAX_PULL_Y],
-
-    outputRange: [0, 42],
-
-    extrapolate: "clamp",
-  });
+  const powerFillAnimatedStyle = useAnimatedStyle(() => ({
+    width: `${Math.min(100, (pullY.get() / MAX_PULL_Y) * 100)}%`,
+  }));
 
   /*
    * =======================================================
@@ -252,9 +269,10 @@ export function DragArcheryGame({
 
   useEffect(() => {
     return () => {
+      cancelAnimation(flightProgress);
       onGestureActiveChange(false);
     };
-  }, [onGestureActiveChange]);
+  }, [flightProgress, onGestureActiveChange]);
 
   /*
    * =======================================================
@@ -269,11 +287,9 @@ export function DragArcheryGame({
 
     setAimY(0);
 
-    setFlight(null);
-
     setIsFlying(false);
 
-    flightProgress.setValue(0);
+    flightProgress.set(0);
 
     /*
      * Make absolutely sure the
@@ -282,18 +298,47 @@ export function DragArcheryGame({
 
     onGestureActiveChange(false);
 
-    Animated.spring(pull, {
-      toValue: {
-        x: 0,
-        y: 0,
-      },
+    pullX.set(withSpring(0, {
+      damping: 15,
+      stiffness: 190,
+    }));
 
-      friction: 6,
+    pullY.set(withSpring(0, {
+      damping: 15,
+      stiffness: 190,
+    }));
+  }
 
-      tension: 70,
+  async function finishFlight(hitIndex: number) {
+    if (hitIndex < 0) {
+      await Haptics.notificationAsync(
+        Haptics.NotificationFeedbackType.Warning,
+      );
 
-      useNativeDriver: true,
-    }).start();
+      setMissMessage(
+        "Walang tinamaan! Ayusin ang iyong tutok at subukan muli.",
+      );
+
+      setTimeout(() => {
+        resetBow();
+
+        setTimeout(() => {
+          setMissMessage(null);
+        }, 800);
+      }, 450);
+
+      return;
+    }
+
+    const choice = activity.choices[hitIndex];
+
+    await onTargetHit(choice);
+
+    if (choice !== activity.answer) {
+      setTimeout(() => {
+        resetBow();
+      }, 700);
+    }
   }
 
   /*
@@ -318,9 +363,9 @@ export function DragArcheryGame({
       return;
     }
 
-    const pullX = clamp(rawX, -MAX_PULL_X, MAX_PULL_X);
+    const releasedPullX = clamp(rawX, -MAX_PULL_X, MAX_PULL_X);
 
-    const pullY = clamp(rawY, 0, MAX_PULL_Y);
+    const releasedPullY = clamp(rawY, 0, MAX_PULL_Y);
 
     setDragging(false);
 
@@ -328,7 +373,7 @@ export function DragArcheryGame({
      * Not enough power.
      */
 
-    if (pullY < MIN_PULL_Y) {
+    if (releasedPullY < MIN_PULL_Y) {
       setMissMessage("Hilahin pa pababa upang lumakas ang pana.");
 
       await Haptics.selectionAsync();
@@ -350,8 +395,8 @@ export function DragArcheryGame({
       originX,
       originY,
 
-      pullX,
-      pullY,
+      pullX: releasedPullX,
+      pullY: releasedPullY,
 
       fieldWidth,
 
@@ -379,243 +424,94 @@ export function DragArcheryGame({
 
     const angle = (Math.atan2(dy, dx) * 180) / Math.PI + 90;
 
-    setFlight({
-      endX: finalX,
-      endY: finalY,
-
-      targetIndex: hit?.index ?? null,
-
-      rotation: angle,
-    });
+    flightEndX.set(finalX - originX);
+    flightEndY.set(finalY - originY);
+    flightRotation.set(angle);
+    flightProgress.set(0);
 
     setIsFlying(true);
-
     setMissMessage(null);
 
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
-    flightProgress.setValue(0);
+    pullX.set(withSpring(0, {
+      damping: 13,
+      stiffness: 220,
+    }));
 
-    /*
-     * Bow snaps back.
-     */
+    pullY.set(withSpring(0, {
+      damping: 13,
+      stiffness: 220,
+    }));
 
-    Animated.spring(pull, {
-      toValue: {
-        x: 0,
-        y: 0,
-      },
-
-      friction: 5,
-
-      tension: 90,
-
-      useNativeDriver: true,
-    }).start();
-
-    requestAnimationFrame(() => {
-      Animated.timing(flightProgress, {
-        toValue: 1,
-
-        duration: 620,
-
+    flightProgress.set(
+      withTiming(1, {
+        duration: FLIGHT_DURATION_MS,
         easing: Easing.out(Easing.cubic),
+      }),
+    );
 
-        useNativeDriver: true,
-      }).start(async ({ finished }) => {
-        if (!finished) {
-          return;
-        }
-
-        /*
-         * MISS
-         *
-         * Does NOT count as a
-         * wrong academic answer.
-         */
-
-        if (!hit) {
-          await Haptics.notificationAsync(
-            Haptics.NotificationFeedbackType.Warning,
-          );
-
-          setMissMessage(
-            "Walang tinamaan! Ayusin ang iyong tutok at subukan muli.",
-          );
-
-          setTimeout(() => {
-            resetBow();
-
-            setTimeout(() => {
-              setMissMessage(null);
-            }, 800);
-          }, 450);
-
-          return;
-        }
-
-        /*
-         * Whatever target the
-         * arrow hits becomes the answer.
-         */
-
-        const choice = activity.choices[hit.index];
-
-        await onTargetHit(choice);
-
-        /*
-         * Wrong target:
-         * automatically reload bow.
-         */
-
-        if (choice !== activity.answer) {
-          setTimeout(() => {
-            resetBow();
-          }, 700);
-        }
-      });
-    });
+    setTimeout(() => {
+      void finishFlight(hit?.index ?? -1);
+    }, FLIGHT_DURATION_MS + 30);
   }
 
   /*
    * =======================================================
-   * PAN RESPONDER
-   * =======================================================
-   *
-   * THIS IS THE IMPORTANT FIX.
-   *
-   * Capture the gesture BEFORE
-   * ScrollView can claim it.
+   * NATIVE PAN GESTURE
    * =======================================================
    */
 
-  const panResponder = useMemo(
-    () =>
-      PanResponder.create({
-        /*
-         * Claim immediately when
-         * the finger touches the bow.
-         */
+  function beginPull() {
+    onGestureActiveChange(true);
+    setDragging(true);
+    setMissMessage(null);
+    setAimX(0);
+    setAimY(0);
+    void Haptics.selectionAsync();
+  }
 
-        onStartShouldSetPanResponder: () => !submitted && !isFlying,
+  function updateAim(x: number, y: number) {
+    setAimX(Math.round(x));
+    setAimY(Math.round(y));
+  }
 
-        onStartShouldSetPanResponderCapture: () => !submitted && !isFlying,
+  function cancelPull() {
+    onGestureActiveChange(false);
+    resetBow();
+  }
 
-        /*
-         * Continue owning the gesture
-         * when movement begins.
-         */
+  const panGesture = Gesture.Pan()
+    .enabled(!submitted && !isFlying)
+    .minDistance(0)
+    .shouldCancelWhenOutside(false)
+    .onBegin(() => {
+      cancelAnimation(pullX);
+      cancelAnimation(pullY);
+      pullX.set(0);
+      pullY.set(0);
+      scheduleOnRN(beginPull);
+    })
+    .onUpdate((event) => {
+      const x = Math.min(
+        MAX_PULL_X,
+        Math.max(-MAX_PULL_X, event.translationX),
+      );
+      const y = Math.min(MAX_PULL_Y, Math.max(0, event.translationY));
 
-        onMoveShouldSetPanResponder: () => !submitted && !isFlying,
-
-        onMoveShouldSetPanResponderCapture: () => !submitted && !isFlying,
-
-        /*
-         * Don't allow ScrollView or
-         * another parent to steal it.
-         */
-
-        onPanResponderTerminationRequest: () => false,
-
-        onShouldBlockNativeResponder: () => true,
-
-        /*
-         * Finger touches bow.
-         */
-
-        onPanResponderGrant: () => {
-          if (submitted || isFlying) {
-            return;
-          }
-
-          /*
-           * TURN OFF PAGE SCROLL.
-           */
-
-          onGestureActiveChange(true);
-
-          setDragging(true);
-
-          setMissMessage(null);
-
-          setAimX(0);
-
-          setAimY(0);
-
-          pull.setValue({
-            x: 0,
-            y: 0,
-          });
-
-          Haptics.selectionAsync();
-        },
-
-        /*
-         * Player is pulling / aiming.
-         */
-
-        onPanResponderMove: (_, gesture) => {
-          if (submitted || isFlying) {
-            return;
-          }
-
-          const x = clamp(
-            gesture.dx,
-
-            -MAX_PULL_X,
-
-            MAX_PULL_X,
-          );
-
-          /*
-           * Downward pull only.
-           */
-
-          const y = clamp(
-            gesture.dy,
-
-            0,
-
-            MAX_PULL_Y,
-          );
-
-          pull.setValue({
-            x,
-            y,
-          });
-
-          setAimX(Math.round(x));
-
-          setAimY(Math.round(y));
-        },
-
-        /*
-         * Finger released = FIRE.
-         */
-
-        onPanResponderRelease: (_, gesture) => {
-          /*
-           * Re-enable page scrolling
-           * immediately after release.
-           */
-
-          onGestureActiveChange(false);
-
-          void releaseArrow(gesture.dx, gesture.dy);
-        },
-
-        /*
-         * Gesture unexpectedly cancelled.
-         */
-
-        onPanResponderTerminate: () => {
-          onGestureActiveChange(false);
-
-          resetBow();
-        },
-      }),
-    [fieldWidth, isFlying, submitted, targetRects, onGestureActiveChange],
-  );
+      pullX.set(x);
+      pullY.set(y);
+      scheduleOnRN(updateAim, x, y);
+    })
+    .onEnd((event) => {
+      scheduleOnRN(onGestureActiveChange, false);
+      scheduleOnRN(releaseArrow, event.translationX, event.translationY);
+    })
+    .onFinalize((_event, success) => {
+      if (!success) {
+        scheduleOnRN(cancelPull);
+      }
+    });
 
   /*
    * =======================================================
@@ -623,32 +519,31 @@ export function DragArcheryGame({
    * =======================================================
    */
 
-  const flightX = flight
-    ? flightProgress.interpolate({
-        inputRange: [0, 1],
+  const flightAnimatedStyle = useAnimatedStyle(() => {
+    const progress = flightProgress.get();
+    const endX = flightEndX.get();
+    const endY = flightEndY.get();
 
-        outputRange: [0, flight.endX - originX],
-      })
-    : flightProgress;
-
-  const flightY = flight
-    ? flightProgress.interpolate({
-        inputRange: [0, 0.5, 1],
-
-        outputRange: [
-          0,
-
-          (flight.endY - originY) / 2 - 20,
-
-          flight.endY - originY,
-        ],
-      })
-    : flightProgress;
-
-  const flightScale = flightProgress.interpolate({
-    inputRange: [0, 1],
-
-    outputRange: [1, 0.9],
+    return {
+      transform: [
+        {
+          translateX: interpolate(progress, [0, 1], [0, endX]),
+        },
+        {
+          translateY: interpolate(
+            progress,
+            [0, 0.5, 1],
+            [0, endY / 2 - 20, endY],
+          ),
+        },
+        {
+          rotate: String(flightRotation.get()) + "deg",
+        },
+        {
+          scale: interpolate(progress, [0, 1], [1, 0.9]),
+        },
+      ],
+    };
   });
 
   /*
@@ -910,8 +805,8 @@ export function DragArcheryGame({
             FLYING ARROW
         ================================= */}
 
-        {isFlying && flight && (
-          <Animated.View
+        {isFlying && (
+          <Reanimated.View
             pointerEvents="none"
             style={[
               styles.flightArrow,
@@ -921,24 +816,8 @@ export function DragArcheryGame({
 
                 top: originY - 24,
 
-                transform: [
-                  {
-                    translateX: flightX,
-                  },
-
-                  {
-                    translateY: flightY,
-                  },
-
-                  {
-                    rotate: `${flight.rotation}deg`,
-                  },
-
-                  {
-                    scale: flightScale,
-                  },
-                ],
               },
+              flightAnimatedStyle,
             ]}
           >
             <MaterialCommunityIcons
@@ -946,7 +825,7 @@ export function DragArcheryGame({
               size={42}
               color="#7B4D28"
             />
-          </Animated.View>
+          </Reanimated.View>
         )}
 
         {/* =================================
@@ -967,17 +846,10 @@ export function DragArcheryGame({
           {/* POWER */}
 
           <View style={styles.powerTrack}>
-            <View
+            <Reanimated.View
               style={[
                 styles.powerFill,
-
-                {
-                  width: `${Math.min(
-                    100,
-
-                    (aimY / MAX_PULL_Y) * 100,
-                  )}%`,
-                },
+                powerFillAnimatedStyle,
               ]}
             />
           </View>
@@ -993,40 +865,28 @@ export function DragArcheryGame({
           ================================= */}
 
           {!isFlying && (
-            <View {...panResponder.panHandlers} style={styles.bowGestureArea}>
-              <View style={styles.bowBase}>
-                <MaterialCommunityIcons
-                  name="bow-arrow"
-                  size={41}
-                  color={Colors.secondary}
-                />
-              </View>
+            <GestureDetector gesture={panGesture}>
+              <Reanimated.View style={styles.bowGestureArea}>
+                <View style={styles.bowBase}>
+                  <MaterialCommunityIcons
+                    name="bow-arrow"
+                    size={41}
+                    color={Colors.secondary}
+                  />
+                </View>
 
-              <Animated.View
-                pointerEvents="none"
-                style={[
-                  styles.readyArrow,
-
-                  {
-                    transform: [
-                      {
-                        translateX: pullVisualX,
-                      },
-
-                      {
-                        translateY: pullVisualY,
-                      },
-                    ],
-                  },
-                ]}
-              >
-                <MaterialCommunityIcons
-                  name="arrow-up-bold"
-                  size={35}
-                  color="#74471F"
-                />
-              </Animated.View>
-            </View>
+                <Reanimated.View
+                  pointerEvents="none"
+                  style={[styles.readyArrow, readyArrowAnimatedStyle]}
+                >
+                  <MaterialCommunityIcons
+                    name="arrow-up-bold"
+                    size={35}
+                    color="#74471F"
+                  />
+                </Reanimated.View>
+              </Reanimated.View>
+            </GestureDetector>
           )}
 
           <Text style={styles.bowInstruction}>
@@ -1283,20 +1143,4 @@ function findTargetHit(
   });
 
   return matches[0];
-}
-
-function attemptsLabel(
-  activity: ChoiceActivity,
-  selectedChoice: string | null,
-  wrongChoice: string | null,
-) {
-  if (wrongChoice) {
-    return "Hindi tama";
-  }
-
-  if (selectedChoice === activity.answer) {
-    return "Tama";
-  }
-
-  return "Wala pa";
 }

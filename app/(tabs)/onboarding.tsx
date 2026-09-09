@@ -1,5 +1,12 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { router } from "expo-router";
+import type { LucideIcon } from "lucide-react-native";
+import CircleUserRound from "lucide-react-native/icons/circle-user-round";
+import UserRoundCheck from "lucide-react-native/icons/user-round-check";
+import UserRoundCog from "lucide-react-native/icons/user-round-cog";
+import UserRoundPen from "lucide-react-native/icons/user-round-pen";
+import UserRoundSearch from "lucide-react-native/icons/user-round-search";
+import UserStar from "lucide-react-native/icons/user-star";
 import {
   ComponentProps,
   useMemo,
@@ -30,39 +37,39 @@ type IconName =
 
 type PlayerIcon = {
   id: string;
-  icon: IconName;
+  icon: LucideIcon;
   title: string;
 };
 
 const PLAYER_ICONS: PlayerIcon[] = [
   {
     id: "reader",
-    icon: "book-open-page-variant",
+    icon: CircleUserRound,
     title: "Mambabasa",
   },
   {
     id: "writer",
-    icon: "fountain-pen-tip",
+    icon: UserRoundPen,
     title: "Manunulat",
   },
   {
     id: "explorer",
-    icon: "compass-outline",
+    icon: UserRoundSearch,
     title: "Manlalakbay",
   },
   {
     id: "thinker",
-    icon: "lightbulb-outline",
+    icon: UserRoundCog,
     title: "Mapanuri",
   },
   {
     id: "storyteller",
-    icon: "drama-masks",
+    icon: UserRoundCheck,
     title: "Tagapagkwento",
   },
   {
     id: "scholar",
-    icon: "school-outline",
+    icon: UserStar,
     title: "Iskolar",
   },
 ];
@@ -625,6 +632,8 @@ function IconStep({
   firstName: string;
   pangkat: PangkatOption | null;
 }) {
+  const SelectedIcon = selectedIcon.icon;
+
   return (
     <>
       <View style={styles.introIcon}>
@@ -653,6 +662,7 @@ function IconStep({
         {PLAYER_ICONS.map((item) => {
           const active =
             item.id === selectedIconId;
+          const AvatarIcon = item.icon;
 
           return (
             <Pressable
@@ -675,14 +685,14 @@ function IconStep({
                     styles.iconOptionCircleActive,
                 ]}
               >
-                <MaterialCommunityIcons
-                  name={item.icon}
+                <AvatarIcon
                   size={28}
                   color={
                     active
                       ? Colors.surface
                       : Colors.primary
                   }
+                  strokeWidth={2.25}
                 />
               </View>
 
@@ -717,10 +727,10 @@ function IconStep({
 
       <View style={styles.playerCard}>
         <View style={styles.playerIcon}>
-          <MaterialCommunityIcons
-            name={selectedIcon.icon}
+          <SelectedIcon
             size={34}
             color={Colors.surface}
+            strokeWidth={2.25}
           />
         </View>
 
@@ -769,16 +779,18 @@ function ReadyStep({
   pangkat: PangkatOption | null;
   selectedIcon: PlayerIcon;
 }) {
+  const SelectedIcon = selectedIcon.icon;
+
   return (
     <>
       <View style={styles.readyHero}>
         <View
           style={styles.readyIconOuter}
         >
-          <MaterialCommunityIcons
-            name={selectedIcon.icon}
+          <SelectedIcon
             size={45}
             color={Colors.surface}
+            strokeWidth={2.25}
           />
         </View>
 
@@ -813,10 +825,10 @@ function ReadyStep({
           <View
             style={styles.summaryUserIcon}
           >
-            <MaterialCommunityIcons
-              name={selectedIcon.icon}
+            <SelectedIcon
               size={27}
               color={Colors.surface}
+              strokeWidth={2.25}
             />
           </View>
 

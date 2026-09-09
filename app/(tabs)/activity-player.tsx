@@ -6,7 +6,7 @@ import * as Haptics from "expo-haptics";
 
 import { router, useLocalSearchParams } from "expo-router";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 
 import {
   Animated,
@@ -24,6 +24,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import styles from "@/components/activity-player/styles";
 
 import {
+  CharacterRaceGame,
   CompassGame,
   DragArcheryGame,
   getActivityIcon,
@@ -70,8 +71,6 @@ export default function ActivityPlayerScreen() {
     activityIndex?: string;
   }>();
 
-  const [isGameGestureActive, setIsGameGestureActive] = useState(false);
-
   const storyId = typeof params.storyId === "string" ? params.storyId : "";
 
   const parsedActivityIndex = Number(params.activityIndex ?? 0);
@@ -80,6 +79,22 @@ export default function ActivityPlayerScreen() {
     ? Math.max(0, parsedActivityIndex)
     : 0;
 
+  return (
+    <ActivityPlayerSession
+      key={`${storyId}:${activityIndex}`}
+      storyId={storyId}
+      activityIndex={activityIndex}
+    />
+  );
+}
+
+function ActivityPlayerSession({
+  storyId,
+  activityIndex,
+}: {
+  storyId: string;
+  activityIndex: number;
+}) {
   const story = getStoryById(storyId);
 
   const activity = story?.activities[activityIndex] ?? null;
@@ -99,6 +114,8 @@ export default function ActivityPlayerScreen() {
    */
 
   const [selectedChoice, setSelectedChoice] = useState<string | null>(null);
+
+  const [isGameGestureActive, setIsGameGestureActive] = useState(false);
 
   const [orderedItems, setOrderedItems] = useState<string[]>([]);
 
@@ -146,61 +163,27 @@ export default function ActivityPlayerScreen() {
    * =======================================================
    */
 
-  const introFade = useRef(new Animated.Value(0)).current;
+  const [introFade] = useState(() => new Animated.Value(0));
 
-  const introY = useRef(new Animated.Value(18)).current;
+  const [introY] = useState(() => new Animated.Value(18));
 
-  const feedbackScale = useRef(new Animated.Value(0.9)).current;
+  const [feedbackScale] = useState(() => new Animated.Value(0.9));
 
-  const targetShake = useRef(new Animated.Value(0)).current;
+  const [targetShake] = useState(() => new Animated.Value(0));
 
-  const lanternGlow = useRef(new Animated.Value(0)).current;
+  const [lanternGlow] = useState(() => new Animated.Value(0));
 
-  const compassNeedle = useRef(new Animated.Value(0)).current;
+  const [compassNeedle] = useState(() => new Animated.Value(0));
 
-  const pathPulse = useRef(new Animated.Value(0)).current;
+  const [pathPulse] = useState(() => new Animated.Value(0));
 
   /*
    * =======================================================
-   * RESET WHEN ACTIVITY CHANGES
+   * ACTIVITY INTRO
    * =======================================================
    */
 
   useEffect(() => {
-    setSelectedChoice(null);
-
-    setOrderedItems([]);
-
-    setAttempts(0);
-
-    setSubmitted(false);
-
-    setCorrect(false);
-
-    setIsResolving(false);
-
-    setArcheryWrongChoice(null);
-
-    setArcheryHint(null);
-
-    setLanternActivated(false);
-
-    setCompassChoiceIndex(null);
-
-    feedbackScale.setValue(0.9);
-
-    targetShake.setValue(0);
-
-    lanternGlow.setValue(0);
-
-    compassNeedle.setValue(0);
-
-    pathPulse.setValue(0);
-
-    introFade.setValue(0);
-
-    introY.setValue(18);
-
     Animated.parallel([
       Animated.timing(introFade, {
         toValue: 1,
@@ -220,16 +203,7 @@ export default function ActivityPlayerScreen() {
         useNativeDriver: true,
       }),
     ]).start();
-  }, [
-    activity?.id,
-    compassNeedle,
-    feedbackScale,
-    introFade,
-    introY,
-    lanternGlow,
-    pathPulse,
-    targetShake,
-  ]);
+  }, [introFade, introY]);
 
   /*
    * =======================================================
@@ -409,6 +383,40 @@ export default function ActivityPlayerScreen() {
     setAttempts(newAttempts);
 
     if (selectedChoice === currentActivity.answer) {
+      await handleCorrect(newAttempts);
+
+      return;
+    }
+
+    await handleWrong();
+  }
+
+  /*
+   * =======================================================
+   * CHARACTER RACE
+   * =======================================================
+   */
+
+  async function finishCharacterRace(winner: string) {
+    if (
+      currentActivity.type !== "character_race" ||
+      !selectedChoice ||
+      submitted ||
+      isResolving
+    ) {
+      return;
+    }
+
+    setIsResolving(true);
+
+    const newAttempts = attempts + 1;
+
+    setAttempts(newAttempts);
+
+    if (
+      winner === currentActivity.answer &&
+      selectedChoice === currentActivity.answer
+    ) {
       await handleCorrect(newAttempts);
 
       return;
@@ -930,6 +938,20 @@ export default function ActivityPlayerScreen() {
                 onSubmit={submitChoice}
                 needle={compassNeedle}
                 submitted={submitted}
+              />
+            )}
+
+            {/* =================================
+                CHARACTER RACE
+            ================================= */}
+
+            {currentActivity.type === "character_race" && (
+              <CharacterRaceGame
+                activity={currentActivity}
+                selectedChoice={selectedChoice}
+                submitted={submitted}
+                onSelectChoice={setSelectedChoice}
+                onFinish={finishCharacterRace}
               />
             )}
 

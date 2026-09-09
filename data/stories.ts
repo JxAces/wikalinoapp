@@ -50,9 +50,34 @@ export type PlotSequenceActivity = {
   isFinal?: boolean;
 };
 
+export type CharacterRaceActivity = {
+  id: string;
+  type: "character_race";
+
+  title: string;
+  instruction: string;
+  question: string;
+
+  choices: string[];
+  answer: string;
+  racers: {
+    name: string;
+    icon: string;
+    color: string;
+  }[];
+
+  hint: string;
+  explanation: string;
+
+  xp: number;
+
+  isFinal?: boolean;
+};
+
 export type StoryActivity =
   | ChoiceActivity
-  | PlotSequenceActivity;
+  | PlotSequenceActivity
+  | CharacterRaceActivity;
 
 export type StoryPrediction = {
   question: string;
@@ -336,6 +361,55 @@ const storyOne: Story = {
         'Ang "mawari" ay nangangahulugang maunawaan o malaman.',
 
       xp: 20,
+    },
+
+    {
+      id: "lamp-character-race",
+
+      type: "character_race",
+
+      title: "Karera ng mga Tauhan",
+
+      instruction:
+        "Piliin ang tauhang gumawa ng mahalagang kilos sa kwento. Pagkatapos, simulan ang karera upang makita kung tama ang iyong hula.",
+
+      question:
+        "Sino ang gumamit ng lumang lampara upang gabayan ang batang pauwi?",
+
+      choices: ["Lira", "Lolo", "Ang bata", "Ang kapitbahay"],
+
+      answer: "Lira",
+
+      racers: [
+        {
+          name: "Lira",
+          icon: "face-woman",
+          color: "#D95F76",
+        },
+        {
+          name: "Lolo",
+          icon: "face-man",
+          color: "#5475B8",
+        },
+        {
+          name: "Ang bata",
+          icon: "human-child",
+          color: "#E59D32",
+        },
+        {
+          name: "Ang kapitbahay",
+          icon: "account-group",
+          color: "#628E5C",
+        },
+      ],
+
+      hint:
+        "Balikan ang tagpo noong nawalan ng kuryente at may batang hindi makita ang daan pauwi.",
+
+      explanation:
+        "Si Lira ang kumuha at gumamit ng lumang lampara upang gabayan ang bata pabalik sa kaniyang pamilya.",
+
+      xp: 25,
     },
 
     {
