@@ -10,6 +10,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { Colors } from "../../constants/colors";
 import {
   getChallengesByMarkahan,
   getMarkahanByNumber,
@@ -123,8 +124,8 @@ function ChallengeRow({
             style={[
               styles.iconButton,
               {
-                backgroundColor: locked ? "#b4b4b4" : color,
-                borderColor: locked ? "#8a8a8a" : "#7b5528",
+                backgroundColor: locked ? Colors.locked : color,
+                borderColor: locked ? Colors.locked : Colors.primary,
               },
               completed && styles.iconButtonCompleted,
               active && !locked && styles.iconButtonActive,
@@ -188,7 +189,13 @@ export default function ChallengesScreen() {
       const active = !locked && !completed;
 
       const icons = ["⚑", "⚔", "🧩", "📖", "🎯", "✏"];
-      const colors = ["#6db66d", "#78a83a", "#b9862b", "#4e9cc7", "#d88837"];
+      const colors = [
+        Colors.teal,
+        "#78A85A",
+        Colors.accent,
+        "#5C91B8",
+        Colors.secondary,
+      ];
 
       return {
         ...challenge,
@@ -205,6 +212,7 @@ export default function ChallengesScreen() {
     <ImageBackground
       source={require("../../assets/images/pageBackground/ThirdPage.png")}
       style={styles.background}
+      imageStyle={styles.backgroundImage}
       resizeMode="cover"
     >
       <SafeAreaView style={styles.safeArea}>
@@ -271,7 +279,12 @@ export default function ChallengesScreen() {
 
 const styles = StyleSheet.create({
   background: {
+    backgroundColor: Colors.background,
     flex: 1,
+  },
+
+  backgroundImage: {
+    opacity: 0.1,
   },
 
   safeArea: {
@@ -293,24 +306,24 @@ const styles = StyleSheet.create({
     width: 42,
     height: 42,
     borderRadius: 21,
-    backgroundColor: "#7b5528",
+    backgroundColor: Colors.primary,
     alignItems: "center",
     justifyContent: "center",
     elevation: 4,
   },
 
   backText: {
-    color: "#fff6d5",
+    color: Colors.accent,
     fontSize: 24,
     fontWeight: "900",
   },
 
   screenCard: {
     flex: 1,
-    backgroundColor: "rgba(246, 229, 191, 0.96)",
+    backgroundColor: Colors.surface,
     borderRadius: 24,
     borderWidth: 3,
-    borderColor: "#7b5528",
+    borderColor: Colors.primary,
     paddingTop: 18,
     paddingHorizontal: 16,
     overflow: "hidden",
@@ -318,7 +331,7 @@ const styles = StyleSheet.create({
 
   markahanTitle: {
     textAlign: "center",
-    color: "#4d3316",
+    color: Colors.primary,
     fontSize: 24,
     fontWeight: "900",
     marginBottom: 12,
@@ -326,18 +339,18 @@ const styles = StyleSheet.create({
 
   unitBadge: {
     alignSelf: "center",
-    backgroundColor: "#8b5721",
+    backgroundColor: Colors.primary,
     borderRadius: 14,
     paddingHorizontal: 18,
     paddingVertical: 10,
     marginBottom: 16,
     borderWidth: 2,
-    borderColor: "#6d4317",
+    borderColor: Colors.primaryDark,
     elevation: 4,
   },
 
   unitBadgeText: {
-    color: "#fff6d5",
+    color: Colors.accent,
     fontSize: 15,
     fontWeight: "900",
     textAlign: "center",
@@ -362,7 +375,7 @@ const styles = StyleSheet.create({
     bottom: 20,
     width: 8,
     borderRadius: 999,
-    backgroundColor: "#c7b48d",
+    backgroundColor: Colors.border,
   },
 
   lessonBlock: {
@@ -398,22 +411,22 @@ const styles = StyleSheet.create({
   },
 
   iconButtonCompleted: {
-    backgroundColor: "#f2c94c",
+    backgroundColor: Colors.success,
   },
 
   iconText: {
     fontSize: 28,
     fontWeight: "900",
-    color: "#fff",
+    color: Colors.surface,
   },
 
   lessonCard: {
     flex: 1,
     minHeight: 76,
     borderRadius: 22,
-    backgroundColor: "#fff8e8",
+    backgroundColor: Colors.surface,
     borderWidth: 2,
-    borderColor: "#d9c39a",
+    borderColor: Colors.border,
     justifyContent: "center",
     paddingHorizontal: 18,
     paddingVertical: 12,
@@ -421,38 +434,38 @@ const styles = StyleSheet.create({
   },
 
   lessonCardActive: {
-    backgroundColor: "#fffaf0",
-    borderColor: "#cfae71",
+    backgroundColor: Colors.tealSoft,
+    borderColor: Colors.teal,
   },
 
   lessonCardCompleted: {
-    backgroundColor: "#fff4cb",
-    borderColor: "#e0b443",
+    backgroundColor: Colors.tealSoft,
+    borderColor: Colors.success,
   },
 
   lessonCardLocked: {
-    backgroundColor: "#ece7df",
-    borderColor: "#c9c2b7",
+    backgroundColor: Colors.lockedSoft,
+    borderColor: Colors.border,
   },
 
   lessonTitle: {
-    color: "#493114",
+    color: Colors.text,
     fontSize: 20,
     fontWeight: "900",
     marginBottom: 2,
   },
 
   lessonTitleLocked: {
-    color: "#7a7368",
+    color: Colors.locked,
   },
 
   lessonSubtitle: {
-    color: "#6a5437",
+    color: Colors.textMuted,
     fontSize: 14,
     fontWeight: "600",
   },
 
   lessonSubtitleLocked: {
-    color: "#8d8578",
+    color: Colors.locked,
   },
 });

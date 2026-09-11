@@ -41,3 +41,15 @@ app-example
 # generated native folders
 /ios
 /android
+
+# Local source models. The optimized wikalino-* GLBs used by the app are tracked.
+/assets/models/batangPinoy.glb
+/assets/models/indigenous.glb
+/assets/models/muslim.glb
+/assets/models/muslim.obj
+/assets/models/pixellabs-scroll-3468.glb
+/assets/models/pixellabs-treasure-chest-4062.glb
+/assets/models/pixellabs-tropical-hut-4226.glb
+/assets/models/pixellabs-watermill-3425.glb
+/assets/models/tiny_planet_friends_3d-kangaroo-4186.glb
+/assets/models/wikalino-explorer.glb

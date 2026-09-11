@@ -6,7 +6,7 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
 
-    backgroundColor: "#35327C",
+    backgroundColor: Colors.primary,
   },
 
   screen: {

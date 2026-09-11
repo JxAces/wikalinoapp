@@ -47,7 +47,7 @@ export default function TabsLayout() {
           backgroundColor:
             Colors.surface,
 
-          shadowColor: "#302E70",
+          shadowColor: Colors.primaryDark,
 
           shadowOpacity: 0.15,
 
@@ -81,6 +81,10 @@ export default function TabsLayout() {
         options={{
           title: "Aralin",
 
+          tabBarStyle: {
+            display: "none",
+          },
+
           tabBarIcon: ({
             color,
             focused,
@@ -98,7 +102,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="collection"
         options={{
-          title: "Koleksyon",
+          title: "Aklatan",
 
           tabBarIcon: ({
             color,
@@ -107,8 +111,8 @@ export default function TabsLayout() {
             <GameTabIcon
               focused={focused}
               color={color}
-              activeIcon="cards"
-              inactiveIcon="cards-outline"
+              activeIcon="bookshelf"
+              inactiveIcon="book-open-outline"
             />
           ),
         }}

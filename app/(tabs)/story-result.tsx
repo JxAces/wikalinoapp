@@ -36,6 +36,10 @@ import {
   useUserStore,
 } from "../../store/useUserStore";
 
+import {
+  StoryRewardVisual,
+} from "../../components/three/integrations/StoryRewardVisual";
+
 export default function StoryResultScreen() {
   const { storyId } =
     useLocalSearchParams<{
@@ -71,25 +75,24 @@ export default function StoryResultScreen() {
         state.getStoryStars,
     );
 
-  if (!story) {
-    return null;
-  }
-
   const allCompleted =
-    story.activities.every(
+    story?.activities.every(
       (activity) =>
         !!activityResults[
           activity.id
         ],
-    );
+    ) ?? false;
 
   const alreadyCompleted =
-    completedStoryIds.includes(
-      story.id,
-    );
+    story
+      ? completedStoryIds.includes(
+          story.id,
+        )
+      : false;
 
   useEffect(() => {
     if (
+      story &&
       allCompleted &&
       !alreadyCompleted
     ) {
@@ -99,8 +102,12 @@ export default function StoryResultScreen() {
     allCompleted,
     alreadyCompleted,
     completeStory,
-    story.id,
+    story,
   ]);
+
+  if (!story) {
+    return null;
+  }
 
   const stars =
     getStoryStars(story.id);
@@ -135,15 +142,7 @@ export default function StoryResultScreen() {
           styles.container
         }
       >
-        <View
-          style={styles.trophy}
-        >
-          <MaterialCommunityIcons
-            name="trophy"
-            size={54}
-            color={Colors.primary}
-          />
-        </View>
+        <StoryRewardVisual />
 
         <Text
           style={styles.eyebrow}
@@ -337,19 +336,6 @@ const styles =
       paddingTop: 50,
 
       paddingBottom: 30,
-    },
-
-    trophy: {
-      width: 105,
-      height: 105,
-
-      borderRadius: 34,
-
-      alignItems: "center",
-      justifyContent: "center",
-
-      backgroundColor:
-        Colors.accent,
     },
 
     eyebrow: {

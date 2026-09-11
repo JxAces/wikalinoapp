@@ -7,6 +7,7 @@ import {
     View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { Colors } from "../../constants/colors";
 import { getChallengesByMarkahan } from "../../data/markahan";
 import { useUserStore } from "../../store/useUserStore";
 
@@ -24,6 +25,7 @@ export default function ResultScreen() {
     <ImageBackground
       source={require("../../assets/images/pageBackground/ThirdPage.png")}
       style={styles.background}
+      imageStyle={styles.backgroundImage}
       resizeMode="cover"
     >
       <SafeAreaView style={styles.safeArea}>
@@ -56,7 +58,11 @@ export default function ResultScreen() {
 
 const styles = StyleSheet.create({
   background: {
+    backgroundColor: Colors.background,
     flex: 1,
+  },
+  backgroundImage: {
+    opacity: 0.1,
   },
   safeArea: {
     flex: 1,
@@ -67,23 +73,23 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
   },
   card: {
-    backgroundColor: "rgba(255,245,220,0.96)",
+    backgroundColor: Colors.surface,
     borderRadius: 22,
     borderWidth: 2,
-    borderColor: "#ccb07a",
+    borderColor: Colors.border,
     padding: 24,
     alignItems: "center",
   },
   title: {
     fontSize: 30,
     fontWeight: "900",
-    color: "#5a3d1e",
+    color: Colors.primary,
     marginBottom: 12,
   },
   score: {
     fontSize: 18,
     fontWeight: "800",
-    color: "#7a5a2c",
+    color: Colors.textMuted,
     textAlign: "center",
     marginBottom: 20,
   },
@@ -91,21 +97,21 @@ const styles = StyleSheet.create({
     width: "100%",
     minHeight: 52,
     borderRadius: 14,
-    backgroundColor: "#4f9e3f",
+    backgroundColor: Colors.teal,
     alignItems: "center",
     justifyContent: "center",
     marginTop: 10,
   },
   buttonText: {
-    color: "#fff",
+    color: Colors.surface,
     fontWeight: "900",
     fontSize: 16,
   },
   secondaryButton: {
-    backgroundColor: "#e7d2a2",
+    backgroundColor: Colors.accentSoft,
   },
   secondaryButtonText: {
-    color: "#4b3416",
+    color: Colors.primary,
     fontWeight: "900",
     fontSize: 16,
   },

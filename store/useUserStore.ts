@@ -13,6 +13,11 @@ import {
 import {
   getChallengesByMarkahan,
 } from "../data/markahan";
+import {
+  DEFAULT_PLAYER_CHARACTER,
+  isPlayerCharacterId,
+  type PlayerCharacterId,
+} from "../data/player-characters";
 
 const USER_STORE_STORAGE_KEY = "wikalino-user-store";
 
@@ -61,6 +66,7 @@ export type UserProfile = {
   fullName: string;
   pangkat: string;
   avatar?: string;
+  character: PlayerCharacterId;
 };
 
 export type ActivityResult = {
@@ -597,7 +603,7 @@ export const useUserStore =
       {
         name: USER_STORE_STORAGE_KEY,
 
-        version: 2,
+        version: 3,
 
         storage: createJSONStorage(
           () => AsyncStorage,
@@ -630,6 +636,16 @@ export const useUserStore =
                   pangkat:
                     oldProfile.pangkat ??
                     "",
+
+                  avatar:
+                    oldProfile.avatar,
+
+                  character:
+                    isPlayerCharacterId(
+                      oldProfile.character,
+                    )
+                      ? oldProfile.character
+                      : DEFAULT_PLAYER_CHARACTER,
                 }
               : null,
 

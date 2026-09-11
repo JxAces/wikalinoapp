@@ -9,6 +9,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { Colors } from "../../constants/colors";
 import {
   Challenge,
   formatChallengeType,
@@ -224,6 +225,7 @@ export default function ChallengePlayerScreen() {
     <ImageBackground
       source={require("../../assets/images/pageBackground/ThirdPage.png")}
       style={styles.background}
+      imageStyle={styles.backgroundImage}
       resizeMode="cover"
     >
       <SafeAreaView style={styles.safeArea}>
@@ -400,15 +402,19 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#f7ecd6",
+    backgroundColor: Colors.background,
   },
   notFoundText: {
     fontSize: 18,
     fontWeight: "800",
-    color: "#5a3d1e",
+    color: Colors.text,
   },
   background: {
+    backgroundColor: Colors.background,
     flex: 1,
+  },
+  backgroundImage: {
+    opacity: 0.1,
   },
   safeArea: {
     flex: 1,
@@ -429,32 +435,32 @@ const styles = StyleSheet.create({
     width: 42,
     height: 42,
     borderRadius: 21,
-    backgroundColor: "rgba(86, 52, 22, 0.9)",
+    backgroundColor: Colors.primary,
     alignItems: "center",
     justifyContent: "center",
   },
   backText: {
-    color: "#fff6d5",
+    color: Colors.accent,
     fontSize: 24,
     fontWeight: "900",
   },
   progressText: {
     fontSize: 16,
     fontWeight: "900",
-    color: "#5a3d1e",
+    color: Colors.primary,
   },
   card: {
     flex: 1,
-    backgroundColor: "rgba(255,245,220,0.96)",
+    backgroundColor: Colors.surface,
     borderRadius: 22,
     borderWidth: 2,
-    borderColor: "#ccb07a",
+    borderColor: Colors.border,
     padding: 20,
   },
   title: {
     fontSize: 22,
     fontWeight: "900",
-    color: "#5a3d1e",
+    color: Colors.primary,
     textAlign: "center",
     marginBottom: 10,
   },
@@ -468,27 +474,27 @@ const styles = StyleSheet.create({
   typeText: {
     fontSize: 14,
     fontWeight: "800",
-    color: "#7a5a2c",
+    color: Colors.textMuted,
     textTransform: "capitalize",
     flex: 1,
   },
   difficultyText: {
     fontSize: 15,
     fontWeight: "900",
-    color: "#d4a017",
+    color: Colors.accent,
     letterSpacing: 1,
   },
   instruction: {
     fontSize: 15,
     fontWeight: "700",
-    color: "#7a5a2c",
+    color: Colors.textMuted,
     textAlign: "center",
     marginBottom: 14,
   },
   question: {
     fontSize: 18,
     fontWeight: "800",
-    color: "#5a3d1e",
+    color: Colors.text,
     marginBottom: 18,
     textAlign: "center",
   },
@@ -498,33 +504,33 @@ const styles = StyleSheet.create({
   choiceButton: {
     minHeight: 52,
     borderRadius: 14,
-    backgroundColor: "#fff7e4",
+    backgroundColor: Colors.surface,
     borderWidth: 2,
-    borderColor: "#ccb07a",
+    borderColor: Colors.border,
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 14,
     paddingVertical: 12,
   },
   choiceButtonSelected: {
-    backgroundColor: "#d9f2c7",
-    borderColor: "#4f9e3f",
+    backgroundColor: Colors.tealSoft,
+    borderColor: Colors.teal,
   },
   choiceText: {
     fontSize: 16,
     fontWeight: "800",
-    color: "#5a3d1e",
+    color: Colors.text,
     textAlign: "center",
   },
   input: {
     minHeight: 54,
     borderRadius: 14,
     borderWidth: 2,
-    borderColor: "#ccb07a",
-    backgroundColor: "#fff7e4",
+    borderColor: Colors.border,
+    backgroundColor: Colors.surface,
     paddingHorizontal: 14,
     fontSize: 16,
-    color: "#5a3d1e",
+    color: Colors.text,
   },
   booleanWrap: {
     flexDirection: "row",
@@ -534,50 +540,50 @@ const styles = StyleSheet.create({
     flex: 1,
     minHeight: 52,
     borderRadius: 14,
-    backgroundColor: "#fff7e4",
+    backgroundColor: Colors.surface,
     borderWidth: 2,
-    borderColor: "#ccb07a",
+    borderColor: Colors.border,
     alignItems: "center",
     justifyContent: "center",
   },
   arrangedBox: {
-    backgroundColor: "#fff7e4",
+    backgroundColor: Colors.surface,
     borderRadius: 14,
     borderWidth: 2,
-    borderColor: "#ccb07a",
+    borderColor: Colors.border,
     padding: 12,
     marginBottom: 12,
   },
   arrangedLabel: {
     fontSize: 14,
     fontWeight: "800",
-    color: "#7a5a2c",
+    color: Colors.textMuted,
     marginBottom: 6,
   },
   arrangedText: {
     fontSize: 15,
     fontWeight: "700",
-    color: "#5a3d1e",
+    color: Colors.text,
   },
   resetButton: {
     marginTop: 12,
     alignSelf: "center",
-    backgroundColor: "#e7d2a2",
+    backgroundColor: Colors.accentSoft,
     borderRadius: 12,
     borderWidth: 2,
-    borderColor: "#a7844c",
+    borderColor: Colors.accent,
     paddingHorizontal: 18,
     paddingVertical: 10,
   },
   resetButtonText: {
-    color: "#4b3416",
+    color: Colors.primary,
     fontWeight: "900",
   },
   submitButton: {
     marginTop: 20,
     minHeight: 54,
     borderRadius: 14,
-    backgroundColor: "#8b4f1f",
+    backgroundColor: Colors.primary,
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 16,
@@ -586,7 +592,7 @@ const styles = StyleSheet.create({
     opacity: 0.55,
   },
   submitButtonText: {
-    color: "#fff6d5",
+    color: Colors.surface,
     fontSize: 16,
     fontWeight: "900",
   },
@@ -600,15 +606,15 @@ const styles = StyleSheet.create({
     fontWeight: "900",
   },
   correctText: {
-    color: "#2f8f2f",
+    color: Colors.success,
   },
   wrongText: {
-    color: "#c0392b",
+    color: Colors.error,
   },
   nextButton: {
-    backgroundColor: "#4f9e3f",
+    backgroundColor: Colors.success,
   },
   retryButton: {
-    backgroundColor: "#f1bb2b",
+    backgroundColor: Colors.secondary,
   },
 });

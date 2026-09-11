@@ -69,7 +69,8 @@ export function BackgroundMusic() {
     return () => {
       isMounted = false;
       subscription.remove();
-      player.pause();
+      // useAudioPlayer releases the native player automatically. Its cleanup
+      // can run before ours during reload; calling pause here uses a released object.
     };
   }, [player]);
 

@@ -106,6 +106,7 @@ function ActivityPlayerSession({
    */
 
   const completeActivity = useUserStore((state) => state.completeActivity);
+  const completeStory = useUserStore((state) => state.completeStory);
 
   /*
    * =======================================================
@@ -676,6 +677,7 @@ function ActivityPlayerSession({
     const lastActivity = activityIndex >= currentStory.activities.length - 1;
 
     if (lastActivity) {
+      completeStory(currentStory.id);
       router.replace({
         pathname: "/story-result",
 
@@ -722,7 +724,7 @@ function ActivityPlayerSession({
         ===================================== */}
 
         <LinearGradient
-          colors={["#302E70", Colors.primary, "#4A4799"]}
+          colors={["#35664A", Colors.primary, Colors.primaryDark]}
           start={{
             x: 0,
             y: 0,

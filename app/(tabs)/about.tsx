@@ -8,6 +8,8 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { Colors } from "../../constants/colors";
+
 export default function AboutScreen() {
   const router = useRouter();
 
@@ -15,6 +17,7 @@ export default function AboutScreen() {
     <ImageBackground
       source={require("../../assets/images/pageBackground/ThirdPage.png")}
       style={styles.background}
+      imageStyle={styles.backgroundImage}
       resizeMode="cover"
     >
       <SafeAreaView style={styles.safeArea}>
@@ -47,7 +50,11 @@ export default function AboutScreen() {
 
 const styles = StyleSheet.create({
   background: {
+    backgroundColor: Colors.background,
     flex: 1,
+  },
+  backgroundImage: {
+    opacity: 0.1,
   },
   safeArea: {
     flex: 1,
@@ -60,12 +67,12 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: "rgba(86, 52, 22, 0.9)",
+    backgroundColor: Colors.primary,
     alignItems: "center",
     justifyContent: "center",
   },
   backText: {
-    color: "#fff6d5",
+    color: Colors.accent,
     fontSize: 22,
     fontWeight: "900",
   },
@@ -75,30 +82,30 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
   },
   card: {
-    backgroundColor: "rgba(255, 245, 220, 0.95)",
+    backgroundColor: Colors.surface,
     borderRadius: 20,
     padding: 20,
     borderWidth: 2,
-    borderColor: "#c8a96a",
+    borderColor: Colors.border,
   },
   title: {
     fontSize: 22,
     fontWeight: "900",
     textAlign: "center",
     marginBottom: 12,
-    color: "#5a3d1e",
+    color: Colors.primary,
   },
   text: {
     fontSize: 16,
     lineHeight: 22,
     textAlign: "center",
     marginBottom: 10,
-    color: "#5a3d1e",
+    color: Colors.text,
   },
   footer: {
     marginTop: 10,
     textAlign: "center",
     fontSize: 12,
-    color: "#7a5a2c",
+    color: Colors.textMuted,
   },
 });
