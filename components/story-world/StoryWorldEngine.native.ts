@@ -116,6 +116,7 @@ function scrollAppearance(state: StoryPortalState) {
 }
 
 function makeCanvas(gl: ExpoWebGLRenderingContext): HTMLCanvasElement {
+  if (typeof HTMLCanvasElement !== "undefined" && gl.canvas instanceof HTMLCanvasElement) return gl.canvas;
   return {
     addEventListener: () => undefined,
     clientHeight: gl.drawingBufferHeight,
@@ -139,6 +140,7 @@ function makeRendererContext(
   gl: ExpoWebGLRenderingContext,
   canvas: HTMLCanvasElement,
 ): WebGLRenderingContext {
+  if (typeof HTMLCanvasElement !== "undefined" && gl.canvas instanceof HTMLCanvasElement) return gl as unknown as WebGLRenderingContext;
   const boundMethods = new Map<PropertyKey, (...args: unknown[]) => unknown>();
   const nativeContext = gl as unknown as Record<PropertyKey, unknown>;
   const nativeGetParameter = gl.getParameter.bind(gl);
@@ -207,6 +209,8 @@ export class StoryWorldEngine {
   private standingPose: Object3D | null = null;
   private walkingPose: Object3D | null = null;
   private walkPhase = 0;
+  private viewportWidth = 0;
+  private viewportHeight = 0;
 
   constructor(private options: StoryWorldEngineOptions) {
     const { gl } = options;
@@ -527,6 +531,14 @@ export class StoryWorldEngine {
     this.animateStoryScrolls(delta, elapsed);
     this.updateCamera(delta);
     try {
+      const { drawingBufferWidth: width, drawingBufferHeight: height } = this.options.gl;
+      if (width !== this.viewportWidth || height !== this.viewportHeight) {
+        this.viewportWidth = width;
+        this.viewportHeight = height;
+        this.renderer.setSize(width, height, false);
+        this.camera.aspect = width / Math.max(1, height);
+        this.camera.updateProjectionMatrix();
+      }
       this.renderer.render(this.scene, this.camera);
       this.options.gl.endFrameEXP();
       this.animationFrame = requestAnimationFrame(this.renderFrame);

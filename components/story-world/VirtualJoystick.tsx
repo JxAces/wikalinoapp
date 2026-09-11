@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { Platform, StyleSheet, Text, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
   useAnimatedStyle,
@@ -55,8 +55,8 @@ export function VirtualJoystick({
 
   return (
     <View style={styles.wrapper}>
-      <Text style={styles.label}>GALAW</Text>
-      <GestureDetector gesture={gesture}>
+      <Text style={styles.label}>{Platform.OS === "web" ? "GALAW · WASD / ARROWS" : "GALAW"}</Text>
+      <GestureDetector gesture={gesture} touchAction="none">
         <Animated.View style={[styles.base, disabled && styles.disabled]}>
           <View style={styles.crossHorizontal} />
           <View style={styles.crossVertical} />

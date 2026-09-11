@@ -1,1 +1,1 @@
-export { default } from "@/components/screens/LegacyLandingScreen";
+export { default } from "./StoryWorld.native";

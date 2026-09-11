@@ -1,6 +1,6 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import type { ExpoWebGLRenderingContext } from "expo-gl";
-import { GLView } from "expo-gl";
+import { RenderSurface } from "@/components/three/RenderSurface";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useIsFocused } from "expo-router";
 import {
@@ -51,6 +51,7 @@ type PreviewRuntime = {
 };
 
 function makeCanvas(gl: ExpoWebGLRenderingContext): HTMLCanvasElement {
+  if (typeof HTMLCanvasElement !== "undefined" && gl.canvas instanceof HTMLCanvasElement) return gl.canvas;
   return {
     addEventListener: () => undefined,
     clientHeight: gl.drawingBufferHeight,
@@ -68,6 +69,7 @@ function makeRendererContext(
   gl: ExpoWebGLRenderingContext,
   canvas: HTMLCanvasElement,
 ): WebGLRenderingContext {
+  if (typeof HTMLCanvasElement !== "undefined" && gl.canvas instanceof HTMLCanvasElement) return gl as unknown as WebGLRenderingContext;
   const boundMethods = new Map<PropertyKey, (...args: unknown[]) => unknown>();
   const nativeContext = gl as unknown as Record<PropertyKey, unknown>;
   const nativeGetParameter = gl.getParameter.bind(gl);
@@ -303,7 +305,7 @@ export function CharacterModelPreview({ characterId, style, interactive = false 
     accessibilityRole={interactive ? "adjustable" : "image"}
     accessibilityActions={interactive ? [{ name: "increment", label: "Paikutin pakanan" }, { name: "decrement", label: "Paikutin pakaliwa" }] : undefined}
     onAccessibilityAction={event => { rotation.current.target += event.nativeEvent.actionName === "increment" ? Math.PI / 4 : -Math.PI / 4; }}>
-    <GLView onContextCreate={handleContextCreate} style={styles.canvas} />
+    <RenderSurface onContextCreate={handleContextCreate} style={styles.canvas} />
     {!ready && <View style={styles.overlay}>
       {error ? <>
         <MaterialCommunityIcons color={Colors.secondary} name="cube-off-outline" size={34} />

@@ -1,11 +1,12 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import type { ExpoWebGLRenderingContext } from "expo-gl";
-import { GLView } from "expo-gl";
+import { RenderSurface } from "@/components/three/RenderSurface";
 import * as Haptics from "expo-haptics";
-import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
+import { router, useFocusEffect, useIsFocused, useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  AppState,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -34,6 +35,7 @@ import type {
   StoryWorldStatus,
 } from "./story-world.types";
 import { VirtualJoystick } from "./VirtualJoystick";
+import { useWorldKeyboard } from "@/hooks/useWorldKeyboard";
 
 const EMPTY_STATUS: StoryWorldStatus = {
   animation: "Idle",
@@ -41,6 +43,7 @@ const EMPTY_STATUS: StoryWorldStatus = {
 };
 
 export default function StoryWorld() {
+  const focused = useIsFocused();
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ markahan?: string }>();
   const profile = useUserStore((state) => state.profile);
@@ -156,19 +159,28 @@ export default function StoryWorld() {
           onStatusChange: handleStatusChange,
           portals,
         });
+        if (!focused) engineRef.current.stop();
       } catch (cause) {
         const worldError = cause instanceof Error ? cause : new Error(String(cause));
         console.warn("Hindi masimulan ang 3D story world.", worldError);
         setError(worldError.message);
       }
     },
-    [characterId, handleStatusChange, portals],
+    [characterId, focused, handleStatusChange, portals],
   );
 
   const handleMove = useCallback((x: number, y: number) => {
     inputRef.current = { ...inputRef.current, x, y };
     engineRef.current?.setInput(inputRef.current);
   }, []);
+  useWorldKeyboard(focused && ready && !enteringStoryId, handleMove);
+  useEffect(() => {
+    const subscription = AppState.addEventListener("change", state => {
+      if (state === "active" && focused) engineRef.current?.start();
+      else { engineRef.current?.setInput({ x: 0, y: 0 }); engineRef.current?.stop(); }
+    });
+    return () => subscription.remove();
+  }, [focused]);
 
   const enterStory = useCallback(
     (storyId: string) => {
@@ -227,7 +239,8 @@ export default function StoryWorld() {
   return (
     <View style={styles.root}>
       <StatusBar style="light" />
-      <GLView
+      <RenderSurface
+        key={characterId}
         msaaSamples={0}
         onContextCreate={handleContextCreate}
         style={StyleSheet.absoluteFill}

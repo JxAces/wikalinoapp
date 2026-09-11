@@ -2,7 +2,8 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useIsFocused } from "expo-router";
 import { type ComponentProps, useState } from "react";
-import { Alert, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Alert } from "../../utils/app-alert";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { CharacterLineup } from "../../components/character-select/CharacterLineup";
@@ -96,7 +97,7 @@ export default function ProgressScreen() {
             <View pointerEvents="none" style={styles.characterTag}><Text style={styles.characterTagText}>{characterTitle}</Text></View>
           </View>
           <View style={styles.characterActions}>
-            <Text style={styles.rotateHint}>{Platform.OS === "web" ? "Iyong tauhan sa mapa" : "I-drag upang paikutin"}</Text>
+            <Text style={styles.rotateHint}>I-drag upang paikutin</Text>
             <Pressable accessibilityRole="button" accessibilityLabel="Palitan ang tauhan" onPress={openLineup} style={({ pressed }) => [styles.changeButton, pressed && styles.pressed]}>
               <MaterialCommunityIcons name="account-switch-outline" color={Colors.secondary} size={18} />
               <Text style={styles.changeText}>Palitan ang tauhan</Text>

@@ -1,5 +1,5 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { Colors } from "@/constants/colors";
@@ -54,10 +54,10 @@ export function CharacterLineup({ characterId, onCharacterChange, onBack, onConf
           <View style={[styles.dot, i === index && styles.activeDot]} />
         </Pressable>)}
       </View>
-      {Platform.OS !== "web" && <View style={styles.hint}>
+      <View style={styles.hint}>
         <MaterialCommunityIcons name="rotate-360" color={Colors.secondary} size={19} />
         <Text style={styles.hintText}>I-drag ang tauhan upang paikutin</Text>
-      </View>}
+      </View>
       <Pressable accessibilityRole="button" accessibilityLabel={confirmLabel} onPress={onConfirm} style={({ pressed }) => [styles.confirm, pressed && styles.pressed]}>
         <Text style={styles.confirmText}>{confirmLabel}</Text>
         <MaterialCommunityIcons name="arrow-right" size={22} color={Colors.primaryDark} />

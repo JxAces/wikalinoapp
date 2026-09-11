@@ -1,5 +1,4 @@
-import { Asset } from "expo-asset";
-import { File } from "expo-file-system";
+import { loadBundledGlb } from "./load-bundled-glb";
 import {
   Box3,
   Group,
@@ -8,7 +7,6 @@ import {
   Object3D,
   Vector3,
 } from "three";
-import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 
 import type { PlayerCharacterId } from "@/data/player-characters";
 
@@ -36,37 +34,6 @@ const storyScrollAsset = require("../../assets/models/wikalino-story-scroll.glb"
 const treasureChestAsset = require("../../assets/models/wikalino-treasure-chest.glb");
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const tropicalHutAsset = require("../../assets/models/wikalino-tropical-hut.glb");
-
-function ensureReactNativeUserAgent() {
-  const runtimeNavigator = globalThis.navigator as Navigator & {
-    userAgent?: string;
-  };
-
-  if (typeof runtimeNavigator.userAgent === "string") {
-    return;
-  }
-
-  // React Native defines `navigator`, but it may omit userAgent. GLTFLoader
-  // assumes the field exists even when a GLB has no textures.
-  Object.defineProperty(runtimeNavigator, "userAgent", {
-    configurable: true,
-    value: "React Native",
-  });
-}
-
-async function loadBundledGlb(assetModule: number) {
-  const asset = Asset.fromModule(assetModule);
-  await asset.downloadAsync();
-
-  const uri = asset.localUri ?? asset.uri;
-  if (!uri) {
-    throw new Error("Hindi mahanap ang bundled 3D model.");
-  }
-
-  const data = await new File(uri).arrayBuffer();
-  ensureReactNativeUserAgent();
-  return new GLTFLoader().parseAsync(data, "");
-}
 
 type CharacterPalette = {
   pants: number;
