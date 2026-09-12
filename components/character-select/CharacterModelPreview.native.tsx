@@ -7,6 +7,7 @@ import {
   ActivityIndicator,
   AppState,
   PanResponder,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -28,12 +29,14 @@ import {
   MeshStandardMaterial,
   PerspectiveCamera,
   Scene,
+  SkinnedMesh,
   SRGBColorSpace,
   WebGLRenderer,
 } from "three";
 
 import { Colors } from "@/constants/colors";
 import { loadExplorerModel } from "@/components/story-world/load-explorer.native";
+import { prepareCompatibleSkinning, type CompatibleSkinning } from "@/components/story-world/compatible-skinning";
 
 import type { CharacterModelPreviewProps } from "./CharacterModelPreview";
 
@@ -46,6 +49,8 @@ type PreviewRuntime = {
   scene: Scene;
   camera: PerspectiveCamera;
   display: Group | null;
+  skinning: CompatibleSkinning;
+  needsRender: boolean;
   width: number;
   height: number;
 };
@@ -99,14 +104,11 @@ function makeRendererContext(
         };
       }
 
-      const value = nativeContext[property];
-      if (typeof value !== "function") {
-        return value;
-      }
+      // Avoid crossing into Expo's native HostObject again for every draw.
       const cached = boundMethods.get(property);
-      if (cached) {
-        return cached;
-      }
+      if (cached) return cached;
+      const value = nativeContext[property];
+      if (typeof value !== "function") return value;
       const bound = value.bind(gl) as (...args: unknown[]) => unknown;
       boundMethods.set(property, bound);
       return bound;
@@ -117,6 +119,7 @@ function makeRendererContext(
 }
 
 function disposeObject(root: Object3D) {
+  root.traverse(object => { if (object instanceof SkinnedMesh) object.skeleton.dispose(); });
   // Several poses can share geometry/materials; release each GPU resource once.
   const geometries = new Set<Mesh["geometry"]>();
   const materials = new Set<MeshStandardMaterial>();
@@ -138,6 +141,7 @@ function disposeRuntime(runtime: PreviewRuntime | null) {
   if (!runtime || runtime.disposed) return;
   runtime.disposed = true;
   if (runtime.animationFrame !== null) cancelAnimationFrame(runtime.animationFrame);
+  runtime.skinning?.dispose();
   disposeObject(runtime.scene);
   runtime.renderer.dispose();
 }
@@ -154,6 +158,7 @@ function fitCamera(runtime: PreviewRuntime) {
   runtime.camera.position.set(0, center.y + 0.05, distance);
   runtime.camera.lookAt(0, center.y, 0);
   runtime.camera.updateProjectionMatrix();
+  runtime.needsRender = true;
 }
 
 export function CharacterModelPreview({ characterId, style, interactive = false }: CharacterModelPreviewProps) {
@@ -165,7 +170,10 @@ export function CharacterModelPreview({ characterId, style, interactive = false 
   const appActive = useRef(AppState.currentState === "active");
   const focused = useIsFocused();
   const focusedRef = useRef(focused);
-  useEffect(() => { focusedRef.current = focused; }, [focused]);
+  useEffect(() => {
+    focusedRef.current = focused;
+    if (focused && runtimeRef.current) runtimeRef.current.needsRender = true;
+  }, [focused]);
   const [contextVersion, setContextVersion] = useState(0);
   const [retry, setRetry] = useState(0);
   const [error, setError] = useState(false);
@@ -174,7 +182,10 @@ export function CharacterModelPreview({ characterId, style, interactive = false 
 
   useEffect(() => {
     mounted.current = true;
-    const subscription = AppState.addEventListener("change", state => { appActive.current = state === "active"; });
+    const subscription = AppState.addEventListener("change", state => {
+      appActive.current = state === "active";
+      if (appActive.current && runtimeRef.current) runtimeRef.current.needsRender = true;
+    });
     return () => {
       mounted.current = false;
       subscription.remove();
@@ -205,9 +216,12 @@ export function CharacterModelPreview({ characterId, style, interactive = false 
     setReady(false);
     setError(false);
     if (runtime.display) {
+      runtime.skinning?.dispose();
+      runtime.skinning = null;
       runtime.scene.remove(runtime.display);
       disposeObject(runtime.display);
       runtime.display = null;
+      runtime.needsRender = true;
     }
     rotation.current = { target: 0, current: 0, start: 0 };
     // Serialize asset decoding. Rapid next/back skips obsolete selections.
@@ -223,6 +237,7 @@ export function CharacterModelPreview({ characterId, style, interactive = false 
         display.add(model.scene);
         runtime.scene.add(display);
         runtime.display = display;
+        runtime.skinning = prepareCompatibleSkinning(model.scene, runtime.renderer.capabilities.isWebGL2, Platform.OS === "web" ? runtime.renderer.capabilities.maxVertexUniforms : 0);
         fitCamera(runtime);
         setReady(true);
       } catch (cause) {
@@ -260,7 +275,7 @@ export function CharacterModelPreview({ characterId, style, interactive = false 
       ground.position.y = -0.025;
       scene.add(ground);
       const runtime: PreviewRuntime = { animationFrame: null, disposed: false, renderer, scene, camera,
-        display: null, width: gl.drawingBufferWidth, height: gl.drawingBufferHeight };
+        display: null, skinning: null, needsRender: true, width: gl.drawingBufferWidth, height: gl.drawingBufferHeight };
       runtimeRef.current = runtime;
       let lastTime = 0;
       const render = (time: number) => {
@@ -277,11 +292,18 @@ export function CharacterModelPreview({ characterId, style, interactive = false 
               fitCamera(runtime);
             }
             if (runtime.display) {
-              rotation.current.current += (rotation.current.target - rotation.current.current) * (1 - Math.exp(-delta * 18));
+              const remaining = rotation.current.target - rotation.current.current;
+              if (Math.abs(remaining) > 0.0001) {
+                runtime.needsRender = true;
+                rotation.current.current += remaining * (1 - Math.exp(-delta * 18));
+              }
               runtime.display.rotation.y = rotation.current.current;
             }
-            renderer.render(scene, camera);
-            gl.endFrameEXP();
+            if (runtime.needsRender) {
+              renderer.render(scene, camera);
+              gl.endFrameEXP();
+              runtime.needsRender = false;
+            }
           } catch (cause) {
             console.warn("Hindi ma-render ang character preview.", cause);
             disposeRuntime(runtime);
@@ -305,7 +327,7 @@ export function CharacterModelPreview({ characterId, style, interactive = false 
     accessibilityRole={interactive ? "adjustable" : "image"}
     accessibilityActions={interactive ? [{ name: "increment", label: "Paikutin pakanan" }, { name: "decrement", label: "Paikutin pakaliwa" }] : undefined}
     onAccessibilityAction={event => { rotation.current.target += event.nativeEvent.actionName === "increment" ? Math.PI / 4 : -Math.PI / 4; }}>
-    <RenderSurface onContextCreate={handleContextCreate} style={styles.canvas} />
+    <RenderSurface msaaSamples={0} onContextCreate={handleContextCreate} style={styles.canvas} />
     {!ready && <View style={styles.overlay}>
       {error ? <>
         <MaterialCommunityIcons color={Colors.secondary} name="cube-off-outline" size={34} />

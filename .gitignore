@@ -44,6 +44,7 @@ app-example
 
 # Local source models. The optimized wikalino-* GLBs used by the app are tracked.
 /assets/models/batangPinoy.glb
+/assets/models/.source-models/
 /assets/models/indigenous.glb
 /assets/models/muslim.glb
 /assets/models/muslim.obj

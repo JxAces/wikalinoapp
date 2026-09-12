@@ -3,7 +3,11 @@ import fs from "node:fs";
 import path from "node:path";
 
 const projectRoot = path.resolve(import.meta.dirname, "..");
-const inputPath = path.join(projectRoot, "assets/models/batangPinoy.glb");
+const requestedPath = path.join(projectRoot, "assets/models/batangPinoy.glb");
+// Keep the original scan locally so repeated color edits never accumulate
+// color buffers/rigs or lose the geometry supplied by the user.
+const sourcePath = path.join(projectRoot, "assets/models/.source-models/batangPinoy.glb");
+const inputPath = fs.existsSync(sourcePath) ? sourcePath : requestedPath;
 const debugComponents = process.argv.includes("--debug-components");
 const outputPath = path.join(
   projectRoot,
@@ -17,13 +21,14 @@ const JSON_CHUNK = 0x4e4f534a;
 const BIN_CHUNK = 0x004e4942;
 
 const palette = {
-  hat: "#B58B58",
-  hatLight: "#D8BE88",
-  red: "#C52E32",
-  redDark: "#8F2026",
-  shirt: "#F4F1E8",
-  shirtShadow: "#D8D9D2",
-  skin: "#A96E52",
+  hat: "#C8BDB2",
+  hatLight: "#DED5CC",
+  red: "#C51B29",
+  redDark: "#A71B27",
+  shirt: "#F5F7FC",
+  shirtShadow: "#E8EDF5",
+  skin: "#AF7C65",
+  hair: "#28221F",
 };
 
 function parseHex(hex) {
@@ -66,7 +71,6 @@ const linearPalette = Object.fromEntries(
   ]),
 );
 
-const HAT_COMPONENTS = new Set([1, 3]);
 const TROUSER_COMPONENTS = new Set([2, 4, 6, 8, 10, 13, 14]);
 const SCARF_COMPONENTS = new Set([12, 22, 29, 30, 31, 33, 34]);
 const SKIN_COMPONENTS = new Set([
@@ -74,14 +78,35 @@ const SKIN_COMPONENTS = new Set([
 ]);
 
 function colorRegion(component, x, y, z) {
-  if (HAT_COMPONENTS.has(component)) {
-    if (y < 1.69 && z > -0.02 && Math.abs(x) < 0.26) {
-      return "skin";
-    }
-    return component === 3 ? "hatLight" : "hat";
+  const ax = Math.abs(x);
+  if (y > 1.667 && y < 1.717 && Math.hypot(x, z) < 0.145 && z > -0.10) {
+    return "hair";
+  }
+  // The hat islands include parts of the forehead. Use the actual brim/head
+  // boundary rather than assigning a whole connected fragment one color.
+  if (y > 1.683 || (y > 1.585 && ax > 0.151) || (y > 1.61 && z < -0.112)) {
+    return y > 1.72 ? "hatLight" : "hat";
+  }
+  if (SCARF_COMPONENTS.has(component)) {
+    if (y > 1.434 && z > 0.075 && ax < 0.022 + (y - 1.434) * 0.35) return "shirt";
+    return component === 12 ? "redDark" : "red";
+  }
+  if (component === 0 && y > 1.38 && y < 1.585 && ax > 0.112) return "red";
+  if (y > 1.472) {
+    return (y > 1.615 && z < 0.075) || (z < -0.035 && y > 1.54) ? "hair" : "skin";
+  }
+  // Repair the isolated shin patch and retain only the exposed bare toes.
+  if (component === 9) return y < 0.056 && z > 0.025 ? "skin" : "red";
+  if (component === 18 || component === 21 || component === 24) return "skin";
+  if (component === 15 && ax < 0.19) return "red";
+  if (y < 0.07 && z > 0.045) return "skin";
+  // Small white collar inside the red neckerchief; the neck remains skin.
+  if (y > 1.415 && ax < 0.052) {
+    if (z < 0.02) return "skin";
+    return ax < 0.023 + Math.max(0, y - 1.42) * 0.42 ? "shirt" : "red";
   }
   if (TROUSER_COMPONENTS.has(component)) {
-    return y < 0.08 && z > 0.02 ? "redDark" : "red";
+    return "red";
   }
   if (SCARF_COMPONENTS.has(component)) {
     return component === 12 ? "redDark" : "red";
@@ -96,13 +121,13 @@ function colorRegion(component, x, y, z) {
     return y >= 1.2 ? "shirt" : "skin";
   }
   if (component === 0) {
-    if (y >= 1.38) {
+    if (y >= 1.38 || (z < -0.03 && y > 1.295 + ax * 0.23)) {
       return "red";
     }
-    if (Math.abs(x) >= 0.18 && y < 1.2) {
+    if (ax >= 0.204 && y < 1.2) {
       return "skin";
     }
-    return y < 0.95 ? "skin" : "shirt";
+    return y < 0.815 ? "red" : "shirt";
   }
   return "shirt";
 }
@@ -229,6 +254,22 @@ function buildComponentRanks(vertexCount) {
 
 const componentRanks = buildComponentRanks(positionAccessor.count);
 
+if (process.argv.includes("--inspect")) {
+  const parts = new Map();
+  componentRanks.forEach((rank, i) => {
+    const entry = parts.get(rank) ?? { rank, count: 0, min: [Infinity, Infinity, Infinity], max: [-Infinity, -Infinity, -Infinity] };
+    entry.count++;
+    for (let axis = 0; axis < 3; axis++) {
+      const value = binary.readFloatLE(positionStart + i * positionStride + axis * 4);
+      entry.min[axis] = Math.min(entry.min[axis], value);
+      entry.max[axis] = Math.max(entry.max[axis], value);
+    }
+    parts.set(rank, entry);
+  });
+  console.log([...parts.values()].sort((a, b) => a.rank - b.rank).map(part => ({ ...part, min: part.min.map(v => +v.toFixed(3)), max: part.max.map(v => +v.toFixed(3)) })));
+  process.exit(0);
+}
+
 for (let index = 0; index < positionAccessor.count; index += 1) {
   const offset = positionStart + index * positionStride;
   const x = binary.readFloatLE(offset);
@@ -241,7 +282,14 @@ for (let index = 0; index < positionAccessor.count; index += 1) {
     0.78,
     component % 2 === 0 ? 0.48 : 0.62,
   ).map(srgbToLinearByte);
-  const color = debugComponents ? debugColor : linearPalette[region];
+  let color = debugComponents ? debugColor : linearPalette[region];
+  if (!debugComponents && (region === "hat" || region === "hatLight")) {
+    // Subtle woven bands follow the hat crown and brim, in vertex colors so
+    // the asset stays self-contained on native Expo GL and offline PWA.
+    const radius = Math.hypot(x, z);
+    const grain = 1 + Math.sin((y > 1.72 ? y : radius) * 420) * 0.025 + Math.sin(Math.atan2(z, x) * 46) * 0.012;
+    color = color.map(value => Math.min(255, Math.round(value * grain)));
+  }
   colors[index * 4] = color[0];
   colors[index * 4 + 1] = color[1];
   colors[index * 4 + 2] = color[2];
@@ -278,7 +326,7 @@ document.materials[primitive.material] = {
   name: "Batang Pinoy attire colors",
   pbrMetallicRoughness: {
     baseColorFactor: [1, 1, 1, 1],
-    metallicFactor: 0.02,
+    metallicFactor: 0,
     roughnessFactor: 0.82,
   },
 };
@@ -289,7 +337,12 @@ document.extras = {
   palette,
 };
 
+if (!debugComponents && !fs.existsSync(sourcePath)) {
+  fs.mkdirSync(path.dirname(sourcePath), { recursive: true });
+  fs.copyFileSync(requestedPath, sourcePath, fs.constants.COPYFILE_EXCL);
+}
 writeGlb(outputPath, document, extendedBinary);
+if (!debugComponents) fs.copyFileSync(outputPath, requestedPath);
 console.log(`Wrote ${path.relative(projectRoot, outputPath)}`);
 console.log(`Size: ${(fs.statSync(outputPath).size / 1024).toFixed(1)} KB`);
 console.log(Object.fromEntries([...counts.entries()].sort()));

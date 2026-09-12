@@ -1,6 +1,7 @@
 import type { ExpoWebGLRenderingContext } from "expo-gl";
 import { useEffect, useRef, useState } from "react";
 import { StyleSheet, Text, View, type StyleProp, type ViewStyle } from "react-native";
+import { renderBudget } from "./render-budget";
 
 type Props = {
   style?: StyleProp<ViewStyle>;
@@ -20,7 +21,7 @@ export function RenderSurface({ style, onContextCreate }: Props) {
     if (!canvas) return;
     const resize = () => {
       const rect = canvas.getBoundingClientRect();
-      const ratio = Math.min(window.devicePixelRatio || 1, 1.5);
+      const ratio = renderBudget(rect.width, rect.height, window.devicePixelRatio || 1).pixelRatio;
       const width = Math.max(1, Math.round(rect.width * ratio));
       const height = Math.max(1, Math.round(rect.height * ratio));
       if (canvas.width !== width) canvas.width = width;

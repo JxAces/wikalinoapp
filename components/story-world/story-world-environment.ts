@@ -4,6 +4,7 @@ import {
   Mesh, MeshBasicMaterial, MeshLambertMaterial, Object3D, PlaneGeometry,
   RepeatWrapping, RGBAFormat, SphereGeometry, SRGBColorSpace,
 } from "three";
+import { mergeColoredScenery } from "./merge-colored-scenery";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 
 /** The hut stays behind every scroll and outside the walkable rectangle.
@@ -117,11 +118,13 @@ class SceneryBatch {
   }
 }
 
-export function createMeadowEnvironment() {
+export function createMeadowEnvironment(lowDetail = false) {
   const group = new Group();
   group.name = "Storybook meadow";
   const texture = meadowTexture();
-  const terrain = new PlaneGeometry(60, 80, 100, 136);
+  // The playable surface is flat and the outer hills vary slowly. A one-unit
+  // grid preserves their silhouette without submitting 27,200 terrain faces.
+  const terrain = new PlaneGeometry(60, 80, lowDetail ? 30 : 60, lowDetail ? 40 : 80);
   terrain.rotateX(-Math.PI / 2);
   terrain.translate(0, 0, -7);
   const positions = terrain.getAttribute("position");
@@ -154,11 +157,11 @@ export function createMeadowEnvironment() {
   const grassTips = new SceneryBatch(0x98b951);
   const rocks = new SceneryBatch(0x929879);
   const flowers = new SceneryBatch(0xf0c765);
-  const sphere = new SphereGeometry(1, 16, 10);
-  const trunk = new CylinderGeometry(0.34, 0.58, 2.1, 12, 3);
+  const sphere = new SphereGeometry(1, lowDetail ? 10 : 16, lowDetail ? 7 : 10);
+  const trunk = new CylinderGeometry(0.34, 0.58, 2.1, lowDetail ? 8 : 12, lowDetail ? 1 : 3);
   const root = new CylinderGeometry(0.06, 0.17, 0.8, 7);
-  const stem = new CylinderGeometry(0.14, 0.25, 0.9, 12, 3);
-  const cap = new SphereGeometry(1, 24, 12, 0, Math.PI * 2, 0, Math.PI / 2);
+  const stem = new CylinderGeometry(0.14, 0.25, 0.9, lowDetail ? 8 : 12, lowDetail ? 1 : 3);
+  const cap = new SphereGeometry(1, lowDetail ? 16 : 24, lowDetail ? 8 : 12, 0, Math.PI * 2, 0, Math.PI / 2);
   const underside = new CylinderGeometry(1, 0.91, 0.10, 24);
   const leaf = new BufferGeometry();
   leaf.setAttribute("position", new Float32BufferAttribute([
@@ -217,7 +220,7 @@ export function createMeadowEnvironment() {
   });
 
   const random = randomSource(958);
-  for (let i = 0; i < 220; i++) {
+  for (let i = 0; i < (lowDetail ? 130 : 220); i++) {
     const x = (i % 2 ? -1 : 1) * (6.2 + random() * 9);
     const z = 14 - random() * 44;
     // Leave a small lawn around the hut's foundation.
@@ -277,5 +280,6 @@ export function createMeadowEnvironment() {
   if (shadowGeometry) group.add(new Mesh(shadowGeometry, new MeshBasicMaterial({
     vertexColors: true, transparent: true, depthWrite: false,
   })));
+  if (lowDetail) mergeColoredScenery(group);
   return group;
 }

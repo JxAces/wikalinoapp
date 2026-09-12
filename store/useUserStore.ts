@@ -1,3 +1,4 @@
+import { canAnswerQuestion, isStoryAnswered } from "../components/story-world/quest-progression";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { create } from "zustand";
 import {
@@ -300,6 +301,9 @@ export const useUserStore =
           xpReward,
         }) =>
           set((state) => {
+            const story = getStoryById(storyId);
+            const index = story?.activities.findIndex(activity => activity.id === activityId) ?? -1;
+            if (!story || !state.readingCompletedStoryIds.includes(storyId) || !canAnswerQuestion(story, index, state.activityResults)) return state;
             /*
              * Prevent XP farming by repeatedly
              * completing the same activity.
@@ -354,7 +358,7 @@ export const useUserStore =
             const story =
               getStoryById(storyId);
 
-            if (!story) {
+            if (!story || !isStoryAnswered(story, state.activityResults)) {
               return state;
             }
 

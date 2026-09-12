@@ -8,6 +8,9 @@ export type StoryWorldPosition = {
 export type StoryPortalState = "completed" | "current" | "locked";
 
 export type StoryWorldPortal = {
+  id?: string;
+  activityIndex?: number;
+  questionGroup?: { index: number; start: number; end: number; answeredCount: number };
   position: StoryWorldPosition;
   state: StoryPortalState;
   story: Story;

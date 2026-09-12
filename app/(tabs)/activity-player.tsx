@@ -1,10 +1,11 @@
+import { canAnswerQuestion, questionGroup, QUESTIONS_PER_SCROLL } from "@/components/story-world/quest-progression";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 
 import { LinearGradient } from "expo-linear-gradient";
 
 import * as Haptics from "expo-haptics";
 
-import { router, useLocalSearchParams } from "expo-router";
+import { Redirect, router, useIsFocused, useLocalSearchParams } from "expo-router";
 
 import { useEffect, useState } from "react";
 
@@ -65,19 +66,28 @@ function isChoiceActivity(activity: StoryActivity): activity is ChoiceActivity {
  * =========================================================
  */
 
+
 export default function ActivityPlayerScreen() {
   const params = useLocalSearchParams<{
     storyId?: string;
     activityIndex?: string;
   }>();
 
+  const focused = useIsFocused();
   const storyId = typeof params.storyId === "string" ? params.storyId : "";
 
   const parsedActivityIndex = Number(params.activityIndex ?? 0);
 
-  const activityIndex = Number.isFinite(parsedActivityIndex)
+  const activityIndex = Number.isInteger(parsedActivityIndex)
     ? Math.max(0, parsedActivityIndex)
     : 0;
+
+  const story = getStoryById(storyId);
+  const answers = useUserStore(state => state.activityResults);
+  const reading = useUserStore(state => state.readingCompletedStoryIds);
+  if (!focused) return null;
+  if (story && !reading.includes(story.id)) return <Redirect href={{ pathname: "/story", params: { storyId } }} />;
+  if (story && !canAnswerQuestion(story, activityIndex, answers)) return <Redirect href={{ pathname: "/quest-world", params: { storyId } }} />;
 
   return (
     <ActivityPlayerSession
@@ -674,30 +684,14 @@ function ActivityPlayerSession({
    */
 
   function continueMission() {
-    const lastActivity = activityIndex >= currentStory.activities.length - 1;
-
-    if (lastActivity) {
-      completeStory(currentStory.id);
-      router.replace({
-        pathname: "/story-result",
-
-        params: {
-          storyId: currentStory.id,
-        },
-      });
-
-      return;
+    if (!correct) return;
+    const answers = useUserStore.getState().activityResults;
+    if (currentStory.activities.every(item => answers[item.id])) completeStory(currentStory.id);
+    if (activityIndex + 1 < group.end) {
+      router.replace({ pathname: "/activity-player", params: { storyId: currentStory.id, activityIndex: String(activityIndex + 1) } });
+    } else {
+      router.replace({ pathname: "/quest-world", params: { storyId: currentStory.id, node: group.id } });
     }
-
-    router.replace({
-      pathname: "/activity-player",
-
-      params: {
-        storyId: currentStory.id,
-
-        activityIndex: String(activityIndex + 1),
-      },
-    });
   }
 
   /*
@@ -706,9 +700,8 @@ function ActivityPlayerSession({
    * =======================================================
    */
 
-  const missionProgress = Math.round(
-    ((activityIndex + 1) / currentStory.activities.length) * 100,
-  );
+  const group = questionGroup(currentStory, activityIndex);
+  const missionProgress = Math.round(((activityIndex - group.start + 1) / (group.end - group.start)) * 100);
 
   /*
    * =======================================================
@@ -739,7 +732,7 @@ function ActivityPlayerSession({
 
           <View style={styles.headerTop}>
             <Pressable
-              onPress={() => router.back()}
+              onPress={() => router.replace({ pathname: "/quest-world", params: { storyId, node: group.id } })}
               style={({ pressed }) => [
                 styles.backButton,
 
@@ -755,7 +748,7 @@ function ActivityPlayerSession({
 
             <View style={styles.headerStory}>
               <Text numberOfLines={1} style={styles.headerEyebrow}>
-                MISYON NG KWENTO
+                BALUMBON {Math.floor(group.start / QUESTIONS_PER_SCROLL) + 1} · MGA TANONG
               </Text>
 
               <Text numberOfLines={1} style={styles.headerTitle}>
@@ -765,11 +758,11 @@ function ActivityPlayerSession({
 
             <View style={styles.activityCounter}>
               <Text style={styles.activityCounterText}>
-                {activityIndex + 1}
+                {activityIndex - group.start + 1}
               </Text>
 
               <Text style={styles.activityCounterTotal}>
-                /{currentStory.activities.length}
+                /{group.end - group.start}
               </Text>
             </View>
           </View>
@@ -1042,9 +1035,7 @@ function ActivityPlayerSession({
                     ]}
                   >
                     <Text style={styles.continueButtonText}>
-                      {activityIndex >= currentStory.activities.length - 1
-                        ? "TINGNAN ANG RESULTA"
-                        : "SUNOD NA HAMON"}
+                      {activityIndex + 1 < group.end ? "SUSUNOD NA TANONG" : "TAPOS ANG BALUMBON · SA LANDAS"}
                     </Text>
 
                     <MaterialCommunityIcons

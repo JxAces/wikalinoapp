@@ -22,7 +22,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { getStoryUnitByNumber, storyUnits } from "@/data/stories";
+import { getStoryById, getStoryUnitByNumber, storyUnits } from "@/data/stories";
 import { DEFAULT_PLAYER_CHARACTER } from "@/data/player-characters";
 import { useUserStore } from "@/store/useUserStore";
 import { getLevelInfo } from "@/utils/progression";
@@ -37,18 +37,21 @@ import type {
 import { VirtualJoystick } from "./VirtualJoystick";
 import { useWorldKeyboard } from "@/hooks/useWorldKeyboard";
 
+import { isStoryAnswered, questionScrolls, scrollTitle, storySetting, worldNodeId } from "./quest-progression";
+
 const EMPTY_STATUS: StoryWorldStatus = {
   animation: "Idle",
   nearestStoryId: null,
 };
 
-export default function StoryWorld() {
+export default function StoryWorld({ questStoryId }: { questStoryId?: string } = {}) {
   const focused = useIsFocused();
   const insets = useSafeAreaInsets();
-  const params = useLocalSearchParams<{ markahan?: string }>();
+  const params = useLocalSearchParams<{ markahan?: string; node?: string }>();
+  const questStory = questStoryId ? getStoryById(questStoryId) : undefined;
+  const setting = storySetting(questStoryId);
   const profile = useUserStore((state) => state.profile);
   const xp = useUserStore((state) => state.xp);
-  const completedStoryIds = useUserStore((state) => state.completedStoryIds);
   const activityResults = useUserStore((state) => state.activityResults);
   const requestedMarkahan = Number(params.markahan);
   const currentMarkahan =
@@ -64,57 +67,42 @@ export default function StoryWorld() {
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<StoryWorldStatus>(EMPTY_STATUS);
   const [enteringStoryId, setEnteringStoryId] = useState<string | null>(null);
-  const arrival = useSharedValue(0);
   const portalTransition = useSharedValue(0);
 
   const portals = useMemo<StoryWorldPortal[]>(
-    () =>
-      stories.map((story, index) => {
-        const completed =
-          completedStoryIds.includes(story.id) ||
-          (story.activities.length > 0 &&
-            story.activities.every((activity) => activityResults[activity.id]));
-        const previousStory = stories[index - 1];
-        const previousCompleted =
-          index === 0 ||
-          (previousStory !== undefined &&
-            (completedStoryIds.includes(previousStory.id) ||
-              (previousStory.activities.length > 0 &&
-                previousStory.activities.every(
-                  (activity) => activityResults[activity.id],
-                ))));
-        return {
-          position: STORY_WORLD_POSITIONS[index] ?? { x: 0, z: 8 - index * 5 },
-          state: completed ? "completed" : previousCompleted ? "current" : "locked",
-          story,
-        };
-      }),
-    [activityResults, completedStoryIds, stories],
+    () => questStory ? questionScrolls(questStory, activityResults) : stories.map((story, index) => ({
+      position: STORY_WORLD_POSITIONS[index] ?? { x: 0, z: 8 - index * 5 },
+      state: isStoryAnswered(story, activityResults) ? "completed" : "current",
+      story,
+    })),
+    [activityResults, questStory, stories],
   );
+  const spawnNode = questStory ? portals.find(node => (worldNodeId(node) === params.node || (node.questionGroup && node.story.activities.slice(node.questionGroup.start, node.questionGroup.end).some(activity => activity.id === params.node)))) ?? portals.find(node => node.state === "current") : undefined;
+  const spawnPosition = useMemo(() => spawnNode ? { x: spawnNode.position.x, z: spawnNode.position.z + 1.7 } : undefined, [spawnNode]);
+  const answered = questStory?.activities.filter(activity => activityResults[activity.id]).length ?? 0;
+  const nodeTitle = scrollTitle;
 
   const level = getLevelInfo(xp);
   const firstName = profile?.fullName?.trim().split(" ")[0] || "Mambabasa";
   const characterId = profile?.character ?? DEFAULT_PLAYER_CHARACTER;
   const nearbyPortal = portals.find(
-    ({ story }) => story.id === status.nearestStoryId,
+    (node) => worldNodeId(node) === status.nearestStoryId,
   );
   const enteringPortal = portals.find(
-    ({ story }) => story.id === enteringStoryId,
+    (node) => worldNodeId(node) === enteringStoryId,
   );
 
   useEffect(() => {
-    arrival.value = withTiming(1, {
-      duration: 920,
-      easing: Easing.out(Easing.cubic),
-    });
+    if (__DEV__) console.info("[Wikalino world UI] mounted");
     return () => {
       if (navigationTimerRef.current) {
         clearTimeout(navigationTimerRef.current);
       }
       engineRef.current?.dispose();
       engineRef.current = null;
+      if (__DEV__) console.info("[Wikalino world UI] unmounted");
     };
-  }, [arrival]);
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
@@ -122,9 +110,12 @@ export default function StoryWorld() {
       setEnteringStoryId(null);
       engineRef.current?.start();
       return () => {
+        if (navigationTimerRef.current) clearTimeout(navigationTimerRef.current);
         inputRef.current = { x: 0, y: 0 };
         engineRef.current?.setInput(inputRef.current);
-        engineRef.current?.stop();
+        engineRef.current?.dispose();
+        engineRef.current = null;
+        setReady(false);
       };
     }, [portalTransition]),
   );
@@ -150,6 +141,8 @@ export default function StoryWorld() {
         setReady(false);
         engineRef.current = new StoryWorldEngine({
           characterId,
+          questStoryId,
+          spawnPosition,
           gl,
           onError: (worldError) => {
             console.warn("Hindi ma-load ang 3D story world.", worldError);
@@ -166,7 +159,7 @@ export default function StoryWorld() {
         setError(worldError.message);
       }
     },
-    [characterId, focused, handleStatusChange, portals],
+    [characterId, focused, handleStatusChange, portals, questStoryId, spawnPosition],
   );
 
   const handleMove = useCallback((x: number, y: number) => {
@@ -184,12 +177,16 @@ export default function StoryWorld() {
 
   const enterStory = useCallback(
     (storyId: string) => {
-      const portal = portals.find(({ story }) => story.id === storyId);
+      const portal = portals.find(node => worldNodeId(node) === storyId);
       if (!portal || portal.state === "locked" || enteringStoryId) {
         return;
       }
       inputRef.current = { x: 0, y: 0 };
       engineRef.current?.setInput(inputRef.current);
+      if (questStory && portal.activityIndex !== undefined) {
+        router.push({ pathname: "/activity-player", params: { storyId: questStory.id, activityIndex: String(portal.activityIndex) } });
+        return;
+      }
       setEnteringStoryId(storyId);
       void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       portalTransition.set(0);
@@ -201,12 +198,8 @@ export default function StoryWorld() {
         router.push({ pathname: "/story", params: { storyId } });
       }, 1010);
     },
-    [enteringStoryId, portalTransition, portals],
+    [enteringStoryId, portalTransition, portals, questStory],
   );
-
-  const arrivalStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(arrival.value, [0, 0.25, 1], [1, 0.9, 0]),
-  }));
 
   const transitionBackdropStyle = useAnimatedStyle(() => ({
     opacity: interpolate(portalTransition.value, [0, 0.55, 1], [0, 0.6, 1]),
@@ -226,12 +219,15 @@ export default function StoryWorld() {
     ],
   }));
 
+  if (!focused) return null;
+
   if (error) {
     return (
       <FallbackWorld
         error={error}
         onEnterStory={enterStory}
         portals={portals}
+        questStoryId={questStoryId}
       />
     );
   }
@@ -239,14 +235,14 @@ export default function StoryWorld() {
   return (
     <View style={styles.root}>
       <StatusBar style="light" />
-      <RenderSurface
-        key={characterId}
+      {focused && <RenderSurface
+        key={`${characterId}:${questStoryId ?? "hub"}`}
         msaaSamples={0}
         onContextCreate={handleContextCreate}
         style={StyleSheet.absoluteFill}
-      />
+      />}
 
-      <View pointerEvents="box-none" style={StyleSheet.absoluteFill}>
+      <View pointerEvents="box-none" style={[StyleSheet.absoluteFill, styles.hudLayer]}>
         <View style={[styles.topHud, { paddingTop: insets.top + 8 }]}>
           <View style={styles.identityCard}>
             <View style={styles.avatar}>
@@ -258,7 +254,7 @@ export default function StoryWorld() {
             </View>
           </View>
           <View style={styles.topActions}>
-            <HudButton icon="cards-outline" onPress={() => router.push("/collection")} />
+            <HudButton icon={questStory ? "map-outline" : "cards-outline"} onPress={() => questStory ? router.replace("/landing") : router.push("/collection")} />
             <HudButton icon="chart-timeline-variant" onPress={() => router.push("/progress")} />
             <HudButton icon="information-outline" onPress={() => router.push("/about")} />
           </View>
@@ -267,9 +263,9 @@ export default function StoryWorld() {
         <View style={[styles.missionCard, { top: insets.top + 78 }]}>
           <MaterialCommunityIcons color="#F7D77A" name="map-marker-path" size={17} />
           <View style={styles.missionCopy}>
-            <Text style={styles.missionEyebrow}>MUNDO {currentMarkahan}</Text>
+            <Text style={styles.missionEyebrow}>{setting?.name ?? "MGA PORTAL NG KUWENTO"}</Text>
             <Text numberOfLines={1} style={styles.missionText}>
-              Lumapit sa isang lumulutang na balumbon
+              {questStory ? `${portals.filter(node => node.state === "completed").length}/${portals.length} balumbon · ${answered}/${questStory.activities.length} tamang sagot` : "Pumasok sa portal at buksan ang aklat"}
             </Text>
           </View>
           <View style={styles.levelBadge}>
@@ -309,34 +305,37 @@ export default function StoryWorld() {
             <View style={styles.storyPromptCopy}>
               <Text style={styles.storyPromptEyebrow}>
                 {nearbyPortal.state === "locked"
-                  ? "NAKAKANDADO"
+                  ? "TAPUSIN MUNA ANG NAUNANG BALUMBON"
                   : nearbyPortal.state === "completed"
-                    ? "BALIKAN ANG KUWENTO"
-                    : `KUWENTO ${nearbyPortal.story.order}`}
+                    ? (questStory ? "TAMA NA · BALIKAN" : "BALIKAN ANG KUWENTO")
+                    : questStory ? `TANONG ${(nearbyPortal.questionGroup?.start ?? 0) + 1}–${nearbyPortal.questionGroup?.end ?? 5}` : `KUWENTO ${nearbyPortal.story.order}`}
               </Text>
               <Text numberOfLines={1} style={styles.storyPromptTitle}>
-                {nearbyPortal.story.title}
+                {nodeTitle(nearbyPortal)}
               </Text>
             </View>
             {nearbyPortal.state !== "locked" ? (
               <Pressable
-                accessibilityLabel={`Buksan ang ${nearbyPortal.story.title}`}
-                onPress={() => enterStory(nearbyPortal.story.id)}
+                accessibilityRole="button"
+                accessibilityLabel={`Buksan ang ${nodeTitle(nearbyPortal)}`}
+                onPress={() => enterStory(worldNodeId(nearbyPortal))}
                 style={({ pressed }) => [styles.enterButton, pressed && styles.pressed]}
               >
-                <Text style={styles.enterButtonText}>PASOK</Text>
+                <Text style={styles.enterButtonText}>{questStory ? "SAGUTIN" : "PASOK"}</Text>
                 <MaterialCommunityIcons color="#18283B" name="arrow-right" size={17} />
               </Pressable>
             ) : null}
           </View>
         ) : null}
 
+        {questStory && answered === questStory.activities.length && <View style={[styles.storyPrompt, { top: insets.top + 138, bottom: undefined }]}>
+          <View style={styles.storyPromptCopy}><Text style={styles.storyPromptTitle}>Lahat ng balumbon ay luntian!</Text><Text style={styles.storyPromptEyebrow}>NAKUMPLETO ANG MUNDO</Text></View>
+          <Pressable style={styles.enterButton} onPress={() => router.replace({ pathname: "/story-result", params: { storyId: questStory.id } })}><Text style={styles.enterButtonText}>GANTIMPALA</Text></Pressable>
+        </View>}
         <View style={[styles.controls, { bottom: insets.bottom + 16 }]}>
           <VirtualJoystick disabled={!ready || Boolean(enteringStoryId)} onMove={handleMove} />
         </View>
       </View>
-
-      <Animated.View pointerEvents="none" style={[styles.arrivalPortal, arrivalStyle]} />
 
       {enteringPortal ? (
         <Animated.View
@@ -356,7 +355,7 @@ export default function StoryWorld() {
 
 function HudButton({ icon, onPress }: { icon: keyof typeof MaterialCommunityIcons.glyphMap; onPress: () => void }) {
   return (
-    <Pressable onPress={onPress} style={({ pressed }) => [styles.hudButton, pressed && styles.pressed]}>
+    <Pressable accessibilityRole="button" accessibilityLabel={icon === "map-outline" ? "Bumalik sa mga portal" : icon === "cards-outline" ? "Aklatan" : icon === "chart-timeline-variant" ? "Progreso" : "Tungkol sa Wikalino"} onPress={onPress} style={({ pressed }) => [styles.hudButton, pressed && styles.pressed]}>
       <MaterialCommunityIcons color="#FFF1BD" name={icon} size={20} />
     </Pressable>
   );
@@ -366,10 +365,12 @@ function FallbackWorld({
   error,
   onEnterStory,
   portals,
+  questStoryId,
 }: {
   error: string;
   onEnterStory: (storyId: string) => void;
   portals: StoryWorldPortal[];
+  questStoryId?: string;
 }) {
   const insets = useSafeAreaInsets();
   return (
@@ -379,15 +380,16 @@ function FallbackWorld({
         contentContainerStyle={[styles.fallbackContent, { paddingTop: insets.top + 24 }]}
       >
         <MaterialCommunityIcons color="#F7D77A" name="map-outline" size={38} />
-        <Text style={styles.fallbackTitle}>Mapa ng mga Kuwento</Text>
+        <Text style={styles.fallbackTitle}>{questStoryId ? "Landas ng mga Tanong" : "Mapa ng mga Kuwento"}</Text>
+        <Pressable onPress={() => router.replace("/landing")}><Text style={styles.fallbackText}>Bumalik sa mga portal</Text></Pressable>
         <Text style={styles.fallbackText}>
           Hindi maipakita ang 3D mundo ngayon. Maaari mo pa ring buksan ang mga kuwento.
         </Text>
         {portals.map((portal) => (
           <Pressable
             disabled={portal.state === "locked"}
-            key={portal.story.id}
-            onPress={() => onEnterStory(portal.story.id)}
+            key={worldNodeId(portal)}
+            onPress={() => onEnterStory(worldNodeId(portal))}
             style={[styles.fallbackStory, portal.state === "locked" && styles.fallbackStoryLocked]}
           >
             <MaterialCommunityIcons
@@ -402,13 +404,14 @@ function FallbackWorld({
               size={22}
             />
             <View style={styles.fallbackStoryCopy}>
-              <Text style={styles.fallbackStoryTitle}>{portal.story.title}</Text>
+              <Text style={styles.fallbackStoryTitle}>{scrollTitle(portal)}</Text>
               <Text style={styles.fallbackStoryMeta}>
                 {portal.state === "completed" ? "Tapos na" : portal.story.subtitle}
               </Text>
             </View>
           </Pressable>
         ))}
+        {questStoryId && portals.length > 0 && portals.every(node => node.state === "completed") && <Pressable style={styles.enterButton} onPress={() => router.replace({ pathname: "/story-result", params: { storyId: questStoryId } })}><Text style={styles.enterButtonText}>TINGNAN ANG GANTIMPALA</Text></Pressable>}
         <Text style={styles.fallbackError} numberOfLines={2}>{error}</Text>
       </ScrollView>
     </View>
@@ -416,14 +419,7 @@ function FallbackWorld({
 }
 
 const styles = StyleSheet.create({
-  arrivalPortal: {
-    position: "absolute",
-    top: 0,
-    right: 0,
-    bottom: 0,
-    left: 0,
-    backgroundColor: "#B9DFC5",
-  },
+  hudLayer: { zIndex: 1 },
   avatar: {
     alignItems: "center",
     backgroundColor: "rgba(255,255,255,0.1)",
@@ -551,6 +547,7 @@ const styles = StyleSheet.create({
     right: 17,
   },
   transitionBackdrop: {
+    zIndex: 2,
     alignItems: "center",
     backgroundColor: "#18283B",
     bottom: 0,

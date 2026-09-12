@@ -1,3 +1,4 @@
+import { Platform } from "react-native";
 import type { ExpoWebGLRenderingContext } from "expo-gl";
 import {
   ACESFilmicToneMapping,
@@ -45,6 +46,10 @@ import {
   loadTreasureChestModel,
 } from "./load-explorer.native";
 import type { PlayerCharacterId } from "@/data/player-characters";
+import { bakeExplorerWalk, type BakedExplorerWalk } from "./baked-explorer-walk";
+import { ExplorerWalk } from "./explorer-walk";
+import { disposeWorldObject } from "./dispose-world-object";
+import { prepareCompatibleSkinning, type CompatibleSkinning } from "./compatible-skinning";
 import type {
   StoryPortalState,
   StoryWorldInput,
@@ -52,7 +57,13 @@ import type {
   StoryWorldStatus,
 } from "./story-world.types";
 
+import { createStoryPortal } from "./story-portal-visual";
+import { createQuestScenery } from "./quest-scenery";
+import { storySetting, worldNodeId } from "./quest-progression";
+
 type StoryWorldEngineOptions = {
+  questStoryId?: string;
+  spawnPosition?: { x: number; z: number };
   characterId: PlayerCharacterId;
   gl: ExpoWebGLRenderingContext;
   onError: (error: Error) => void;
@@ -170,15 +181,11 @@ function makeRendererContext(
         };
       }
 
-      const value = nativeContext[property];
-      if (typeof value !== "function") {
-        return value;
-      }
-
+      // Avoid crossing into Expo's native HostObject again for every draw.
       const cached = boundMethods.get(property);
-      if (cached) {
-        return cached;
-      }
+      if (cached) return cached;
+      const value = nativeContext[property];
+      if (typeof value !== "function") return value;
       const bound = value.bind(gl) as (...args: unknown[]) => unknown;
       boundMethods.set(property, bound);
       return bound;
@@ -190,6 +197,7 @@ function makeRendererContext(
 
 export class StoryWorldEngine {
   private activeAnimation: StoryWorldStatus["animation"] = "Idle";
+  private storyGates: ReturnType<typeof createStoryPortal>[] = [];
   private animatedStoryScrolls: AnimatedStoryScroll[] = [];
   private animationFrame: number | null = null;
   private camera: PerspectiveCamera;
@@ -208,9 +216,21 @@ export class StoryWorldEngine {
   private scene = new Scene();
   private standingPose: Object3D | null = null;
   private walkingPose: Object3D | null = null;
+  private explorerWalk: ExplorerWalk | null = null;
+  private bakedWalk: BakedExplorerWalk = null;
+  private explorerSkinning: CompatibleSkinning = null;
   private walkPhase = 0;
   private viewportWidth = 0;
   private viewportHeight = 0;
+  private lastRenderedAt: number | null = null;
+  private loadingStage = "environment";
+  private renderedStage = "";
+  private skinningElapsed = 0;
+  private measuredFrames = 0;
+  private measuredSince = 0;
+  private measuredWorkMs = 0;
+  private measuredUpdateMs = 0;
+  private measuredRenderMs = 0;
 
   constructor(private options: StoryWorldEngineOptions) {
     const { gl } = options;
@@ -235,6 +255,10 @@ export class StoryWorldEngine {
     this.renderer.toneMapping = ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.1;
 
+    if (options.spawnPosition) {
+      this.character.position.set(options.spawnPosition.x, 0, options.spawnPosition.z);
+      this.cameraAnchor.copy(this.character.position);
+    }
     this.createScene();
     this.start();
     void this.loadWorldModels();
@@ -250,8 +274,9 @@ export class StoryWorldEngine {
   }
 
   updatePortals(portals: StoryWorldPortal[]) {
+    this.options.portals = portals;
     for (const visual of this.animatedStoryScrolls) {
-      const portal = portals.find(({ story }) => story.id === visual.storyId);
+      const portal = portals.find(portal => worldNodeId(portal) === visual.storyId);
       if (!portal) {
         continue;
       }
@@ -264,6 +289,12 @@ export class StoryWorldEngine {
       return;
     }
     this.clock.start();
+    this.lastRenderedAt = null;
+    this.measuredFrames = 0;
+    this.measuredSince = 0;
+    this.measuredWorkMs = 0;
+    this.measuredUpdateMs = 0;
+    this.measuredRenderMs = 0;
     this.animationFrame = requestAnimationFrame(this.renderFrame);
   }
 
@@ -281,22 +312,17 @@ export class StoryWorldEngine {
     }
     this.disposed = true;
     this.stop();
-    this.scene.traverse((object) => {
-      if (!(object instanceof Mesh)) {
-        return;
-      }
-      object.geometry.dispose();
-      const materials = Array.isArray(object.material) ? object.material : [object.material];
-      for (const material of materials) {
-        material.dispose();
-      }
-    });
+    this.explorerWalk?.dispose();
+    this.bakedWalk?.dispose();
+    this.explorerSkinning?.dispose();
+    disposeWorldObject(this.scene);
     this.renderer.dispose();
   }
 
   private createScene() {
-    this.scene.background = new Color(MEADOW_LIGHTING.sky);
-    this.scene.fog = new FogExp2(MEADOW_LIGHTING.fog, MEADOW_LIGHTING.fogDensity);
+    const setting = storySetting(this.options.questStoryId);
+    this.scene.background = new Color(setting?.sky ?? MEADOW_LIGHTING.sky);
+    this.scene.fog = new FogExp2(setting?.sky ?? MEADOW_LIGHTING.fog, MEADOW_LIGHTING.fogDensity);
     this.scene.add(new HemisphereLight(
       MEADOW_LIGHTING.hemisphereSky, MEADOW_LIGHTING.hemisphereGround,
       MEADOW_LIGHTING.hemisphereIntensity,
@@ -305,10 +331,14 @@ export class StoryWorldEngine {
     const sunlight = new DirectionalLight(0xfff0c9, MEADOW_LIGHTING.sunlightIntensity);
     sunlight.position.set(-6, 11, 8);
     this.scene.add(sunlight);
-    this.scene.add(createMeadowEnvironment());
+    const meadow = createMeadowEnvironment(Platform.OS !== "web");
+    // Static scenery never needs its local matrices recomposed each frame.
+    meadow.traverse(object => { object.updateMatrix(); object.matrixAutoUpdate = false; });
+    this.scene.add(meadow);
 
+    if (this.options.questStoryId) this.scene.add(createQuestScenery(this.options.questStoryId));
     this.addPath();
-    this.character.position.copy(START_POSITION);
+    if (!this.options.spawnPosition) this.character.position.copy(START_POSITION);
     this.character.rotation.y = INITIAL_CHARACTER_HEADING;
     this.character.add(this.characterVisual);
     this.scene.add(this.character);
@@ -323,10 +353,11 @@ export class StoryWorldEngine {
     ];
     const curve = new CatmullRomCurve3(curvePoints, false, "catmullrom", 0.35);
     const geometry = new BoxGeometry(0.82, 0.08, 1.05);
-    const material = new MeshLambertMaterial({ color: 0xd3bd82 });
+    const material = new MeshLambertMaterial({ color: storySetting(this.options.questStoryId)?.path ?? 0xd3bd82 });
     const stoneGeometries: BufferGeometry[] = [];
-    for (let index = 0; index < 58; index += 1) {
-      const progress = index / 57;
+    const count = this.options.questStoryId ? 120 : 58;
+    for (let index = 0; index < count; index += 1) {
+      const progress = index / (count - 1);
       const point = curve.getPoint(progress);
       const tangent = curve.getTangent(progress);
       tempObject.position.copy(point);
@@ -346,17 +377,29 @@ export class StoryWorldEngine {
 
   private async loadWorldModels() {
     try {
-      await Promise.all([
-        this.addExplorer(),
-        this.addStoryScrolls(),
-        this.addTropicalHut(),
-        this.addTreasureChest(),
-      ]);
+      const stages: [string, () => void | Promise<void>][] = [
+        [`character:${this.options.characterId}`, () => this.addExplorer()],
+        [this.options.questStoryId ? "scrolls" : "portals", () => this.options.questStoryId ? this.addStoryScrolls() : this.addStoryGates()],
+        ...(!this.options.questStoryId ? [["hut", () => this.addTropicalHut()] as [string, () => Promise<void>]] : []),
+        ["chest", () => this.addTreasureChest()],
+      ];
+      // Stagger GLB decoding and first uploads instead of creating every
+      // model while the intro is still releasing its native views.
+      for (const [label, load] of stages) {
+        await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+        if (this.disposed) return;
+        if (__DEV__) console.info(`[Wikalino world] loading ${label}`);
+        await load();
+        if (this.disposed) return;
+        this.loadingStage = label;
+      }
       if (this.disposed) {
         return;
       }
       this.options.onReady();
+      if (__DEV__) console.info("[Wikalino world] ready");
     } catch (cause) {
+      if (this.disposed) return;
       const error = cause instanceof Error ? cause : new Error(String(cause));
       this.options.onError(error);
     }
@@ -365,23 +408,55 @@ export class StoryWorldEngine {
   private async addExplorer() {
     const model = await loadExplorerModel(this.options.characterId);
     if (this.disposed) {
+      disposeWorldObject(model.scene);
       return;
+    }
+    // Prepare off-scene: rendering and navigation can continue between poses,
+    // and leaving during preparation must not attach a late-loaded character.
+    if (Platform.OS !== "web" && model.walkClip) {
+      try {
+        this.bakedWalk = await bakeExplorerWalk(model.scene, model.walkClip, () => this.disposed);
+      } catch (error) {
+        disposeWorldObject(model.scene);
+        throw error;
+      }
+      if (this.disposed) {
+        this.bakedWalk?.dispose();
+        disposeWorldObject(model.scene);
+        return;
+      }
     }
     this.standingPose = model.standingPose;
     this.walkingPose = model.walkingPose;
     this.locomotionStyle = model.locomotionStyle;
     this.characterVisual.add(model.scene);
+    if (!this.bakedWalk) {
+      this.explorerSkinning = prepareCompatibleSkinning(model.scene, this.renderer.capabilities.isWebGL2, Platform.OS === "web" ? this.renderer.capabilities.maxVertexUniforms : 0);
+      if (model.walkClip) this.explorerWalk = new ExplorerWalk(model.scene, model.walkClip);
+    }
     this.setAnimation("Idle", true);
+  }
+
+  private addStoryGates() {
+    for (const portal of this.options.portals) {
+      const gate = createStoryPortal(portal.story.id);
+      gate.group.position.set(portal.position.x, 0, portal.position.z);
+      this.scene.add(gate.group);
+      this.storyGates.push(gate);
+    }
   }
 
   private async addStoryScrolls() {
     const template = await loadStoryScrollModel();
     if (this.disposed) {
+      disposeWorldObject(template);
       return;
     }
 
     this.options.portals.forEach((portal, index) => {
       const scroll = template.clone(true);
+      scroll.scale.multiplyScalar(0.62);
+      scroll.position.multiplyScalar(0.62);
       const materials: MeshStandardMaterial[] = [];
       scroll.traverse((object) => {
         if (!(object instanceof Mesh)) {
@@ -457,7 +532,7 @@ export class StoryWorldEngine {
         materials,
         phase: index * 0.83,
         scroll,
-        storyId: portal.story.id,
+        storyId: worldNodeId(portal),
       };
       this.animatedStoryScrolls.push(visual);
       this.updateScrollAppearance(visual, portal.state);
@@ -467,6 +542,7 @@ export class StoryWorldEngine {
   private async addTreasureChest() {
     const chest = await loadTreasureChestModel();
     if (this.disposed) {
+      disposeWorldObject(chest);
       return;
     }
     chest.position.y += 0.04;
@@ -478,6 +554,7 @@ export class StoryWorldEngine {
   private async addTropicalHut() {
     const hut = await loadTropicalHutModel();
     if (this.disposed) {
+      disposeWorldObject(hut);
       return;
     }
     const clearing = new Group();
@@ -511,24 +588,36 @@ export class StoryWorldEngine {
     if (!immediate && name === this.activeAnimation) {
       return;
     }
-    if (this.standingPose) {
+    if (this.standingPose && !this.explorerWalk && !this.bakedWalk) {
       this.standingPose.visible = name === "Idle";
     }
-    if (this.walkingPose) {
+    if (this.walkingPose && !this.explorerWalk && !this.bakedWalk) {
       this.walkingPose.visible = name === "Walk";
     }
     this.activeAnimation = name;
     this.emitStatus();
   }
 
-  private renderFrame = () => {
+  private renderFrame = (time: number) => {
     if (this.disposed) {
       return;
     }
-    const delta = Math.min(this.clock.getDelta(), 0.05);
+    // Expo GL submits work across the native GL queue. Keep native rendering
+    // at a stable 30 FPS instead of saturating it with 60/120 submissions.
+    const interval = this.renderer.capabilities.isWebGL2 ? 1000 / 60 : 1000 / 30;
+    if (this.lastRenderedAt !== null && time - this.lastRenderedAt < interval - 1) {
+      this.animationFrame = requestAnimationFrame(this.renderFrame);
+      return;
+    }
+    this.lastRenderedAt = time;
+    const workStarted = __DEV__ ? performance.now() : 0;
+    const delta = Math.min(this.clock.getDelta(), 0.1);
     const elapsed = this.clock.elapsedTime;
     this.updateCharacter(delta);
     this.animateStoryScrolls(delta, elapsed);
+    for (const gate of this.storyGates) {
+      gate.update(elapsed);
+    }
     this.updateCamera(delta);
     try {
       const { drawingBufferWidth: width, drawingBufferHeight: height } = this.options.gl;
@@ -539,8 +628,39 @@ export class StoryWorldEngine {
         this.camera.aspect = width / Math.max(1, height);
         this.camera.updateProjectionMatrix();
       }
+      this.skinningElapsed += delta;
+      // The camera/controls stay at 30 FPS. CPU leg deformation can update at
+      // 15 FPS, halving buffer uploads while retaining the full walk cycle.
+      if (this.explorerSkinning?.mode !== "cpu" || this.skinningElapsed >= 1 / 15) {
+        this.explorerSkinning?.update();
+        this.skinningElapsed %= 1 / 15;
+      }
+      const renderStarted = __DEV__ ? performance.now() : 0;
       this.renderer.render(this.scene, this.camera);
       this.options.gl.endFrameEXP();
+      if (__DEV__ && this.renderedStage === "chest" && this.measuredFrames < 120) {
+        if (!this.measuredSince) this.measuredSince = time;
+        this.measuredFrames++;
+        this.measuredUpdateMs += renderStarted - workStarted;
+        this.measuredRenderMs += performance.now() - renderStarted;
+        this.measuredWorkMs += performance.now() - workStarted;
+        if (this.measuredFrames === 120) {
+          console.info("[Wikalino performance]", JSON.stringify({
+            submittedFps: Math.round(119000 / Math.max(1, time - this.measuredSince)),
+            averageJsFrameMs: Math.round(this.measuredWorkMs / 120 * 10) / 10,
+            sceneUpdateMs: Math.round(this.measuredUpdateMs / 120 * 10) / 10,
+            renderSubmitMs: Math.round(this.measuredRenderMs / 120 * 10) / 10,
+            drawCalls: this.renderer.info.render.calls,
+            triangles: this.renderer.info.render.triangles,
+            buffer: `${width}x${height}`,
+            animation: this.bakedWalk?.mode ?? this.explorerSkinning?.mode ?? "static-poses",
+          }));
+        }
+      }
+      if (this.renderedStage !== this.loadingStage) {
+        this.renderedStage = this.loadingStage;
+        if (__DEV__) console.info(`[Wikalino world] submitted ${this.loadingStage} frame`);
+      }
       this.animationFrame = requestAnimationFrame(this.renderFrame);
     } catch (cause) {
       this.stop();
@@ -551,6 +671,8 @@ export class StoryWorldEngine {
 
   private updateCharacter(delta: number) {
     const strength = Math.min(1, Math.hypot(this.input.x, this.input.y));
+    this.explorerWalk?.update(delta, strength > 0.06);
+    this.bakedWalk?.update(delta, strength > 0.06);
     if (strength > 0.06) {
       cameraRelativeMovement(this.input.x, this.input.y, this.movementHeading, this.movementDirection);
       const directionX = this.movementDirection.x;
@@ -572,18 +694,19 @@ export class StoryWorldEngine {
         Math.cos(targetRotation - this.character.rotation.y),
       );
       this.character.rotation.y += rotationDifference * Math.min(1, delta * 11);
-      this.walkPhase += delta * (7.5 + strength * 2.5);
+      const duration = this.bakedWalk?.duration ?? this.explorerWalk?.clip.duration;
+      this.walkPhase += delta * (duration ? Math.PI * 2 / duration : 7.5 + strength * 2.5);
       if (this.locomotionStyle === "hop") {
         this.characterVisual.position.y = Math.abs(Math.sin(this.walkPhase)) * 0.18;
         this.characterVisual.rotation.x =
           -0.035 + Math.cos(this.walkPhase * 2) * 0.035;
         this.characterVisual.rotation.z = Math.sin(this.walkPhase) * 0.012;
       } else {
-        this.characterVisual.position.y = Math.abs(Math.sin(this.walkPhase)) * 0.055;
+        this.characterVisual.position.y = Math.abs(Math.sin(this.walkPhase)) * (this.explorerWalk || this.bakedWalk ? 0.012 : 0.055);
         this.characterVisual.rotation.x = 0.025;
         this.characterVisual.rotation.z = Math.sin(this.walkPhase) * 0.025;
       }
-      if (this.walkingPose && this.locomotionStyle === "walk") {
+      if (this.walkingPose && this.locomotionStyle === "walk" && !this.explorerWalk && !this.bakedWalk) {
         // The Quaternius file contains a modeled walking pose rather than a
         // skeleton clip. Mirroring that pose on alternating steps gives the
         // character a clear left/right stride while keeping it mobile-friendly.
@@ -622,7 +745,7 @@ export class StoryWorldEngine {
       );
       if (distance < nearestDistance) {
         nearestDistance = distance;
-        nearestId = portal.story.id;
+        nearestId = worldNodeId(portal);
       }
     }
     if (nearestId !== this.lastNearestStoryId) {

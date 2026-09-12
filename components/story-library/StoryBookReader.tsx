@@ -1,17 +1,27 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { useEffect, useState } from "react";
-import { AccessibilityInfo, Animated, Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useEffect, useRef, useState } from "react";
+import { AccessibilityInfo, Animated, Image, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { Colors } from "@/constants/colors";
 import type { Story } from "@/data/stories";
 import { getReadingPages } from "./reading-pages";
 
-type Props = { story: Story; onClose: () => void };
+type Props = {
+  story: Story;
+  onClose: () => void;
+  onComplete?: () => void;
+  initialPage?: number;
+  onPageChange?: (page: number) => void;
+};
 
-export function StoryBookReader({ story, onClose }: Props) {
+export function StoryBookReader({ story, onClose, onComplete, initialPage = -1, onPageChange }: Props) {
   const pages = getReadingPages(story);
-  const [page, setPage] = useState(-1);
+  const [page, setPage] = useState(Math.max(-1, Math.min(initialPage, pages.length - 1)));
+  const [furthest, setFurthest] = useState(Math.max(0, initialPage));
+  const [atEnd, setAtEnd] = useState(false);
+  const viewport = useRef(0);
+  const contentHeight = useRef(0);
   const [turning, setTurning] = useState(false);
   const [reducedMotion, setReducedMotion] = useState(false);
   const [turn] = useState(() => new Animated.Value(1));
@@ -26,16 +36,26 @@ export function StoryBookReader({ story, onClose }: Props) {
     return () => { mounted = false; subscription.remove(); turn.stopAnimation(); };
   }, [turn]);
 
+  function showPage(next: number) {
+    setPage(next);
+    setAtEnd(false);
+    contentHeight.current = 0;
+    setFurthest(value => Math.max(value, next));
+    if (next >= 0) onPageChange?.(next);
+  }
+
   function turnTo(next: number) {
     if (turning || next < -1 || next >= pages.length || next === page) return;
-    if (reducedMotion) { setPage(next); return; }
+    if (onComplete && next > page && !cover && !atEnd) return;
+    if (onComplete && next > Math.max(furthest, page + 1)) return;
+    if (reducedMotion) { showPage(next); return; }
     setTurning(true);
     // Native transforms only: fold the page toward the spine, then unfold the
     // next page. No GL context, 3D SVG or oversized surfaces on iOS.
-    Animated.timing(turn, { toValue: 0, duration: 190, useNativeDriver: true }).start(({ finished }) => {
+    Animated.timing(turn, { toValue: 0, duration: 190, useNativeDriver: Platform.OS !== "web" }).start(({ finished }) => {
       if (!finished) return;
-      setPage(next);
-      Animated.timing(turn, { toValue: 1, duration: 250, useNativeDriver: true }).start(({ finished: opened }) => {
+      showPage(next);
+      Animated.timing(turn, { toValue: 1, duration: 250, useNativeDriver: Platform.OS !== "web" }).start(({ finished: opened }) => {
         if (opened) setTurning(false);
       });
     });
@@ -47,7 +67,7 @@ export function StoryBookReader({ story, onClose }: Props) {
         <MaterialCommunityIcons name="close" size={24} color={Colors.accentSoft} />
       </Pressable>
       <View style={styles.heading}>
-        <Text style={styles.eyebrow}>AKLATAN NG WIKALINO</Text>
+        <Text style={styles.eyebrow}>{onComplete ? "BASAHIN UPANG BUKSAN ANG MUNDO" : "AKLATAN NG WIKALINO"}</Text>
         <Text style={styles.headerTitle} numberOfLines={2}>{story.title}</Text>
       </View>
       <MaterialCommunityIcons name="book-open-page-variant" size={24} color={Colors.accent} />
@@ -67,7 +87,11 @@ export function StoryBookReader({ story, onClose }: Props) {
           <View style={styles.goldRule} />
           <Text style={styles.author}>{story.author}</Text>
           <Text style={styles.coverDetails}>{pages.length} bahagi · {story.estimatedMinutes} minutong pagbasa</Text>
-        </ScrollView> : <ScrollView key={current.id} contentContainerStyle={styles.pageContent} showsVerticalScrollIndicator>
+        </ScrollView> : <ScrollView key={current.id} contentContainerStyle={styles.pageContent} showsVerticalScrollIndicator
+          onLayout={event => { viewport.current = event.nativeEvent.layout.height; if (contentHeight.current > 0 && contentHeight.current <= viewport.current + 24) setAtEnd(true); }}
+          onContentSizeChange={(_, height) => { contentHeight.current = height; if (viewport.current > 0 && height <= viewport.current + 24) setAtEnd(true); }}
+          scrollEventThrottle={100}
+          onScroll={({ nativeEvent: event }) => { if (event.contentOffset.y + event.layoutMeasurement.height >= event.contentSize.height - 24) setAtEnd(true); }}>
           <View style={styles.pageHeading}>
             <Text style={styles.chapter}>BAHAGI {page + 1}</Text>
             <MaterialCommunityIcons name="star-four-points" size={16} color="#AD8645" />
@@ -89,19 +113,20 @@ export function StoryBookReader({ story, onClose }: Props) {
     <View style={styles.navigation}>
       <Text style={styles.pageCount} accessibilityLiveRegion="polite">{cover ? "PABALAT" : `PAHINA ${page + 1} SA ${pages.length}`}</Text>
       {!cover && <View style={styles.pageMarkers}>
-        {pages.map((item, index) => <Pressable key={item.id} disabled={turning} onPress={() => turnTo(index)}
-          accessibilityRole="button" accessibilityLabel={`Pahina ${index + 1}: ${item.title}`} accessibilityState={{ selected: index === page, disabled: turning }}
+        {pages.map((item, index) => <Pressable key={item.id} disabled={turning || Boolean(onComplete && index > furthest)} onPress={() => turnTo(index)}
+          accessibilityRole="button" accessibilityLabel={`Pahina ${index + 1}: ${item.title}`} accessibilityState={{ selected: index === page, disabled: turning || Boolean(onComplete && index > furthest) }}
           style={styles.markerTarget}><View style={[styles.marker, index === page && styles.markerActive]} /></Pressable>)}
       </View>}
+      {onComplete && !cover && !atEnd && <Text style={styles.pageCount}>Basahin hanggang sa ibaba upang magpatuloy.</Text>}
       <View style={styles.controls}>
         {!cover && <Pressable onPress={() => turnTo(page - 1)} disabled={turning} accessibilityRole="button" accessibilityLabel={page === 0 ? "Bumalik sa pabalat" : "Naunang pahina"}
           style={({ pressed }) => [styles.previous, (turning || pressed) && styles.dim]}>
           <MaterialCommunityIcons name="chevron-left" size={24} color={Colors.accentSoft} /><Text style={styles.previousText}>Bumalik</Text>
         </Pressable>}
-        <Pressable disabled={turning} onPress={() => lastPage ? onClose() : turnTo(page + 1)} accessibilityRole="button"
-          accessibilityLabel={cover ? "Buksan ang aklat" : lastPage ? "Bumalik sa aklatan" : "Susunod na pahina"}
-          style={({ pressed }) => [styles.next, (turning || pressed) && styles.dim]}>
-          <Text style={styles.nextText}>{cover ? "Buksan ang aklat" : lastPage ? "Sa aklatan" : "Susunod"}</Text>
+        <Pressable disabled={turning || Boolean(onComplete && !cover && !atEnd)} onPress={() => lastPage ? (onComplete ?? onClose)() : turnTo(page + 1)} accessibilityRole="button"
+          accessibilityLabel={cover ? "Buksan ang aklat" : lastPage ? (onComplete ? "Pumasok sa mundo ng kuwento" : "Bumalik sa aklatan") : "Susunod na pahina"}
+          style={({ pressed }) => [styles.next, (turning || pressed || Boolean(onComplete && !cover && !atEnd)) && styles.dim]}>
+          <Text style={styles.nextText}>{cover ? "Buksan ang aklat" : lastPage ? (onComplete ? "Pasok sa mundo" : "Sa aklatan") : "Susunod"}</Text>
           <MaterialCommunityIcons name={lastPage ? "bookshelf" : "chevron-right"} size={24} color={Colors.primaryDark} />
         </Pressable>
       </View>
@@ -116,8 +141,8 @@ const styles = StyleSheet.create({
   heading: { flex: 1 },
   eyebrow: { color: "#BCD1B6", fontSize: 8, letterSpacing: 1.5, fontWeight: "800" },
   headerTitle: { color: Colors.surface, fontSize: 14, fontWeight: "800", marginTop: 5 },
-  book: { flex: 1, marginHorizontal: 18, marginTop: 10, marginBottom: 10, maxWidth: 680, width: "auto", alignSelf: "stretch" },
-  pageStack: { ...StyleSheet.absoluteFill, top: 8, left: 5, right: -5, bottom: -6, backgroundColor: "#C9BA92", borderRadius: 8, borderRightWidth: 3, borderBottomWidth: 3, borderColor: "#E5D9B5" },
+  book: { flex: 1, marginHorizontal: 18, paddingLeft: 18, marginTop: 10, marginBottom: 10, maxWidth: 680, width: "auto", alignSelf: "stretch" },
+  pageStack: { ...StyleSheet.absoluteFill, top: 5, left: 0, right: -5, bottom: -6, backgroundColor: "#C9BA92", borderRadius: 8, borderRightWidth: 3, borderBottomWidth: 3, borderColor: "#E5D9B5" },
   sheet: { flex: 1, backgroundColor: "#FFF8E5", borderRadius: 8, overflow: "hidden" },
   spine: { position: "absolute", width: 8, top: 0, bottom: 0, left: 0, backgroundColor: "rgba(87,62,25,0.09)", borderRightWidth: 1, borderRightColor: "rgba(87,62,25,0.08)" },
   cover: { flexGrow: 1, padding: 26, alignItems: "center", justifyContent: "center", backgroundColor: "#274D40" },

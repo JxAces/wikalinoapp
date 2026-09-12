@@ -200,6 +200,8 @@ export default function TabsLayout() {
         }}
       />
 
+      <Tabs.Screen name="quest-world" options={{ href: null, tabBarStyle: { display: "none" } }} />
+
       <Tabs.Screen
         name="story-result"
         options={{

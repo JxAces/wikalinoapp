@@ -1,5 +1,6 @@
 import { loadBundledGlb } from "./load-bundled-glb";
 import {
+  type AnimationClip,
   Box3,
   Group,
   Mesh,
@@ -15,6 +16,7 @@ export type ExplorerModel = {
   scene: Group;
   standingPose: Object3D;
   walkingPose: Object3D;
+  walkClip?: AnimationClip;
 };
 
 // Metro exposes bundled binary assets as numeric module identifiers.
@@ -173,6 +175,15 @@ async function loadStaticExplorer(
   const height = Math.max(bounds.getSize(new Vector3()).y, 0.001);
   const model = new Group();
   const standingPose = gltf.scene;
+  const walkClip = gltf.animations.find(clip => clip.name === "Walk");
+  if (walkClip) {
+    // A rigged scene must keep its bones and mesh together. Cloning it as a
+    // static pose would leave the copy bound to the original skeleton.
+    standingPose.position.set(-center.x, -bounds.min.y, -center.z);
+    model.add(standingPose);
+    model.scale.setScalar(targetHeight / height);
+    return { locomotionStyle: "walk", scene: model, standingPose, walkingPose: standingPose, walkClip };
+  }
   const walkingPose = gltf.scene.clone(true);
   standingPose.position.set(-center.x, -bounds.min.y, -center.z);
   walkingPose.position.copy(standingPose.position);
