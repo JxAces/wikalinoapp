@@ -4,6 +4,7 @@ import {
 
 import {
   router,
+  Redirect,
   useLocalSearchParams,
 } from "expo-router";
 
@@ -39,6 +40,7 @@ import {
 import {
   StoryRewardVisual,
 } from "../../components/three/integrations/StoryRewardVisual";
+import { canEnterStory } from "../../components/story-world/quest-progression";
 
 export default function StoryResultScreen() {
   const { storyId } =
@@ -105,9 +107,8 @@ export default function StoryResultScreen() {
     story,
   ]);
 
-  if (!story) {
-    return null;
-  }
+  if (!story || !canEnterStory(story.id, activityResults)) return <Redirect href="/landing" />;
+  if (!allCompleted) return <Redirect href={{ pathname: "/quest-world", params: { storyId: story.id } }} />;
 
   const stars =
     getStoryStars(story.id);

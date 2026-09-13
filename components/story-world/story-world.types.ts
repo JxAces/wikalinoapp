@@ -24,4 +24,6 @@ export type StoryWorldInput = {
 export type StoryWorldStatus = {
   animation: "Idle" | "Walk";
   nearestStoryId: string | null;
+  nearChest?: boolean;
+  nearReturnPortal?: boolean;
 };

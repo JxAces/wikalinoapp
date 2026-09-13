@@ -1,4 +1,4 @@
-import { canAnswerQuestion, questionGroup, QUESTIONS_PER_SCROLL } from "@/components/story-world/quest-progression";
+import { canAnswerQuestion, canEnterStory, questionGroup, QUESTIONS_PER_SCROLL } from "@/components/story-world/quest-progression";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 
 import { LinearGradient } from "expo-linear-gradient";
@@ -86,6 +86,7 @@ export default function ActivityPlayerScreen() {
   const answers = useUserStore(state => state.activityResults);
   const reading = useUserStore(state => state.readingCompletedStoryIds);
   if (!focused) return null;
+  if (story && !canEnterStory(story.id, answers)) return <Redirect href="/landing" />;
   if (story && !reading.includes(story.id)) return <Redirect href={{ pathname: "/story", params: { storyId } }} />;
   if (story && !canAnswerQuestion(story, activityIndex, answers)) return <Redirect href={{ pathname: "/quest-world", params: { storyId } }} />;
 

@@ -23,6 +23,7 @@ import {
   PerspectiveCamera,
   Scene,
   SRGBColorSpace,
+  TorusGeometry,
   Vector3,
   WebGLRenderer,
 } from "three";
@@ -38,6 +39,9 @@ import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js
 import {
   STORY_INTERACTION_DISTANCE,
   STORY_WORLD_BOUNDS,
+  RETURN_PORTAL_ID,
+  RETURN_PORTAL_POSITION,
+  worldChestPosition,
 } from "./story-world.constants";
 import {
   loadExplorerModel,
@@ -59,7 +63,7 @@ import type {
 
 import { createStoryPortal } from "./story-portal-visual";
 import { createQuestScenery } from "./quest-scenery";
-import { storySetting, worldNodeId } from "./quest-progression";
+import { isWorldChestUnlocked, storySetting, worldNodeId } from "./quest-progression";
 
 type StoryWorldEngineOptions = {
   questStoryId?: string;
@@ -211,6 +215,10 @@ export class StoryWorldEngine {
   private disposed = false;
   private input: StoryWorldInput = { x: 0, y: 0 };
   private lastNearestStoryId: string | null = null;
+  private nearChest = false;
+  private nearReturnPortal = false;
+  private returnGate: ReturnType<typeof createStoryPortal> | null = null;
+  private chestLock: Mesh | null = null;
   private locomotionStyle: "hop" | "walk" = "walk";
   private renderer: WebGLRenderer;
   private scene = new Scene();
@@ -275,6 +283,11 @@ export class StoryWorldEngine {
 
   updatePortals(portals: StoryWorldPortal[]) {
     this.options.portals = portals;
+    if (this.chestLock) this.chestLock.visible = !isWorldChestUnlocked(portals);
+    for (const gate of this.storyGates) {
+      const portal = portals.find(portal => portal.story.id === gate.storyId);
+      if (portal) gate.setState(portal.state);
+    }
     for (const visual of this.animatedStoryScrolls) {
       const portal = portals.find(portal => worldNodeId(portal) === visual.storyId);
       if (!portal) {
@@ -349,13 +362,13 @@ export class StoryWorldEngine {
     const curvePoints = [
       new Vector3(0, 0.015, 13.2),
       ...this.options.portals.map(({ position }) => new Vector3(position.x, 0.015, position.z)),
-      new Vector3(0, 0.015, -19.3),
+      new Vector3(0, 0.015, worldChestPosition(Boolean(this.options.questStoryId)).z),
     ];
     const curve = new CatmullRomCurve3(curvePoints, false, "catmullrom", 0.35);
     const geometry = new BoxGeometry(0.82, 0.08, 1.05);
     const material = new MeshLambertMaterial({ color: storySetting(this.options.questStoryId)?.path ?? 0xd3bd82 });
     const stoneGeometries: BufferGeometry[] = [];
-    const count = this.options.questStoryId ? 120 : 58;
+    const count = this.options.questStoryId ? 32 : 58;
     for (let index = 0; index < count; index += 1) {
       const progress = index / (count - 1);
       const point = curve.getPoint(progress);
@@ -439,7 +452,7 @@ export class StoryWorldEngine {
 
   private addStoryGates() {
     for (const portal of this.options.portals) {
-      const gate = createStoryPortal(portal.story.id);
+      const gate = createStoryPortal(portal.story.id, portal.state);
       gate.group.position.set(portal.position.x, 0, portal.position.z);
       this.scene.add(gate.group);
       this.storyGates.push(gate);
@@ -452,6 +465,10 @@ export class StoryWorldEngine {
       disposeWorldObject(template);
       return;
     }
+
+    this.returnGate = createStoryPortal(RETURN_PORTAL_ID);
+    this.returnGate.group.position.set(RETURN_PORTAL_POSITION.x, 0, RETURN_PORTAL_POSITION.z);
+    this.scene.add(this.returnGate.group);
 
     this.options.portals.forEach((portal, index) => {
       const scroll = template.clone(true);
@@ -546,9 +563,19 @@ export class StoryWorldEngine {
       return;
     }
     chest.position.y += 0.04;
-    chest.position.z += -18.85;
+    const position = worldChestPosition(Boolean(this.options.questStoryId));
+    chest.position.x += position.x;
+    chest.position.z += position.z;
     chest.rotation.y = 0.08;
     this.scene.add(chest);
+    // One small merged draw call for an unmistakable padlock above the chest.
+    const body = new BoxGeometry(0.42, 0.32, 0.12);
+    const shackle = new TorusGeometry(0.14, 0.04, 5, 12);
+    shackle.translate(0, 0.22, 0);
+    this.chestLock = new Mesh(mergeGeometryParts([body, shackle], "kandado"), new MeshBasicMaterial({ color: 0xe8c96e }));
+    this.chestLock.position.set(position.x, 1.85, position.z);
+    this.chestLock.visible = !isWorldChestUnlocked(this.options.portals);
+    this.scene.add(this.chestLock);
   }
 
   private async addTropicalHut() {
@@ -618,6 +645,7 @@ export class StoryWorldEngine {
     for (const gate of this.storyGates) {
       gate.update(elapsed);
     }
+    this.returnGate?.update(elapsed);
     this.updateCamera(delta);
     try {
       const { drawingBufferWidth: width, drawingBufferHeight: height } = this.options.gl;
@@ -748,8 +776,13 @@ export class StoryWorldEngine {
         nearestId = worldNodeId(portal);
       }
     }
-    if (nearestId !== this.lastNearestStoryId) {
+    const chestPosition = worldChestPosition(Boolean(this.options.questStoryId));
+    const nearChest = Math.hypot(this.character.position.x - chestPosition.x, this.character.position.z - chestPosition.z) < STORY_INTERACTION_DISTANCE;
+    const nearReturnPortal = Boolean(this.returnGate) && Math.hypot(this.character.position.x - RETURN_PORTAL_POSITION.x, this.character.position.z - RETURN_PORTAL_POSITION.z) < STORY_INTERACTION_DISTANCE;
+    if (nearestId !== this.lastNearestStoryId || nearChest !== this.nearChest || nearReturnPortal !== this.nearReturnPortal) {
       this.lastNearestStoryId = nearestId;
+      this.nearChest = nearChest;
+      this.nearReturnPortal = nearReturnPortal;
       this.emitStatus();
     }
   }
@@ -780,6 +813,8 @@ export class StoryWorldEngine {
     this.options.onStatusChange({
       animation: this.activeAnimation,
       nearestStoryId: this.lastNearestStoryId,
+      nearChest: this.nearChest,
+      nearReturnPortal: this.nearReturnPortal,
     });
   }
 }

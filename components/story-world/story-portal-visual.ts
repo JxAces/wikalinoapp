@@ -2,6 +2,7 @@ import {
   BufferGeometry, CircleGeometry, DodecahedronGeometry, DoubleSide, Group,
   Mesh, MeshBasicMaterial, MeshLambertMaterial, Object3D, ShaderMaterial, TorusGeometry,
 } from "three";
+import type { StoryPortalState } from "./story-world.types";
 import { mergeColoredScenery } from "./merge-colored-scenery";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 
@@ -9,6 +10,7 @@ import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js
 const fragmentShader = `
   uniform float time;
   uniform float seed;
+  uniform float locked;
   varying vec2 portalUv;
   float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
   float noise(vec2 p) {
@@ -30,6 +32,7 @@ const fragmentShader = `
     color = mix(color, vec3(0.52, 1.0, 0.65), smoothstep(0.91, 0.99, ribbon) * 0.65);
     float rim = smoothstep(0.93, 0.995, radius);
     color = mix(color, vec3(0.67, 1.0, 0.19), rim);
+    color = mix(color, vec3(dot(color, vec3(0.299, 0.587, 0.114))) * 0.48, locked);
     gl_FragColor = vec4(color, 1.0);
     #include <tonemapping_fragment>
     #include <colorspace_fragment>
@@ -39,7 +42,8 @@ const fragmentShader = `
 /** Stone gateway with a flowing emerald surface and gently floating debris.
  * Static rocks are merged by shade to keep all three gates inexpensive on iOS.
  */
-export function createStoryPortal(storyId: string) {
+export function createStoryPortal(storyId: string, initialState: StoryPortalState = "current") {
+  let state = initialState;
   const group = new Group();
   group.name = `Stone story portal ${storyId}`;
   const seed = Number(storyId.slice(-1)) || 1;
@@ -74,7 +78,7 @@ export function createStoryPortal(storyId: string) {
   });
   mergeColoredScenery(group);
   const surfaceMaterial = new ShaderMaterial({
-    uniforms: { time: { value: 0 }, seed: { value: seed * 0.7 } },
+    uniforms: { time: { value: 0 }, seed: { value: seed * 0.7 }, locked: { value: state === "locked" ? 1 : 0 } },
     vertexShader: `varying vec2 portalUv;
       void main() { portalUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
     fragmentShader, side: DoubleSide,
@@ -106,10 +110,14 @@ export function createStoryPortal(storyId: string) {
   fragmentGeometry.dispose();
   if (floatingGeometry) fragments.add(new Mesh(floatingGeometry, fragmentMaterial));
   group.add(fragments);
-  return { group, update(elapsed: number) {
+  return { group, storyId, setState(next: StoryPortalState) {
+    state = next;
+    surfaceMaterial.uniforms.locked.value = state === "locked" ? 1 : 0;
+  }, update(elapsed: number) {
     surfaceMaterial.uniforms.time.value = elapsed;
     fragments.position.y = Math.sin(elapsed * 1.1 + seed) * 0.065;
     fragments.rotation.y = Math.sin(elapsed * 0.4 + seed) * 0.045;
-    rim.material.color.setHSL(0.22 + Math.sin(elapsed * 1.3) * 0.025, 1, 0.66);
+    if (state === "locked") rim.material.color.setHex(0x777a82);
+    else rim.material.color.setHSL(0.22 + Math.sin(elapsed * 1.3) * 0.025, 1, 0.66);
   } };
 }

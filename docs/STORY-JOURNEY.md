@@ -27,3 +27,35 @@ Run `node scripts/check-story-journey.cjs` for reading gates, sequential unlocks
 Also run `npx tsc --noEmit`, lint changed files, `npm run build:pwa`, and an iOS Expo export. Device testing is still needed to assess frame rate and native lifecycle on the target iPhone.
 
 Run `node scripts/check-world-startup.cjs` to check sequential loading, cancellation on exit, and error handling without creating a native GL context. A native process exit still requires a current iOS crash report; Metro warnings alone do not identify its cause.
+# Sequential portal access
+
+Each story world has an always-available return portal at the back-left of its
+entrance. It is separate from the question nodes and never participates in chest
+unlocking. Approaching it reveals BUMALIK; pressing it stops movement, plays the
+portal transition and replaces the quest route with `/landing`. It does not
+award rewards or clear saved answers. The existing map button and non-3D
+fallback return link remain available. The gate uses the existing merged portal
+visual and is disposed with its world on navigation.
+
+Question scrolls now use their own compact positions, about 5.94 units apart,
+and the quest chest sits five units beyond the last scroll. Hub portal positions
+remain unchanged. A chest unlocks only when its nonempty list of nodes is fully
+completed: all question groups in a quest, or all stories in the hub. Locked
+chests display a merged 3D padlock and a HUD prerequisite/progress message.
+The native/PWA reward button requires chest proximity; the non-3D fallback uses
+the same completion requirement without a movement requirement. Reward actions
+recheck the live save. Story-result links redirect away from unfinished worlds.
+The hub chest claims existing story rewards idempotently and opens progress;
+it does not create an additional repeatable XP bonus.
+
+The hub unlocks stories in their catalog order. `canEnterStory` requires every
+activity in every preceding story to have a saved correct result. Reading alone
+does not unlock the next portal; the final correct task does, without requiring
+the player to claim the reward chest. Old out-of-order progress does not bypass
+missing earlier tasks. Completed, unlocked stories remain replayable.
+
+Locked portals appear gray and show a prerequisite message. Both native and
+PWA hub interactions, story/quest/activity routes, and store activity/reward
+writes enforce the rule. The collection's read-only library remains available.
+`scripts/check-story-journey.cjs` checks final-task unlocking, direct store
+bypass attempts, replay, legacy out-of-order answers, and clearing progress.

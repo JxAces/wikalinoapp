@@ -28,19 +28,44 @@ function load(file) {
 }
 
 const { getAllStories } = load(path.join(root, "data/stories.ts"));
-const { questionScrolls, questionGroup, canAnswerQuestion, isStoryAnswered } = load(path.join(root, "components/story-world/quest-progression.ts"));
+const { questionScrolls, questionGroup, canAnswerQuestion, canEnterStory, isStoryAnswered, isWorldChestUnlocked } = load(path.join(root, "components/story-world/quest-progression.ts"));
+const { worldChestPosition, STORY_INTERACTION_DISTANCE, STORY_WORLD_POSITIONS } = load(path.join(root, "components/story-world/story-world.constants.ts"));
 const { useUserStore: store } = load(path.join(root, "store/useUserStore.ts"));
 
 async function check() {
   await store.persist.rehydrate();
   const stories = getAllStories();
   assert.equal(stories.length, 3);
+  const hubNodes = () => stories.map(story => ({ story, state: !canEnterStory(story.id, store.getState().activityResults) ? "locked" : isStoryAnswered(story, store.getState().activityResults) ? "completed" : "current" }));
+  assert(!isWorldChestUnlocked([]), "An empty world must not unlock a chest");
+  const compact = questionScrolls(stories[0], {});
+  for (let i = 1; i < compact.length; i++) {
+    const gap = Math.hypot(compact[i].position.x - compact[i - 1].position.x, compact[i].position.z - compact[i - 1].position.z);
+    assert(gap < 6.5 && gap > 2 * STORY_INTERACTION_DISTANCE, "Scrolls should be close without overlapping interaction zones");
+  }
+  assert(Math.abs(compact[2].position.z - worldChestPosition(true).z) <= 5, "Quest chest is just beyond the last scroll");
+  assert.equal(STORY_WORLD_POSITIONS[2].z, -15, "Hub portal spacing is preserved");
+  assert.equal(worldChestPosition(false).z, -18.85, "Hub chest stays beyond all portals");
+  store.getState().clearGameProgress();
+  assert(canEnterStory(stories[0].id, {}));
+  assert(!canEnterStory("missing-story", {}));
+  for (const locked of stories.slice(1)) {
+    assert(!canEnterStory(locked.id, store.getState().activityResults));
+    store.getState().completeStoryReading(locked.id);
+    store.getState().completeActivity({ storyId: locked.id, activityId: locked.activities[0].id, attempts: 1, firstTryCorrect: true, xpReward: locked.activities[0].xp });
+    assert.equal(Object.keys(store.getState().activityResults).length, 0, "Reading or a direct activity call cannot bypass a locked portal");
+  }
+  const outOfOrder = Object.fromEntries(stories[1].activities.map(activity => [activity.id, {}]));
+  assert(!canEnterStory(stories[2].id, outOfOrder), "Old out-of-order progress cannot bypass the first story");
+  store.getState().clearGameProgress();
   for (const story of stories) {
-    store.getState().clearGameProgress();
+    assert(canEnterStory(story.id, store.getState().activityResults));
+    assert(!isWorldChestUnlocked(hubNodes()), "Hub chest requires every story, not merely accessible portals");
+    const initialAnswerCount = Object.keys(store.getState().activityResults).length;
     const complete = index => store.getState().completeActivity({ storyId: story.id, activityId: story.activities[index].id, attempts: 1, firstTryCorrect: true, xpReward: story.activities[index].xp });
     assert.equal(story.activities.length, 15);
     complete(0);
-    assert.equal(Object.keys(store.getState().activityResults).length, 0, "Questions require reading first");
+    assert.equal(Object.keys(store.getState().activityResults).length, initialAnswerCount, "Questions require reading first");
     store.getState().completeStory(story.id);
     assert(!store.getState().completedStoryIds.includes(story.id), "Cannot finish an unanswered world");
     store.getState().completeStoryReading(story.id);
@@ -48,10 +73,13 @@ async function check() {
     store.getState().completeStoryReading(story.id);
     assert.equal(store.getState().xp, readingXp, "Reading cannot farm XP");
     complete(14);
-    assert.equal(Object.keys(store.getState().activityResults).length, 0, "Cannot skip to last scroll");
+    assert.equal(Object.keys(store.getState().activityResults).length, initialAnswerCount, "Cannot skip to last scroll");
     for (let i = 0; i < 15; i++) {
       const answers = store.getState().activityResults;
+      const nextStory = stories[stories.indexOf(story) + 1];
+      if (nextStory) assert(!canEnterStory(nextStory.id, answers), "Next portal stays locked until the final task is complete");
       const nodes = questionScrolls(story, answers);
+      assert(!isWorldChestUnlocked(nodes), "Any unfinished question keeps the story chest locked");
       assert.equal(nodes.filter(node => node.state === "current").length, 1);
       assert.equal(nodes.length, 3, "Fifteen questions use only three scrolls");
       const groupIndex = Math.floor(i / 5);
@@ -71,6 +99,9 @@ async function check() {
       assert.equal(store.getState().xp, xp, "Replaying cannot farm XP");
     }
     assert(isStoryAnswered(story, store.getState().activityResults));
+    assert(isWorldChestUnlocked(questionScrolls(story, store.getState().activityResults)), "All questions unlock the story chest");
+    const nextStory = stories[stories.indexOf(story) + 1];
+    if (nextStory) assert(canEnterStory(nextStory.id, store.getState().activityResults), "Last correct answer unlocks the next portal without needing to claim the chest");
     assert(questionScrolls(story, store.getState().activityResults).every(node => node.state === "completed"));
     store.getState().completeStory(story.id);
     assert(store.getState().unlockedCollectibleIds.includes(story.collectible.id));
@@ -79,5 +110,10 @@ async function check() {
     assert.equal(store.getState().xp, finalXp);
     console.log(`${story.title}: reading gate, 3 grouped scrolls, 15 sequential questions, green completion, reward and replay checks passed`);
   }
+  assert(stories.every(story => canEnterStory(story.id, store.getState().activityResults)), "Finished stories remain available for replay");
+  assert(isWorldChestUnlocked(hubNodes()), "Finishing all portals unlocks the hub chest");
+  store.getState().clearGameProgress();
+  assert(!isWorldChestUnlocked(hubNodes()), "Reset relocks the main chest");
+  assert(!canEnterStory(stories[1].id, store.getState().activityResults), "Clearing progress relocks later portals");
 }
 check().catch(error => { console.error(error); process.exitCode = 1; });

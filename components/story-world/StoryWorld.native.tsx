@@ -28,7 +28,7 @@ import { useUserStore } from "@/store/useUserStore";
 import { getLevelInfo } from "@/utils/progression";
 
 import { StoryWorldEngine } from "./StoryWorldEngine.native";
-import { STORY_WORLD_POSITIONS } from "./story-world.constants";
+import { RETURN_PORTAL_ID, STORY_WORLD_POSITIONS } from "./story-world.constants";
 import type {
   StoryWorldInput,
   StoryWorldPortal,
@@ -37,7 +37,7 @@ import type {
 import { VirtualJoystick } from "./VirtualJoystick";
 import { useWorldKeyboard } from "@/hooks/useWorldKeyboard";
 
-import { isStoryAnswered, questionScrolls, scrollTitle, storySetting, worldNodeId } from "./quest-progression";
+import { canEnterStory, isStoryAnswered, isWorldChestUnlocked, questionScrolls, scrollTitle, storySetting, worldNodeId } from "./quest-progression";
 
 const EMPTY_STATUS: StoryWorldStatus = {
   animation: "Idle",
@@ -72,7 +72,7 @@ export default function StoryWorld({ questStoryId }: { questStoryId?: string } =
   const portals = useMemo<StoryWorldPortal[]>(
     () => questStory ? questionScrolls(questStory, activityResults) : stories.map((story, index) => ({
       position: STORY_WORLD_POSITIONS[index] ?? { x: 0, z: 8 - index * 5 },
-      state: isStoryAnswered(story, activityResults) ? "completed" : "current",
+      state: !canEnterStory(story.id, activityResults) ? "locked" : isStoryAnswered(story, activityResults) ? "completed" : "current",
       story,
     })),
     [activityResults, questStory, stories],
@@ -80,6 +80,19 @@ export default function StoryWorld({ questStoryId }: { questStoryId?: string } =
   const spawnNode = questStory ? portals.find(node => (worldNodeId(node) === params.node || (node.questionGroup && node.story.activities.slice(node.questionGroup.start, node.questionGroup.end).some(activity => activity.id === params.node)))) ?? portals.find(node => node.state === "current") : undefined;
   const spawnPosition = useMemo(() => spawnNode ? { x: spawnNode.position.x, z: spawnNode.position.z + 1.7 } : undefined, [spawnNode]);
   const answered = questStory?.activities.filter(activity => activityResults[activity.id]).length ?? 0;
+  const chestUnlocked = isWorldChestUnlocked(portals);
+  const chestProgress = questStory ? `${answered}/${questStory.activities.length} gawain` : `${portals.filter(node => node.state === "completed").length}/${portals.length} portal`;
+  const claimChest = () => {
+    const state = useUserStore.getState();
+    const required = questStory ? [questStory] : stories;
+    // Recheck the live save at press time, including previously locked stories.
+    if (!required.length || !required.every(story => canEnterStory(story.id, state.activityResults) && isStoryAnswered(story, state.activityResults))) return;
+    if (questStory) router.replace({ pathname: "/story-result", params: { storyId: questStory.id } });
+    else {
+      required.forEach(story => state.completeStory(story.id));
+      router.push("/progress");
+    }
+  };
   const nodeTitle = scrollTitle;
 
   const level = getLevelInfo(xp);
@@ -91,6 +104,7 @@ export default function StoryWorld({ questStoryId }: { questStoryId?: string } =
   const enteringPortal = portals.find(
     (node) => worldNodeId(node) === enteringStoryId,
   );
+  const returningToHub = enteringStoryId === RETURN_PORTAL_ID;
 
   useEffect(() => {
     if (__DEV__) console.info("[Wikalino world UI] mounted");
@@ -127,6 +141,8 @@ export default function StoryWorld({ questStoryId }: { questStoryId?: string } =
   const handleStatusChange = useCallback((next: StoryWorldStatus) => {
     setStatus((current) =>
       current.animation === next.animation &&
+      current.nearChest === next.nearChest &&
+      current.nearReturnPortal === next.nearReturnPortal &&
       current.nearestStoryId === next.nearestStoryId
         ? current
         : next,
@@ -177,13 +193,14 @@ export default function StoryWorld({ questStoryId }: { questStoryId?: string } =
 
   const enterStory = useCallback(
     (storyId: string) => {
+      const returning = storyId === RETURN_PORTAL_ID && Boolean(questStory);
       const portal = portals.find(node => worldNodeId(node) === storyId);
-      if (!portal || portal.state === "locked" || enteringStoryId) {
+      if (enteringStoryId || (returning ? !ready || !status.nearReturnPortal : !portal || portal.state === "locked")) {
         return;
       }
       inputRef.current = { x: 0, y: 0 };
       engineRef.current?.setInput(inputRef.current);
-      if (questStory && portal.activityIndex !== undefined) {
+      if (questStory && portal && portal.activityIndex !== undefined) {
         router.push({ pathname: "/activity-player", params: { storyId: questStory.id, activityIndex: String(portal.activityIndex) } });
         return;
       }
@@ -195,10 +212,11 @@ export default function StoryWorld({ questStoryId }: { questStoryId?: string } =
         easing: Easing.in(Easing.cubic),
       }));
       navigationTimerRef.current = setTimeout(() => {
-        router.push({ pathname: "/story", params: { storyId } });
+        if (returning) router.replace("/landing");
+        else router.push({ pathname: "/story", params: { storyId } });
       }, 1010);
     },
-    [enteringStoryId, portalTransition, portals, questStory],
+    [enteringStoryId, portalTransition, portals, questStory, ready, status.nearReturnPortal],
   );
 
   const transitionBackdropStyle = useAnimatedStyle(() => ({
@@ -228,6 +246,9 @@ export default function StoryWorld({ questStoryId }: { questStoryId?: string } =
         onEnterStory={enterStory}
         portals={portals}
         questStoryId={questStoryId}
+        chestUnlocked={chestUnlocked}
+        chestProgress={chestProgress}
+        onClaimChest={claimChest}
       />
     );
   }
@@ -282,7 +303,18 @@ export default function StoryWorld({ questStoryId }: { questStoryId?: string } =
           </View>
         ) : null}
 
-        {nearbyPortal ? (
+        {ready && questStory && status.nearReturnPortal ? (
+          <View style={[styles.storyPrompt, { bottom: insets.bottom + 164 }]}>
+            <MaterialCommunityIcons name="exit-run" color="#F7D77A" size={24} />
+            <View style={styles.storyPromptCopy}>
+              <Text style={styles.storyPromptEyebrow}>PORTAL PABALIK</Text>
+              <Text style={styles.storyPromptTitle}>Bumalik sa mga portal ng kuwento</Text>
+            </View>
+            <Pressable accessibilityRole="button" accessibilityLabel="Pumasok sa portal pabalik sa unang mundo" disabled={Boolean(enteringStoryId)} style={styles.enterButton} onPress={() => enterStory(RETURN_PORTAL_ID)}>
+              <Text style={styles.enterButtonText}>BUMALIK</Text>
+            </Pressable>
+          </View>
+        ) : nearbyPortal ? (
           <View style={[styles.storyPrompt, { bottom: insets.bottom + 164 }]}>
             <View
               style={[
@@ -305,7 +337,7 @@ export default function StoryWorld({ questStoryId }: { questStoryId?: string } =
             <View style={styles.storyPromptCopy}>
               <Text style={styles.storyPromptEyebrow}>
                 {nearbyPortal.state === "locked"
-                  ? "TAPUSIN MUNA ANG NAUNANG BALUMBON"
+                  ? (questStory ? "TAPUSIN MUNA ANG NAUNANG BALUMBON" : "TAPUSIN ANG LAHAT NG GAWAIN SA NAUNANG KUWENTO")
                   : nearbyPortal.state === "completed"
                     ? (questStory ? "TAMA NA · BALIKAN" : "BALIKAN ANG KUWENTO")
                     : questStory ? `TANONG ${(nearbyPortal.questionGroup?.start ?? 0) + 1}–${nearbyPortal.questionGroup?.end ?? 5}` : `KUWENTO ${nearbyPortal.story.order}`}
@@ -328,16 +360,15 @@ export default function StoryWorld({ questStoryId }: { questStoryId?: string } =
           </View>
         ) : null}
 
-        {questStory && answered === questStory.activities.length && <View style={[styles.storyPrompt, { top: insets.top + 138, bottom: undefined }]}>
-          <View style={styles.storyPromptCopy}><Text style={styles.storyPromptTitle}>Lahat ng balumbon ay luntian!</Text><Text style={styles.storyPromptEyebrow}>NAKUMPLETO ANG MUNDO</Text></View>
-          <Pressable style={styles.enterButton} onPress={() => router.replace({ pathname: "/story-result", params: { storyId: questStory.id } })}><Text style={styles.enterButtonText}>GANTIMPALA</Text></Pressable>
+        {ready && <View style={[styles.storyPrompt, { top: insets.top + 138, bottom: undefined }]}>
+          <ChestRewardPrompt unlocked={chestUnlocked} progress={chestProgress} quest={Boolean(questStory)} nearby={Boolean(status.nearChest)} onClaim={claimChest} />
         </View>}
         <View style={[styles.controls, { bottom: insets.bottom + 16 }]}>
           <VirtualJoystick disabled={!ready || Boolean(enteringStoryId)} onMove={handleMove} />
         </View>
       </View>
 
-      {enteringPortal ? (
+      {enteringPortal || returningToHub ? (
         <Animated.View
           pointerEvents="none"
           style={[styles.transitionBackdrop, transitionBackdropStyle]}
@@ -345,8 +376,8 @@ export default function StoryWorld({ questStoryId }: { questStoryId?: string } =
           <Animated.View style={[styles.transitionRing, transitionRingStyle]}>
             <MaterialCommunityIcons color="#FFF2B8" name="creation" size={43} />
           </Animated.View>
-          <Text style={styles.transitionEyebrow}>PAPASOK SA KUWENTO</Text>
-          <Text style={styles.transitionTitle}>{enteringPortal.story.title}</Text>
+          <Text style={styles.transitionEyebrow}>{returningToHub ? "PABALIK SA UNANG MUNDO" : "PAPASOK SA KUWENTO"}</Text>
+          <Text style={styles.transitionTitle}>{returningToHub ? "Mga Portal ng Kuwento" : enteringPortal?.story.title}</Text>
         </Animated.View>
       ) : null}
     </View>
@@ -361,16 +392,35 @@ function HudButton({ icon, onPress }: { icon: keyof typeof MaterialCommunityIcon
   );
 }
 
+function ChestRewardPrompt({ unlocked, progress, quest, nearby, onClaim }: {
+  unlocked: boolean; progress: string; quest: boolean; nearby: boolean; onClaim: () => void;
+}) {
+  return <>
+    <MaterialCommunityIcons name={unlocked ? "treasure-chest" : "lock"} color={unlocked ? "#F7D77A" : "#B5B6C2"} size={24} />
+    <View style={styles.storyPromptCopy}>
+      <Text style={styles.storyPromptEyebrow}>{unlocked ? "BUKAS NA ANG KABAN" : `NAKAKANDADO · ${progress}`}</Text>
+      <Text style={styles.storyPromptTitle}>{unlocked ? (nearby ? "Handa na ang gantimpala!" : "Lumapit sa kaban para sa gantimpala.") : quest ? "Tapusin muna ang lahat ng gawain." : "Tapusin muna ang lahat ng portal at mga gawain nito."}</Text>
+    </View>
+    {unlocked && nearby && <Pressable accessibilityRole="button" accessibilityLabel="Kunin ang gantimpala sa kaban" style={styles.enterButton} onPress={onClaim}><Text style={styles.enterButtonText}>GANTIMPALA</Text></Pressable>}
+  </>;
+}
+
 function FallbackWorld({
   error,
   onEnterStory,
   portals,
   questStoryId,
+  chestUnlocked,
+  chestProgress,
+  onClaimChest,
 }: {
   error: string;
   onEnterStory: (storyId: string) => void;
   portals: StoryWorldPortal[];
   questStoryId?: string;
+  chestUnlocked: boolean;
+  chestProgress: string;
+  onClaimChest: () => void;
 }) {
   const insets = useSafeAreaInsets();
   return (
@@ -406,12 +456,12 @@ function FallbackWorld({
             <View style={styles.fallbackStoryCopy}>
               <Text style={styles.fallbackStoryTitle}>{scrollTitle(portal)}</Text>
               <Text style={styles.fallbackStoryMeta}>
-                {portal.state === "completed" ? "Tapos na" : portal.story.subtitle}
+                {portal.state === "locked" ? (questStoryId ? "Tapusin muna ang naunang balumbon" : "Tapusin ang lahat ng gawain sa naunang kuwento") : portal.state === "completed" ? "Tapos na" : portal.story.subtitle}
               </Text>
             </View>
           </Pressable>
         ))}
-        {questStoryId && portals.length > 0 && portals.every(node => node.state === "completed") && <Pressable style={styles.enterButton} onPress={() => router.replace({ pathname: "/story-result", params: { storyId: questStoryId } })}><Text style={styles.enterButtonText}>TINGNAN ANG GANTIMPALA</Text></Pressable>}
+        <View style={styles.fallbackStory}><ChestRewardPrompt unlocked={chestUnlocked} progress={chestProgress} quest={Boolean(questStoryId)} nearby onClaim={onClaimChest} /></View>
         <Text style={styles.fallbackError} numberOfLines={2}>{error}</Text>
       </ScrollView>
     </View>

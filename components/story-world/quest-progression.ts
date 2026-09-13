@@ -1,8 +1,20 @@
-import type { Story } from "@/data/stories";
+import { getAllStories, type Story } from "@/data/stories";
 import type { StoryWorldPortal } from "./story-world.types";
-import { STORY_WORLD_POSITIONS } from "./story-world.constants";
+import { QUESTION_SCROLL_POSITIONS } from "./story-world.constants";
 
 type Answers = Record<string, unknown>;
+
+export function isWorldChestUnlocked(portals: StoryWorldPortal[]) {
+  return portals.length > 0 && portals.every(portal => portal.state === "completed");
+}
+
+/** All preceding stories must have every task completed, including old saves
+ * that may contain answers from a later story completed out of order. */
+export function canEnterStory(storyId: string, answers: Answers) {
+  const stories = getAllStories();
+  const index = stories.findIndex(story => story.id === storyId);
+  return index >= 0 && stories.slice(0, index).every(story => isStoryAnswered(story, answers));
+}
 
 export function isStoryAnswered(story: Story, answers: Answers) {
   return story.activities.length > 0 && story.activities.every(activity => Boolean(answers[activity.id]));
@@ -31,7 +43,7 @@ export function questionScrolls(story: Story, answers: Answers): StoryWorldPorta
       activityIndex: next < 0 ? start : start + next,
       questionGroup: { index, start, end, answeredCount },
       story,
-      position: STORY_WORLD_POSITIONS[index % STORY_WORLD_POSITIONS.length],
+      position: QUESTION_SCROLL_POSITIONS[index % QUESTION_SCROLL_POSITIONS.length],
       state: next < 0 ? "completed" : canAnswerQuestion(story, start, answers) ? "current" : "locked",
     };
   });

@@ -14,3 +14,18 @@ export const STORY_WORLD_BOUNDS = {
 } as const;
 
 export const STORY_INTERACTION_DISTANCE = 2.55;
+
+export const RETURN_PORTAL_ID = "return-to-hub";
+// Behind the entry area, offset left so the chase camera can see the player.
+export const RETURN_PORTAL_POSITION: StoryWorldPosition = { x: -3.8, z: 13.1 };
+
+// Question groups use a compact lane; hub portals retain their wider spacing.
+export const QUESTION_SCROLL_POSITIONS: readonly StoryWorldPosition[] = [
+  { x: -1.6, z: 8 },
+  { x: 1.6, z: 3 },
+  { x: -1.6, z: -2 },
+];
+
+export function worldChestPosition(quest: boolean): StoryWorldPosition {
+  return { x: 0, z: quest ? -7 : -18.85 };
+}
