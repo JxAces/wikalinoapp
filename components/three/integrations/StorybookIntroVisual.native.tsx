@@ -412,7 +412,7 @@ export function StorybookIntroVisual({
               <LinearGradient colors={["#356D55", "#18473C", "#092E2C"]} start={{x:0,y:0}} end={{x:1,y:1}} style={styles.coverGradient}>
                 <View style={StyleSheet.absoluteFill}><BookCoverEngraving /></View>
                 <Text style={styles.coverEdition}>ANG AKLAT NG</Text>
-                <Text adjustsFontSizeToFit numberOfLines={1} style={styles.coverTitle}>WIKALINO</Text>
+                <Text adjustsFontSizeToFit numberOfLines={1} style={styles.coverTitle}>WIKALINGGO</Text>
                 <Text style={styles.coverSubtitle}>MGA KUWENTONG PILIPINO</Text>
                 <LinearGradient colors={["rgba(255,239,189,0.16)","rgba(255,239,189,0)"]} start={{x:0,y:0}} end={{x:1,y:0}} style={styles.coverSheen} />
               </LinearGradient>

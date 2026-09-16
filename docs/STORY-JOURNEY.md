@@ -29,6 +29,50 @@ Also run `npx tsc --noEmit`, lint changed files, `npm run build:pwa`, and an iOS
 Run `node scripts/check-world-startup.cjs` to check sequential loading, cancellation on exit, and error handling without creating a native GL context. A native process exit still requires a current iOS crash report; Metro warnings alone do not identify its cause.
 # Sequential portal access
 
+TEMPORARY OVERRIDE: the prerequisite return in `canEnterStory` is commented
+out; any existing story can be entered without finishing earlier stories.
+Restore that commented return to re-enable sequential portal access. Question
+ordering, reading requirements and chest completion checks still apply.
+
+The third world is a symbolic forgotten Filipino village: six raised homes
+with woven wall details and pitched nipa roofs, a vacant sari-sari stall, a
+waiting shed, faded empty plaques, and a school with two empty desks recalling
+Mimi's pupils. Mist and muted colors replace the bright meadow. This visual
+interpretation does not change the original story or questions. Building
+footprints block walking; question clearings, resumed positions, chest and
+return portal remain reachable. Static village geometry is batched by vertex
+color to keep the phone workload low.
+
+Sandaang Damit now uses a clothing-market maze inspired by densely packed racks:
+five volumetric garment styles, ten colors, pleats, striped/printed fabric,
+contrasting hems, belts, sleeves, visible triangular hangers and folded fabric
+under the rails. Low plinths and steel rails replace the paper display boards.
+Alternating openings and side paths retain the existing collision layout.
+Walls have collision with sliding and small movement substeps. All scrolls,
+resume positions, chest and exit remain reachable. The maze merges into one
+draw call (19,316 triangles, under the 20,000-triangle maze budget). Cloth is
+static geometry with baked vertex colors, not a per-frame cloth simulation.
+
+Ugat uses a separate nighttime forest instead of the meadow and town blocks.
+Moonlight, 23 magical trees, luminous tangled roots, canopy lights and three
+swamp pools evoke deeply rooted problems as a visual metaphor for the story.
+Players start at the forest entrance and search three clearings without a stone
+trail. Trunks and water block movement; all objectives have dry routes. Glowing
+materials use no extra lights, bloom or shadow maps. Forest scenery totals
+11 draws / 13,664 triangles. Node checks validate both worlds' reachability,
+spawn safety, collision and geometry budgets; on-device appearance/FPS needs
+a phone run.
+
+Entering an unlocked story portal now navigates to the story route and plays
+`StoryEntryIntro` before mounting the reader. It reuses only the launch
+animation's swirling portal and tunnel passage, with no book or loading card.
+The roughly three-second zoom ends with the story reader; Reduce Motion uses
+a short static portal instead. The map releases its GL scene on blur. The
+intro cancels its animations and completion timer on unmount.
+It does not mark reading complete or change the
+saved page. After the reader is finished, the existing story-world transition
+still runs; the return portal retains its own transition back to the hub.
+
 Each story world has an always-available return portal at the back-left of its
 entrance. It is separate from the question nodes and never participates in chest
 unlocking. Approaching it reveals BUMALIK; pressing it stops movement, plays the

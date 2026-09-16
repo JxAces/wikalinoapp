@@ -63,6 +63,9 @@ import type {
 
 import { createStoryPortal } from "./story-portal-visual";
 import { createQuestScenery } from "./quest-scenery";
+import { DRESS_MAZE_STORY, moveThroughDressMaze } from "./dress-maze";
+import { createUgatForest, moveThroughUgat, UGAT_STORY } from "./ugat-forest";
+import { createForgottenVillage, moveThroughVillage, VILLAGE_STORY } from "./forgotten-village";
 import { isWorldChestUnlocked, storySetting, worldNodeId } from "./quest-progression";
 
 type StoryWorldEngineOptions = {
@@ -334,22 +337,24 @@ export class StoryWorldEngine {
 
   private createScene() {
     const setting = storySetting(this.options.questStoryId);
+    const night = this.options.questStoryId === UGAT_STORY;
+    const village = this.options.questStoryId === VILLAGE_STORY;
     this.scene.background = new Color(setting?.sky ?? MEADOW_LIGHTING.sky);
-    this.scene.fog = new FogExp2(setting?.sky ?? MEADOW_LIGHTING.fog, MEADOW_LIGHTING.fogDensity);
+    this.scene.fog = new FogExp2(setting?.sky ?? MEADOW_LIGHTING.fog, village ? 0.029 : MEADOW_LIGHTING.fogDensity);
     this.scene.add(new HemisphereLight(
-      MEADOW_LIGHTING.hemisphereSky, MEADOW_LIGHTING.hemisphereGround,
-      MEADOW_LIGHTING.hemisphereIntensity,
+      night ? 0x91c1d9 : MEADOW_LIGHTING.hemisphereSky, night ? 0x203c39 : MEADOW_LIGHTING.hemisphereGround,
+      night ? 0.8 : MEADOW_LIGHTING.hemisphereIntensity,
     ));
-    this.scene.add(new AmbientLight(0xfff8e7, MEADOW_LIGHTING.ambientIntensity));
-    const sunlight = new DirectionalLight(0xfff0c9, MEADOW_LIGHTING.sunlightIntensity);
+    this.scene.add(new AmbientLight(night ? 0x6b9eae : 0xfff8e7, night ? 0.35 : MEADOW_LIGHTING.ambientIntensity));
+    const sunlight = new DirectionalLight(night ? 0xb4d6f4 : 0xfff0c9, night ? 1.1 : MEADOW_LIGHTING.sunlightIntensity);
     sunlight.position.set(-6, 11, 8);
     this.scene.add(sunlight);
-    const meadow = createMeadowEnvironment(Platform.OS !== "web");
+    const meadow = night ? createUgatForest() : village ? createForgottenVillage() : createMeadowEnvironment(Platform.OS !== "web");
     // Static scenery never needs its local matrices recomposed each frame.
     meadow.traverse(object => { object.updateMatrix(); object.matrixAutoUpdate = false; });
     this.scene.add(meadow);
 
-    if (this.options.questStoryId) this.scene.add(createQuestScenery(this.options.questStoryId));
+    if (this.options.questStoryId && !night && !village) this.scene.add(createQuestScenery(this.options.questStoryId));
     this.addPath();
     if (!this.options.spawnPosition) this.character.position.copy(START_POSITION);
     this.character.rotation.y = INITIAL_CHARACTER_HEADING;
@@ -359,6 +364,8 @@ export class StoryWorldEngine {
   }
 
   private addPath() {
+    // The maze corridors are the route; a straight trail would cross walls.
+    if (this.options.questStoryId === DRESS_MAZE_STORY || this.options.questStoryId === UGAT_STORY) return;
     const curvePoints = [
       new Vector3(0, 0.015, 13.2),
       ...this.options.portals.map(({ position }) => new Vector3(position.x, 0.015, position.z)),
@@ -706,16 +713,26 @@ export class StoryWorldEngine {
       const directionX = this.movementDirection.x;
       const directionZ = this.movementDirection.z;
       const speed = 3.15;
-      this.character.position.x = MathUtils.clamp(
+      const nextX = MathUtils.clamp(
         this.character.position.x + directionX * speed * delta,
         STORY_WORLD_BOUNDS.minX,
         STORY_WORLD_BOUNDS.maxX,
       );
-      this.character.position.z = MathUtils.clamp(
+      const nextZ = MathUtils.clamp(
         this.character.position.z + directionZ * speed * delta,
         STORY_WORLD_BOUNDS.minZ,
         STORY_WORLD_BOUNDS.maxZ,
       );
+      if (this.options.questStoryId === DRESS_MAZE_STORY) {
+        moveThroughDressMaze(this.character.position, nextX - this.character.position.x, nextZ - this.character.position.z);
+      } else if (this.options.questStoryId === UGAT_STORY) {
+        moveThroughUgat(this.character.position, nextX - this.character.position.x, nextZ - this.character.position.z);
+      } else if (this.options.questStoryId === VILLAGE_STORY) {
+        moveThroughVillage(this.character.position, nextX - this.character.position.x, nextZ - this.character.position.z);
+      } else {
+        this.character.position.x = nextX;
+        this.character.position.z = nextZ;
+      }
       const targetRotation = Math.atan2(directionX, directionZ);
       const rotationDifference = Math.atan2(
         Math.sin(targetRotation - this.character.rotation.y),

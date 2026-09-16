@@ -119,7 +119,7 @@ export default function LoadingScreen() {
               size={19}
             />
           </View>
-          <Text style={styles.brand}>WIKALINO</Text>
+          <Text style={styles.brand}>WIKALINGGO</Text>
         </View>
 
         <View style={[styles.scene, phase === "entering" && { zIndex: 10 }]}>

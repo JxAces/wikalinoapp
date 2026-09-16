@@ -9,10 +9,10 @@ export default function Html({ children }: PropsWithChildren) {
       <meta name="theme-color" content="#203F36" />
       <meta name="apple-mobile-web-app-capable" content="yes" />
       <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-      <meta name="apple-mobile-web-app-title" content="Wikalino" />
+      <meta name="apple-mobile-web-app-title" content="Wikalinggo" />
       <link rel="manifest" href="/manifest.webmanifest" />
-      <link rel="apple-touch-icon" href="/icons/icon-192.png" />
-      <title>Wikalino · Mundo ng mga Kuwento</title>
+      <link rel="apple-touch-icon" href="/icons/wikalinggo-flat-apple.png" />
+      <title>Wikalinggo · Mundo ng mga Kuwento</title>
       <ScrollViewStyleReset />
     </head>
     <body>{children}</body>

@@ -1,0 +1,7 @@
+# Geometric logo
+
+Created with the built-in image-generation tool. Active master: assets/images/wikalinggo-geometric-icon.png. The previous portal artwork is preserved. Expo launcher/splash, favicon, PWA and Apple touch icons now use this design. Native installation requires rebuilding to update launcher artwork.
+
+## Prompt
+
+Use case: logo-brand. Create one original modern geometric mobile app logo for Wikalinggo, a Filipino storytelling and learning adventure app. Style: bold flat vector-like geometric identity, beautifully balanced folded ribbons, as sophisticated as contemporary colorful abstract brand marks. Subject: a single clever W monogram that also clearly reads as an open book, using broad interlocking folded page shapes and a small diamond of negative space at the central spine. Colors: emerald green, bright mint/teal, warm golden yellow with deeper forest green folds. Background solid warm ivory #FFF9ED filling entire square. Crisp smooth edges, mostly flat color, no textures, no realistic lighting, no 3D rendering, no tiny details. Center the complete emblem within the central 65% of a 1024x1024 square; generous margins for mobile icon cropping. No words or text, no extra symbols, no watermark, no border, no rounded-square container. Deliver one finished icon, not a sheet of options or a mockup. The mark should feel friendly, memorable, playful, and educational, with readable silhouette at 32px.

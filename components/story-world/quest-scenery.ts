@@ -1,6 +1,7 @@
 import { BoxGeometry, BufferGeometry, CylinderGeometry, Group, Mesh, MeshLambertMaterial, Object3D, PlaneGeometry } from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import { storySetting } from "./quest-progression";
+import { createDressMaze } from "./dress-maze-visual";
 
 /** Geometry is merged by color so the story props add only a few draw calls. */
 export function createQuestScenery(storyId: string) {
@@ -23,18 +24,7 @@ export function createQuestScenery(storyId: string) {
   root.add(floor);
 
   if (storyId === "m1-story-1") {
-    // Drawings pinned to display boards: the dresses are drawings, as in the ending.
-    for (const side of [-1, 1]) for (let row = 0; row < 5; row++) {
-      const x = side * 8.1, z = 9 - row * 6;
-      box(0x785a42, x, 1.35, z, 1.25, 2.4, 0.16);
-      box(0xfff1d4, x, 1.55, z + 0.1, 1.05, 1.5, 0.05);
-      const color = [0xe89aaa, 0xf1ce62, 0x9ac8d3, 0xd3b1d9, 0xf7f0dc][row];
-      box(color, x, 1.72, z + 0.14, 0.34, 0.4, 0.025);
-      box(color, x, 1.28, z + 0.14, 0.65, 0.55, 0.025);
-      box(color, x - 0.25, 1.78, z + 0.14, 0.22, 0.22, 0.025, -0.45);
-      box(color, x + 0.25, 1.78, z + 0.14, 0.22, 0.22, 0.025, 0.45);
-      box(0xdbaa49, x, 2.2, z + 0.15, 0.08, 0.08, 0.035);
-    }
+    root.add(createDressMaze());
   } else if (storyId === "m1-story-2") {
     for (const side of [-1, 1]) for (let row = 0; row < 5; row++) {
       const x = side * 10, z = 9 - row * 6;

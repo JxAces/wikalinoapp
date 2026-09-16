@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Animated, Easing, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { Redirect, router, useIsFocused, useLocalSearchParams } from "expo-router";
 import { StoryBookReader } from "@/components/story-library/StoryBookReader";
+import { StoryEntryIntro } from "@/components/story-library/StoryEntryIntro";
 import { canEnterStory, storySetting } from "@/components/story-world/quest-progression";
 import { getStoryById } from "@/data/stories";
 import { useUserStore } from "@/store/useUserStore";
@@ -19,6 +20,8 @@ function JourneyBook({ storyId }: { storyId: string }) {
   const savePage = useUserStore(state => state.setStoryScene);
   const finishReading = useUserStore(state => state.completeStoryReading);
   const [entering, setEntering] = useState(false);
+  const [introComplete, setIntroComplete] = useState(false);
+  const finishIntro = useCallback(() => setIntroComplete(true), []);
   const [transition] = useState(() => new Animated.Value(0));
   const navigating = useRef(false);
 
@@ -27,6 +30,7 @@ function JourneyBook({ storyId }: { storyId: string }) {
   }, [transition]);
 
   if (!story || !canEnterStory(story.id, answers)) return <Redirect href="/landing" />;
+  if (!introComplete) return <StoryEntryIntro title={story.title} onComplete={finishIntro} />;
   function enterWorld() {
     if (!story || navigating.current) return;
     navigating.current = true;

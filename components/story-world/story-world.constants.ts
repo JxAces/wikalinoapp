@@ -14,6 +14,8 @@ export const STORY_WORLD_BOUNDS = {
 } as const;
 
 export const STORY_INTERACTION_DISTANCE = 2.55;
+export const UGAT_STORY = "m1-story-2";
+export const UGAT_SCROLL_POSITIONS = [{ x: -3.8, z: 7.5 }, { x: 3.8, z: 1.8 }, { x: -3.5, z: -4 }];
 
 export const RETURN_PORTAL_ID = "return-to-hub";
 // Behind the entry area, offset left so the chase camera can see the player.

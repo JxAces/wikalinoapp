@@ -1,6 +1,6 @@
 import { getAllStories, type Story } from "@/data/stories";
 import type { StoryWorldPortal } from "./story-world.types";
-import { QUESTION_SCROLL_POSITIONS } from "./story-world.constants";
+import { QUESTION_SCROLL_POSITIONS, UGAT_SCROLL_POSITIONS, UGAT_STORY } from "./story-world.constants";
 
 type Answers = Record<string, unknown>;
 
@@ -8,12 +8,14 @@ export function isWorldChestUnlocked(portals: StoryWorldPortal[]) {
   return portals.length > 0 && portals.every(portal => portal.state === "completed");
 }
 
-/** All preceding stories must have every task completed, including old saves
- * that may contain answers from a later story completed out of order. */
+/** Portal prerequisites are temporarily disabled for exploring all worlds. */
 export function canEnterStory(storyId: string, answers: Answers) {
   const stories = getAllStories();
   const index = stories.findIndex(story => story.id === storyId);
-  return index >= 0 && stories.slice(0, index).every(story => isStoryAnswered(story, answers));
+  // Restore this return to require every preceding story's tasks:
+  // return index >= 0 && stories.slice(0, index).every(story => isStoryAnswered(story, answers));
+  void answers; // Keep the shared signature for map, route and store callers.
+  return index >= 0;
 }
 
 export function isStoryAnswered(story: Story, answers: Answers) {
@@ -33,6 +35,7 @@ export function questionGroup(story: Story, activityIndex: number) {
 }
 
 export function questionScrolls(story: Story, answers: Answers): StoryWorldPortal[] {
+  const positions = story.id === UGAT_STORY ? UGAT_SCROLL_POSITIONS : QUESTION_SCROLL_POSITIONS;
   return Array.from({ length: Math.ceil(story.activities.length / QUESTIONS_PER_SCROLL) }, (_, index) => {
     const { start, end, id } = questionGroup(story, index * QUESTIONS_PER_SCROLL);
     const activities = story.activities.slice(start, end);
@@ -43,7 +46,7 @@ export function questionScrolls(story: Story, answers: Answers): StoryWorldPorta
       activityIndex: next < 0 ? start : start + next,
       questionGroup: { index, start, end, answeredCount },
       story,
-      position: QUESTION_SCROLL_POSITIONS[index % QUESTION_SCROLL_POSITIONS.length],
+      position: positions[index % positions.length],
       state: next < 0 ? "completed" : canAnswerQuestion(story, start, answers) ? "current" : "locked",
     };
   });
@@ -59,9 +62,9 @@ export function worldNodeId(node: StoryWorldPortal) {
 }
 
 export const STORY_SETTINGS = {
-  "m1-story-1": { name: "Bakuran ng mga Pangarap", sky: 0xf3d8be, ground: 0xc8aa86, path: 0xf6dfb0, accent: 0xeab469 },
-  "m1-story-2": { name: "Bayan ng mga Ugat", sky: 0xb9ced8, ground: 0x8b997d, path: 0xb4bdc1, accent: 0x83c7a0 },
-  "m1-story-3": { name: "Paaralan ng Kahulugan", sky: 0xc5e4e6, ground: 0xc3b895, path: 0xe9ce93, accent: 0x69cbd5 },
+  "m1-story-1": { name: "Labirinto ng Sandaang Damit", sky: 0xf3d8be, ground: 0xc8aa86, path: 0xf6dfb0, accent: 0xeab469 },
+  "m1-story-2": { name: "Gubat ng Magkakabuhol na Ugat", sky: 0x06141f, ground: 0x142e2b, path: 0x436d61, accent: 0x83c7a0 },
+  "m1-story-3": { name: "Nayon ng mga Nakalimutang Kuwento", sky: 0xa7b2ac, ground: 0x777d70, path: 0xc5b794, accent: 0xcabb91 },
 } as const;
 
 export function storySetting(storyId?: string) {

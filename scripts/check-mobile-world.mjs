@@ -25,6 +25,9 @@ const { mergeColoredScenery } = await import(moduleUrl('merge-colored-scenery'))
 const { createMeadowEnvironment } = await import(moduleUrl('story-world-environment'));
 const { createStoryPortal } = await import(moduleUrl('story-portal-visual'));
 const { disposeWorldObject } = await import(moduleUrl('dispose-world-object'));
+const { canStandInDressMaze, moveThroughDressMaze } = await import(moduleUrl('dress-maze'));
+const { createDressMaze } = await import(moduleUrl('dress-maze-visual'));
+const { QUESTION_SCROLL_POSITIONS, RETURN_PORTAL_POSITION, worldChestPosition } = await import(moduleUrl('story-world.constants'));
 async function load(name) {
   const bytes = fs.readFileSync(new URL(`../assets/models/wikalino-${name}-explorer.glb`, import.meta.url));
   return new GLTFLoader().parseAsync(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength), '');
@@ -125,3 +128,76 @@ assert(stats(meadow).triangles < stats(full).triangles * .5);
 console.log('Native meadow:', stats(meadow), 'Full meadow:', stats(full), 'Portal:', stats(portal.group));
 [meadow, full, portal.group].forEach(disposeWorldObject);
 console.log('Mobile batching, pose fidelity, shared colors, idle, cancellation and disposal passed');
+
+// Flood the actual collision layout, proving progression and the exit are reachable.
+const step = 0.2, minX = -7.4, minZ = -19.2, columns = 75, rows = 164;
+const cell = point => [Math.round((point.x - minX) / step), Math.round((point.z - minZ) / step)];
+const startCell = cell({ x: -1.6, z: 9.7 });
+const queue = [startCell], visited = new Set([startCell.join(',')]);
+for (let head = 0; head < queue.length; head++) {
+  const [x, z] = queue[head];
+  for (const [dx, dz] of [[1,0], [-1,0], [0,1], [0,-1]]) {
+    const nx = x + dx, nz = z + dz, key = `${nx},${nz}`;
+    if (nx < 0 || nx >= columns || nz < 0 || nz >= rows || visited.has(key)) continue;
+    if (!canStandInDressMaze(minX + nx * step, minZ + nz * step)) continue;
+    visited.add(key); queue.push([nx, nz]);
+  }
+}
+for (const point of [...QUESTION_SCROLL_POSITIONS, ...QUESTION_SCROLL_POSITIONS.map(point => ({ x: point.x, z: point.z + 1.7 })), RETURN_PORTAL_POSITION, worldChestPosition(true)]) {
+  assert(canStandInDressMaze(point.x, point.z), 'A destination or resume spawn must not intersect a partition');
+  assert(visited.has(cell(point).join(',')), 'Every scroll, chest and return portal is reachable');
+}
+const walker = { x: -1.6, z: 8 };
+moveThroughDressMaze(walker, 0, -4);
+assert(walker.z > 6.7, 'A large movement step cannot pass through a thin maze partition');
+moveThroughDressMaze(walker, 1, -1);
+assert(walker.x > -1 && canStandInDressMaze(walker.x, walker.z), 'Player can slide along a wall');
+const maze = createDressMaze();
+assert.equal(stats(maze).meshes, 1, 'All dress colors and partitions share one draw call');
+assert(maze.userData.garmentCount >= 90, 'Clothing racks contain a dense variety of garments');
+assert(stats(maze).triangles < 20000, 'Maze geometry stays within a small phone budget');
+console.log('Dress maze:', stats(maze), 'all destinations reachable; collision, sliding and batching passed');
+disposeWorldObject(maze);
+const { createUgatForest, canStandInUgat, moveThroughUgat, UGAT_SWAMPS } = await import(moduleUrl('ugat-forest'));
+const { UGAT_SCROLL_POSITIONS } = await import(moduleUrl('story-world.constants'));
+const forest = createUgatForest();
+const forestQueue = [cell({x:-3.8,z:9.2})], forestVisited = new Set([forestQueue[0].join(',')]);
+for(let head=0;head<forestQueue.length;head++) {
+  const [x,z]=forestQueue[head];
+  for(const [dx,dz] of [[1,0],[-1,0],[0,1],[0,-1]]) {
+    const nx=x+dx,nz=z+dz,key=`${nx},${nz}`;
+    if(nx<0||nx>=columns||nz<0||nz>=rows||forestVisited.has(key)||!canStandInUgat(minX+nx*step,minZ+nz*step)) continue;
+    forestVisited.add(key);forestQueue.push([nx,nz]);
+  }
+}
+for(const point of [...UGAT_SCROLL_POSITIONS,...UGAT_SCROLL_POSITIONS.map(point=>({x:point.x,z:point.z+1.7})),RETURN_PORTAL_POSITION,worldChestPosition(true)]) {
+  assert(canStandInUgat(point.x,point.z),'Forest destinations and resume positions must be dry and clear');
+  assert(forestVisited.has(cell(point).join(',')),'All forest scrolls, chest and exit have a dry route');
+}
+for(const pool of UGAT_SWAMPS) assert(!canStandInUgat(pool.x,pool.z),'Swamp interiors block walking');
+const forestWalker={x:0,z:9};moveThroughUgat(forestWalker,0,-6);
+assert(forestWalker.z>7.4,'Movement cannot tunnel through swamp water');
+assert(stats(forest).meshes<=12 && stats(forest).triangles<20000,'Night forest stays within mobile scene budget');
+console.log('Ugat forest:',stats(forest),'dry routes, safe spawns and swamp collision passed');
+disposeWorldObject(forest);
+const {createForgottenVillage,canStandInVillage,moveThroughVillage,VILLAGE_BUILDINGS}=await import(moduleUrl('forgotten-village'));
+const village=createForgottenVillage();
+const villageQueue=[cell({x:-1.6,z:9.7})],villageVisited=new Set([villageQueue[0].join(',')]);
+for(let head=0;head<villageQueue.length;head++) {
+  const [x,z]=villageQueue[head];
+  for(const [dx,dz] of [[1,0],[-1,0],[0,1],[0,-1]]) {
+    const nx=x+dx,nz=z+dz,key=`${nx},${nz}`;
+    if(nx<0||nx>=columns||nz<0||nz>=rows||villageVisited.has(key)||!canStandInVillage(minX+nx*step,minZ+nz*step)) continue;
+    villageVisited.add(key);villageQueue.push([nx,nz]);
+  }
+}
+for(const point of [...QUESTION_SCROLL_POSITIONS,...QUESTION_SCROLL_POSITIONS.map(point=>({x:point.x,z:point.z+1.7})),RETURN_PORTAL_POSITION,worldChestPosition(true)]) {
+  assert(canStandInVillage(point.x,point.z),'Village destinations and resume points must be outside buildings');
+  assert(villageVisited.has(cell(point).join(',')),'Village lanes reach all scrolls, chest and exit');
+}
+for(const building of VILLAGE_BUILDINGS) assert(!canStandInVillage(building.x,building.z));
+const villager={x:0,z:8};moveThroughVillage(villager,6,0);
+assert(villager.x<3.8 && canStandInVillage(villager.x,villager.z),'Movement stops at house walls without tunneling');
+assert(stats(village).meshes<=2&&stats(village).triangles<15000,'Village scenery stays inexpensive for phones');
+console.log('Forgotten village:',stats(village),'all objectives reachable; buildings block movement');
+disposeWorldObject(village);

@@ -28,7 +28,7 @@ import { useUserStore } from "@/store/useUserStore";
 import { getLevelInfo } from "@/utils/progression";
 
 import { StoryWorldEngine } from "./StoryWorldEngine.native";
-import { RETURN_PORTAL_ID, STORY_WORLD_POSITIONS } from "./story-world.constants";
+import { RETURN_PORTAL_ID, STORY_WORLD_POSITIONS, UGAT_STORY } from "./story-world.constants";
 import type {
   StoryWorldInput,
   StoryWorldPortal,
@@ -78,7 +78,8 @@ export default function StoryWorld({ questStoryId }: { questStoryId?: string } =
     [activityResults, questStory, stories],
   );
   const spawnNode = questStory ? portals.find(node => (worldNodeId(node) === params.node || (node.questionGroup && node.story.activities.slice(node.questionGroup.start, node.questionGroup.end).some(activity => activity.id === params.node)))) ?? portals.find(node => node.state === "current") : undefined;
-  const spawnPosition = useMemo(() => spawnNode ? { x: spawnNode.position.x, z: spawnNode.position.z + 1.7 } : undefined, [spawnNode]);
+  const forestEntrance = questStoryId === UGAT_STORY && !params.node;
+  const spawnPosition = useMemo(() => spawnNode && !forestEntrance ? { x: spawnNode.position.x, z: spawnNode.position.z + 1.7 } : undefined, [spawnNode, forestEntrance]);
   const answered = questStory?.activities.filter(activity => activityResults[activity.id]).length ?? 0;
   const chestUnlocked = isWorldChestUnlocked(portals);
   const chestProgress = questStory ? `${answered}/${questStory.activities.length} gawain` : `${portals.filter(node => node.state === "completed").length}/${portals.length} portal`;
@@ -100,9 +101,6 @@ export default function StoryWorld({ questStoryId }: { questStoryId?: string } =
   const characterId = profile?.character ?? DEFAULT_PLAYER_CHARACTER;
   const nearbyPortal = portals.find(
     (node) => worldNodeId(node) === status.nearestStoryId,
-  );
-  const enteringPortal = portals.find(
-    (node) => worldNodeId(node) === enteringStoryId,
   );
   const returningToHub = enteringStoryId === RETURN_PORTAL_ID;
 
@@ -206,14 +204,18 @@ export default function StoryWorld({ questStoryId }: { questStoryId?: string } =
       }
       setEnteringStoryId(storyId);
       void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      if (!returning) {
+        // The story route owns the book intro; leaving here first releases GL.
+        router.push({ pathname: "/story", params: { storyId } });
+        return;
+      }
       portalTransition.set(0);
       portalTransition.set(withTiming(1, {
         duration: 1080,
         easing: Easing.in(Easing.cubic),
       }));
       navigationTimerRef.current = setTimeout(() => {
-        if (returning) router.replace("/landing");
-        else router.push({ pathname: "/story", params: { storyId } });
+        router.replace("/landing");
       }, 1010);
     },
     [enteringStoryId, portalTransition, portals, questStory, ready, status.nearReturnPortal],
@@ -286,7 +288,7 @@ export default function StoryWorld({ questStoryId }: { questStoryId?: string } =
           <View style={styles.missionCopy}>
             <Text style={styles.missionEyebrow}>{setting?.name ?? "MGA PORTAL NG KUWENTO"}</Text>
             <Text numberOfLines={1} style={styles.missionText}>
-              {questStory ? `${portals.filter(node => node.state === "completed").length}/${portals.length} balumbon · ${answered}/${questStory.activities.length} tamang sagot` : "Pumasok sa portal at buksan ang aklat"}
+              {questStory ? `${questStoryId === UGAT_STORY ? "Hanapin: " : ""}${portals.filter(node => node.state === "completed").length}/${portals.length} balumbon · ${answered}/${questStory.activities.length} tamang sagot` : "Pumasok sa portal at buksan ang aklat"}
             </Text>
           </View>
           <View style={styles.levelBadge}>
@@ -368,7 +370,7 @@ export default function StoryWorld({ questStoryId }: { questStoryId?: string } =
         </View>
       </View>
 
-      {enteringPortal || returningToHub ? (
+      {returningToHub ? (
         <Animated.View
           pointerEvents="none"
           style={[styles.transitionBackdrop, transitionBackdropStyle]}
@@ -376,8 +378,8 @@ export default function StoryWorld({ questStoryId }: { questStoryId?: string } =
           <Animated.View style={[styles.transitionRing, transitionRingStyle]}>
             <MaterialCommunityIcons color="#FFF2B8" name="creation" size={43} />
           </Animated.View>
-          <Text style={styles.transitionEyebrow}>{returningToHub ? "PABALIK SA UNANG MUNDO" : "PAPASOK SA KUWENTO"}</Text>
-          <Text style={styles.transitionTitle}>{returningToHub ? "Mga Portal ng Kuwento" : enteringPortal?.story.title}</Text>
+          <Text style={styles.transitionEyebrow}>PABALIK SA UNANG MUNDO</Text>
+          <Text style={styles.transitionTitle}>Mga Portal ng Kuwento</Text>
         </Animated.View>
       ) : null}
     </View>
