@@ -287,7 +287,7 @@ export default function StoryResultScreen() {
             }
             onPress={() =>
               router.replace({
-                pathname: "/story",
+                pathname: "/story-room",
 
                 params: {
                   storyId:

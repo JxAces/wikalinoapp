@@ -1,14 +1,11 @@
-import { useSyncExternalStore, type PropsWithChildren } from "react";
+import { type PropsWithChildren } from "react";
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
+import { useUserStoreHydration } from "@/hooks/useUserStoreHydration";
 
 // Browser storage can hydrate before React mounts. Keep the server and first
 // browser render identical before showing saved profiles and canvas scenes.
-const subscribe = () => () => undefined;
-const browserSnapshot = () => true;
-const serverSnapshot = () => false;
-
 export function AppHydration({ children }: PropsWithChildren) {
-  const ready = useSyncExternalStore(subscribe, browserSnapshot, serverSnapshot);
+  const ready = useUserStoreHydration();
   if (ready) return children;
   return <View style={styles.screen}>
     <Text style={styles.brand}>WIKALINO</Text>

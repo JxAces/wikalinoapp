@@ -18,6 +18,11 @@ export function canEnterStory(storyId: string, answers: Answers) {
   return index >= 0;
 }
 
+/** The activity cabinet and quiz scroll unlock after this story's reading. */
+export function canOpenStoryActivities(storyId: string, readingCompleted: readonly string[], answers: Answers) {
+  return canEnterStory(storyId, answers) && readingCompleted.includes(storyId);
+}
+
 export function isStoryAnswered(story: Story, answers: Answers) {
   return story.activities.length > 0 && story.activities.every(activity => Boolean(answers[activity.id]));
 }
