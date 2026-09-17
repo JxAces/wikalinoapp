@@ -3,12 +3,26 @@
 The mobile and PWA routes share the same Three.js world engine.
 
 1. `/landing` contains three widely spaced stone portals with flowing green centers and floating rocks. Every book can be opened. Gate centers are roughly 15 world units apart, inside the existing walkable area.
-2. `/story?storyId=…` uses the book reader in journey mode. Pages turn one section at a time; students scroll to the end of a section before advancing. The last page awards reading XP once and transitions to the story world.
+2. Entering a portal opens `/story-room?storyId=…`, with three floating objects: a book for `/story`, a cabinet for `/story-cabinet`, and a scroll for the existing `/quest-world` quizzes. Both cabinet and scroll remain disabled until reading is complete. The reader advances one section at a time after scrolling to the bottom. Closing early returns to the room with both locked and the reading position saved. Completing the last page awards reading XP once and returns to the room with both unlocked. Direct cabinet and quiz URLs enforce the same reading gate.
 3. `/quest-world?storyId=…` contains a winding road of three scroll checkpoints, each containing five questions. Gold is available, gray is locked, and green with a check means all five answers are correct. The next checkpoint unlocks after the preceding group is complete. Saved answers are retained; reopening a partial group resumes its first unanswered question. Completed groups can be replayed.
 4. A scroll opens `/activity-player`. Wrong answers stay in that question. After each correct answer, the student can continue to the next question in the same group. At the end of five questions, they return beside the completed scroll and walk to the next checkpoint. Leaving midway also returns beside the same group.
 5. After all scrolls are green, the world offers the result/reward screen. Completion and reward XP are awarded once.
 
 The library remains available for free reading with unrestricted page navigation. Reading in the journey saves the section index; returning through a portal resumes that book.
+
+The cabinet contains the PDF's three activities for Sandaang Damit and three for Ugat (`data/cabinet-activities.ts`). It saves written responses and choices locally in `cabinetResponses`, separately from quiz results and XP. Completion checks required fields, not literary correctness. Editing returns a completed response to draft. Group analysis is saved on the current device; there is no shared classroom board, online submission, or teacher grading service. The third story has an explicit empty cabinet because the PDF supplies no activities for it. Clearing progress also clears cabinet responses; version 4 preserves older reading and quiz saves.
+
+The app waits for the user store to hydrate before mounting routes, so refreshing a cabinet or quiz does not evaluate reading locks against an empty initial save.
+
+The Sandaang Damit menu presents each of its three activities as a separate wooden cabinet. New activities and drafts have closed doors; a saved `completedAt` displays open doors, garments, and a completion check. Every cabinet can be opened to answer or review its activity. The doors return to the closed state when editing turns a completed response into a draft. The cabinets sit side by side on wider screens and form a vertical list on phones. Ugat keeps its existing menu.
+
+Web development registers no offline worker. If an earlier development visit installed `/sw.js`, the app unregisters that worker and reloads once to use the current Metro bundle, without touching student storage. Production keeps its offline registration. Run `node scripts/check-pwa-registration.cjs` to check this behavior.
+
+Suri-Lalim (cabinet activity 02) uses four hanging garments to navigate Bago, Suliranin, Pagbabago, and Wakas, followed by the tauhang bilog explanation. It displays one question at a time and keeps the existing five response keys, autosave, and completion rules. An incomplete finish returns to the first missing answer. The cabinet menu still has three activities; interpretation choices and textual evidence remain in activity 03. The map wraps into two rows on narrow screens.
+
+Ugat Check uses a tree with three selectable root interpretations, then the two textual proofs, then the group reflection (Piliin → Patunayan → Pagnilayan). A selected root is highlighted and the choice cards stack on mobile. Written answers remain intact when changing the interpretation. The final view displays the saved analysis for review with the teacher; it does not submit online or award a grade. Existing `ugat-check` response keys and the other two Ugat activities are unchanged.
+
+Kuwentong Detective (Sandaang Damit activity 01) uses five wooden drawers and one answer/evidence pair per case file. Hints and the PDF example guide the group. The story peek reads the existing story scenes in a modal without changing reading progress or leaving the form. Paired answers are autosaved using the original `element-0..4` and `proof-0..4` keys. The final report lists all ten fields and can be marked “Handa nang ipasuri” only when all are filled; this is not grading or online submission. Opening a drawer respects reduced-motion settings. Existing completed responses remain available for review and edits return them to draft.
 
 ## Editing
 
@@ -23,6 +37,8 @@ Inactive world screens unmount their render surface and dispose the engine. Mode
 ## Checks
 
 Run `node scripts/check-story-journey.cjs` for reading gates, sequential unlocks, replay protection, green states, and final rewards for all 45 questions. The script uses in-memory storage and does not modify real player saves.
+
+Run `node scripts/check-cabinet-svg.cjs` to render the Suri-Lalim and Ugat illustrations with the development React DOM renderer. It checks that native SVG accessibility props do not leak into HTML or trigger console errors; production builds suppress that warning.
 
 Also run `npx tsc --noEmit`, lint changed files, `npm run build:pwa`, and an iOS Expo export. Device testing is still needed to assess frame rate and native lifecycle on the target iPhone.
 

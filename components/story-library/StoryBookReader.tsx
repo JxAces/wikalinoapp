@@ -67,7 +67,7 @@ export function StoryBookReader({ story, onClose, onComplete, initialPage = -1, 
         <MaterialCommunityIcons name="close" size={24} color={Colors.accentSoft} />
       </Pressable>
       <View style={styles.heading}>
-        <Text style={styles.eyebrow}>{onComplete ? "BASAHIN UPANG BUKSAN ANG MUNDO" : "AKLATAN NG WIKALINO"}</Text>
+        <Text style={styles.eyebrow}>{onComplete ? "BASAHIN PARA SA GAWAIN AT PAGSUSULIT" : "AKLATAN NG WIKALINO"}</Text>
         <Text style={styles.headerTitle} numberOfLines={2}>{story.title}</Text>
       </View>
       <MaterialCommunityIcons name="book-open-page-variant" size={24} color={Colors.accent} />
@@ -124,9 +124,9 @@ export function StoryBookReader({ story, onClose, onComplete, initialPage = -1, 
           <MaterialCommunityIcons name="chevron-left" size={24} color={Colors.accentSoft} /><Text style={styles.previousText}>Bumalik</Text>
         </Pressable>}
         <Pressable disabled={turning || Boolean(onComplete && !cover && !atEnd)} onPress={() => lastPage ? (onComplete ?? onClose)() : turnTo(page + 1)} accessibilityRole="button"
-          accessibilityLabel={cover ? "Buksan ang aklat" : lastPage ? (onComplete ? "Pumasok sa mundo ng kuwento" : "Bumalik sa aklatan") : "Susunod na pahina"}
+          accessibilityLabel={cover ? "Buksan ang aklat" : lastPage ? (onComplete ? "Tapusin ang pagbasa" : "Bumalik sa aklatan") : "Susunod na pahina"}
           style={({ pressed }) => [styles.next, (turning || pressed || Boolean(onComplete && !cover && !atEnd)) && styles.dim]}>
-          <Text style={styles.nextText}>{cover ? "Buksan ang aklat" : lastPage ? (onComplete ? "Pasok sa mundo" : "Sa aklatan") : "Susunod"}</Text>
+          <Text style={styles.nextText}>{cover ? "Buksan ang aklat" : lastPage ? (onComplete ? "Tapusin ang pagbasa" : "Sa aklatan") : "Susunod"}</Text>
           <MaterialCommunityIcons name={lastPage ? "bookshelf" : "chevron-right"} size={24} color={Colors.primaryDark} />
         </Pressable>
       </View>

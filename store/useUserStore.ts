@@ -1,4 +1,5 @@
-import { canAnswerQuestion, canEnterStory, isStoryAnswered } from "../components/story-world/quest-progression";
+import { canAnswerQuestion, canEnterStory, canOpenStoryActivities, isStoryAnswered } from "../components/story-world/quest-progression";
+import { getCabinetActivity, isCabinetResponseComplete } from "../data/cabinet-activities";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { create } from "zustand";
 import {
@@ -34,6 +35,8 @@ const emptyUserData = () => ({
   storySceneIndexes: {},
 
   activityResults: {},
+
+  cabinetResponses: {},
 
   unlockedCollectibleIds: [],
 
@@ -82,6 +85,14 @@ export type ActivityResult = {
   completedAt: string;
 };
 
+export type CabinetResponse = {
+  storyId: string;
+  activityId: string;
+  responses: Record<string, string>;
+  groupName: string;
+  completedAt: string | null;
+};
+
 type UserStore = {
   /*
    * PROFILE
@@ -118,6 +129,15 @@ type UserStore = {
     string,
     ActivityResult
   >;
+
+  cabinetResponses: Record<string, CabinetResponse>;
+  saveCabinetResponse: (payload: {
+    storyId: string;
+    activityId: string;
+    responses: Record<string, string>;
+    groupName: string;
+    complete?: boolean;
+  }) => void;
 
   unlockedCollectibleIds: string[];
 
@@ -245,6 +265,22 @@ export const useUserStore =
 
         activityResults: {},
 
+        cabinetResponses: {},
+
+        saveCabinetResponse: ({ storyId, activityId, responses, groupName, complete = false }) =>
+          set(state => {
+            const activity = getCabinetActivity(storyId, activityId);
+            if (!activity || !canOpenStoryActivities(storyId, state.readingCompletedStoryIds, state.activityResults)) return state;
+            const cleaned = Object.fromEntries(activity.fields.map(field => [field.id, typeof responses[field.id] === "string" ? responses[field.id] : ""]));
+            if (complete && !isCabinetResponseComplete(activity, cleaned)) return state;
+            return {
+              cabinetResponses: {
+                ...state.cabinetResponses,
+                [activityId]: { storyId, activityId, responses: cleaned, groupName: groupName.trim(), completedAt: complete ? new Date().toISOString() : null },
+              },
+            };
+          }),
+
         unlockedCollectibleIds: [],
 
         lastStoryId: null,
@@ -266,6 +302,8 @@ export const useUserStore =
           storyId,
         ) =>
           set((state) => {
+            const story = getStoryById(storyId);
+            if (!story || !canEnterStory(storyId, state.activityResults)) return state;
             if (
               state.readingCompletedStoryIds.includes(
                 storyId,
@@ -275,9 +313,6 @@ export const useUserStore =
                 lastStoryId: storyId,
               };
             }
-
-            const story =
-              getStoryById(storyId);
 
             return {
               readingCompletedStoryIds: [
@@ -303,7 +338,7 @@ export const useUserStore =
           set((state) => {
             const story = getStoryById(storyId);
             const index = story?.activities.findIndex(activity => activity.id === activityId) ?? -1;
-            if (!story || !canEnterStory(storyId, state.activityResults) || !state.readingCompletedStoryIds.includes(storyId) || !canAnswerQuestion(story, index, state.activityResults)) return state;
+            if (!story || !canOpenStoryActivities(storyId, state.readingCompletedStoryIds, state.activityResults) || !canAnswerQuestion(story, index, state.activityResults)) return state;
             /*
              * Prevent XP farming by repeatedly
              * completing the same activity.
@@ -471,6 +506,8 @@ export const useUserStore =
 
             activityResults: {},
 
+            cabinetResponses: {},
+
             unlockedCollectibleIds: [],
 
             lastStoryId: null,
@@ -607,7 +644,7 @@ export const useUserStore =
       {
         name: USER_STORE_STORAGE_KEY,
 
-        version: 3,
+        version: 4,
 
         storage: createJSONStorage(
           () => AsyncStorage,
@@ -670,6 +707,8 @@ export const useUserStore =
             activityResults:
               state.activityResults ??
               {},
+
+            cabinetResponses: state.cabinetResponses ?? {},
 
             unlockedCollectibleIds:
               state.unlockedCollectibleIds ??

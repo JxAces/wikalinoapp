@@ -22,7 +22,8 @@
       },
       "predictiveBackGestureEnabled": false,
       "permissions": [
-        "android.permission.MODIFY_AUDIO_SETTINGS"
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.RECORD_AUDIO"
       ]
     },
     "web": {
@@ -45,17 +46,8 @@
       ],
       "expo-asset",
       "expo-font",
-      "expo-image",
-      "expo-status-bar",
       "expo-web-browser",
-      [
-        "expo-audio",
-        {
-          "microphonePermission": false,
-          "recordAudioAndroid": false,
-          "enableBackgroundPlayback": false
-        }
-      ]
+      "expo-audio"
     ],
     "experiments": {
       "typedRoutes": true,
@@ -64,9 +56,9 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "d7115105-7b81-4aa6-8a39-218bb75492c9"
+        "projectId": "c658340d-a76c-4922-b47a-343ad1710a6d"
       }
     },
-    "owner": "johnmark8"
+    "owner": "jxaces01"
   }
 }

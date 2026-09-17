@@ -205,8 +205,8 @@ export default function StoryWorld({ questStoryId }: { questStoryId?: string } =
       setEnteringStoryId(storyId);
       void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       if (!returning) {
-        // The story route owns the book intro; leaving here first releases GL.
-        router.push({ pathname: "/story", params: { storyId } });
+        // Leave the GL world before showing the book, cabinet, and quiz choices.
+        router.push({ pathname: "/story-room", params: { storyId } });
         return;
       }
       portalTransition.set(0);
@@ -277,7 +277,7 @@ export default function StoryWorld({ questStoryId }: { questStoryId?: string } =
             </View>
           </View>
           <View style={styles.topActions}>
-            <HudButton icon={questStory ? "map-outline" : "cards-outline"} onPress={() => questStory ? router.replace("/landing") : router.push("/collection")} />
+            <HudButton icon={questStory ? "bookshelf" : "cards-outline"} onPress={() => questStory ? router.replace({ pathname: "/story-room", params: { storyId: questStory.id } }) : router.push("/collection")} />
             <HudButton icon="chart-timeline-variant" onPress={() => router.push("/progress")} />
             <HudButton icon="information-outline" onPress={() => router.push("/about")} />
           </View>
@@ -288,7 +288,7 @@ export default function StoryWorld({ questStoryId }: { questStoryId?: string } =
           <View style={styles.missionCopy}>
             <Text style={styles.missionEyebrow}>{setting?.name ?? "MGA PORTAL NG KUWENTO"}</Text>
             <Text numberOfLines={1} style={styles.missionText}>
-              {questStory ? `${questStoryId === UGAT_STORY ? "Hanapin: " : ""}${portals.filter(node => node.state === "completed").length}/${portals.length} balumbon · ${answered}/${questStory.activities.length} tamang sagot` : "Pumasok sa portal at buksan ang aklat"}
+              {questStory ? `${questStoryId === UGAT_STORY ? "Hanapin: " : ""}${portals.filter(node => node.state === "completed").length}/${portals.length} balumbon · ${answered}/${questStory.activities.length} tamang sagot` : "Pumasok sa portal: aklat, kabinet, at balumbon."}
             </Text>
           </View>
           <View style={styles.levelBadge}>
@@ -388,7 +388,7 @@ export default function StoryWorld({ questStoryId }: { questStoryId?: string } =
 
 function HudButton({ icon, onPress }: { icon: keyof typeof MaterialCommunityIcons.glyphMap; onPress: () => void }) {
   return (
-    <Pressable accessibilityRole="button" accessibilityLabel={icon === "map-outline" ? "Bumalik sa mga portal" : icon === "cards-outline" ? "Aklatan" : icon === "chart-timeline-variant" ? "Progreso" : "Tungkol sa Wikalino"} onPress={onPress} style={({ pressed }) => [styles.hudButton, pressed && styles.pressed]}>
+    <Pressable accessibilityRole="button" accessibilityLabel={icon === "bookshelf" ? "Bumalik sa aklat, kabinet, at balumbon" : icon === "map-outline" ? "Bumalik sa mga portal" : icon === "cards-outline" ? "Aklatan" : icon === "chart-timeline-variant" ? "Progreso" : "Tungkol sa Wikalino"} onPress={onPress} style={({ pressed }) => [styles.hudButton, pressed && styles.pressed]}>
       <MaterialCommunityIcons color="#FFF1BD" name={icon} size={20} />
     </Pressable>
   );
@@ -433,7 +433,7 @@ function FallbackWorld({
       >
         <MaterialCommunityIcons color="#F7D77A" name="map-outline" size={38} />
         <Text style={styles.fallbackTitle}>{questStoryId ? "Landas ng mga Tanong" : "Mapa ng mga Kuwento"}</Text>
-        <Pressable onPress={() => router.replace("/landing")}><Text style={styles.fallbackText}>Bumalik sa mga portal</Text></Pressable>
+        <Pressable accessibilityRole="button" onPress={() => questStoryId ? router.replace({ pathname: "/story-room", params: { storyId: questStoryId } }) : router.replace("/landing")}><Text style={styles.fallbackText}>{questStoryId ? "Bumalik sa aklat, kabinet, at balumbon" : "Bumalik sa mga portal"}</Text></Pressable>
         <Text style={styles.fallbackText}>
           Hindi maipakita ang 3D mundo ngayon. Maaari mo pa ring buksan ang mga kuwento.
         </Text>
