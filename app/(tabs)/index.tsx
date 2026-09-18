@@ -10,6 +10,7 @@ import styles from "@/components/screens/loading.styles";
 import { StorybookIntroVisual } from "@/components/three/integrations/StorybookIntroVisual";
 import { useThreePerformance } from "@/hooks/useThreePerformance";
 import { useUserStore } from "@/store/useUserStore";
+import { hubStartRoute } from "@/components/story-world/hub-navigation";
 
 type IntroPhase = "opening" | "title" | "entering";
 
@@ -52,7 +53,7 @@ export default function LoadingScreen() {
 
     hasNavigated.current = true;
     if (__DEV__) console.info("[Wikalino intro] opening destination");
-    router.replace(profile ? "/landing" : "/onboarding");
+    router.replace(profile ? hubStartRoute() : "/onboarding");
   }, [isFocused, isHydrated, profile]);
 
   const showTitle = useCallback(() => {

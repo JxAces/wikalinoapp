@@ -13,6 +13,7 @@ import { Colors } from "../../constants/colors";
 import { PANGKAT_OPTIONS, type PangkatOption } from "../../data/pangkat";
 import { DEFAULT_PLAYER_CHARACTER, type PlayerCharacterId } from "../../data/player-characters";
 import { useUserStore } from "../../store/useUserStore";
+import { hubStartRoute } from "../../components/story-world/hub-navigation";
 
 export default function OnboardingScreen() {
   const setProfile = useUserStore(state => state.setProfile);
@@ -47,7 +48,7 @@ export default function OnboardingScreen() {
       avatar: "reader",
       character,
     });
-    router.replace("/landing");
+    router.replace(hubStartRoute());
   }
 
   if (choosingCharacter) {

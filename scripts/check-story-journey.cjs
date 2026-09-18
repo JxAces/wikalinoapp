@@ -33,11 +33,21 @@ const { cabinetActivities, getCabinetActivities, isCabinetResponseComplete } = l
 const { questionScrolls, questionGroup, canAnswerQuestion, canEnterStory, canOpenStoryActivities, isStoryAnswered, isWorldChestUnlocked } = load(path.join(root, "components/story-world/quest-progression.ts"));
 const { worldChestPosition, STORY_INTERACTION_DISTANCE, STORY_WORLD_POSITIONS } = load(path.join(root, "components/story-world/story-world.constants.ts"));
 const { useUserStore: store } = load(path.join(root, "store/useUserStore.ts"));
+const { hubReturnRoute, hubSpawn } = load(path.join(root, "components/story-world/hub-navigation.ts"));
 
 async function check() {
   await store.persist.rehydrate();
   const stories = getAllStories();
   assert.equal(stories.length, 3);
+  const destinations=stories.map((story,index)=>({story,position:STORY_WORLD_POSITIONS[index]}));
+  for (const story of stories) {
+    const route=hubReturnRoute(story);
+    assert.equal(route.params.returnPortal,story.id);
+    assert.equal(route.params.markahan,String(story.markahan));
+    const arrival=hubSpawn(destinations,route.params.returnPortal);
+    const destination=destinations.find(node=>node.story.id===story.id).position;
+    assert(Math.hypot(arrival.position.x-destination.x,arrival.position.z-destination.z)<4,'Each real story routes back to its own hub portal');
+  }
   const hubNodes = () => stories.map(story => ({ story, state: !canEnterStory(story.id, store.getState().activityResults) ? "locked" : isStoryAnswered(story, store.getState().activityResults) ? "completed" : "current" }));
   assert(!isWorldChestUnlocked([]), "An empty world must not unlock a chest");
   const compact = questionScrolls(stories[0], {});
@@ -46,8 +56,8 @@ async function check() {
     assert(gap < 6.5 && gap > 2 * STORY_INTERACTION_DISTANCE, "Scrolls should be close without overlapping interaction zones");
   }
   assert(Math.abs(compact[2].position.z - worldChestPosition(true).z) <= 5, "Quest chest is just beyond the last scroll");
-  assert.equal(STORY_WORLD_POSITIONS[2].z, -15, "Hub portal spacing is preserved");
-  assert.equal(worldChestPosition(false).z, -18.85, "Hub chest stays beyond all portals");
+  assert.equal(STORY_WORLD_POSITIONS[2].x, 23, "Third hub portal is in the village");
+  assert.equal(worldChestPosition(false).z, 23, "Hub reward is in the village square");
   store.getState().clearGameProgress();
   assert(canEnterStory(stories[0].id, {}));
   store.getState().saveCabinetResponse({ storyId: stories[0].id, activityId: "damit-detective", responses: {}, groupName: "Test" });

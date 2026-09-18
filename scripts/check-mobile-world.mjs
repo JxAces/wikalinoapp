@@ -201,3 +201,117 @@ assert(villager.x<3.8 && canStandInVillage(villager.x,villager.z),'Movement stop
 assert(stats(village).meshes<=2&&stats(village).triangles<15000,'Village scenery stays inexpensive for phones');
 console.log('Forgotten village:',stats(village),'all objectives reachable; buildings block movement');
 disposeWorldObject(village);
+
+const { createHubWorld, canStandInHub, moveThroughHub, hubWaypoint, HUB_BOUNDS, HUB_HOUSES } = await import(moduleUrl('hub-world'));
+const { STORY_WORLD_POSITIONS } = await import(moduleUrl('story-world.constants'));
+const { HUB_PORTALS, HUB_START_POSITION, portalApproachClear } = await import(moduleUrl('hub-layout'));
+const { hubSpawn, hubStartRoute, hubReturnRoute } = await import(moduleUrl('hub-navigation'));
+const { FOREST_WILDLIFE } = await import(moduleUrl('hub-wildlife'));
+const hub = createHubWorld();
+const hubStats = stats(hub.group);
+const hubGround = hub.group.getObjectByName('Painted leafy grass and rolling banks');
+assert(hubGround?.material.map, 'Hub uses painted grass');
+assert.equal(hubGround.material.map.image.width, 256, 'Grass texture stays small');
+assert(hub.group.getObjectByName('Storybook mushroom gardens'), 'Fantasy undergrowth is present');
+const terrainPositions=hubGround.geometry.attributes.position;
+for(let i=0;i<terrainPositions.count;i++){ const x=terrainPositions.getX(i),z=terrainPositions.getZ(i);if(x>=-36&&x<=38&&z>=-40&&z<=32)assert(Math.abs(terrainPositions.getY(i)+.07)<1e-6,'Playable ground stays level'); }
+console.log('Textured hub geometry:',hubStats);
+assert(hubStats.meshes <= 24, 'Hub scenery and all 16 living actors stay batched');
+assert(hubStats.triangles < 32000, 'Textured hub stays below the previous native meadow triangle count');
+for (const portal of HUB_PORTALS) {
+  assert(canStandInHub(portal.approach.x,portal.approach.z), 'Portal approach must be dry and unobstructed');
+  const dx=portal.approach.x-portal.x,dz=portal.approach.z-portal.z;
+  assert((Math.sin(portal.heading)*dx+Math.cos(portal.heading)*dz)/Math.hypot(dx,dz)>.9,
+    'Each portal faces its walking approach');
+}
+const hubQueue = [{...HUB_START_POSITION}], hubVisited = new Set([`${HUB_START_POSITION.x},${HUB_START_POSITION.z}`]);
+for(let head=0;head<hubQueue.length;head++) {
+  const at=hubQueue[head];
+  for(const [dx,dz] of [[.5,0],[-.5,0],[0,.5],[0,-.5]]) {
+    const p={x:at.x+dx,z:at.z+dz},key=`${p.x},${p.z}`;
+    if(hubVisited.has(key)||!canStandInHub(p.x,p.z))continue;
+    hubVisited.add(key);hubQueue.push(p);
+  }
+}
+for(const p of [...STORY_WORLD_POSITIONS,worldChestPosition(false)]) assert(hubVisited.has(`${p.x},${p.z}`),'Every hub portal and chest is reachable over a bridge');
+assert(!canStandInHub(-13,0),'River requires a bridge');
+assert(canStandInHub(-13,-8)&&canStandInHub(-13,18),'Both bridges are walkable');
+assert(!canStandInHub(HUB_HOUSES[0].x,HUB_HOUSES[0].z),'Houses block movement');
+const hubWalker={...HUB_START_POSITION};
+for(const target of [...STORY_WORLD_POSITIONS,worldChestPosition(false)]) {
+  let steps=0;
+  while(Math.hypot(hubWalker.x-target.x,hubWalker.z-target.z)>.7&&steps++<4000) {
+    const waypoint=hubWaypoint(hubWalker,target),dx=waypoint.x-hubWalker.x,dz=waypoint.z-hubWalker.z,len=Math.hypot(dx,dz);
+    moveThroughHub(hubWalker,dx/len*.12,dz/len*.12);
+  }
+  assert(steps<4000,`Following HUD arrow to ${JSON.stringify(target)} stuck at ${JSON.stringify(hubWalker)}`);
+}
+const hubDestinations=STORY_WORLD_POSITIONS.map((position,index)=>({position,story:{id:`m1-story-${index+1}`,markahan:1}}));
+const beginning=hubSpawn(hubDestinations,hubStartRoute().params.returnPortal);
+assert.deepEqual(beginning.position,HUB_START_POSITION);
+assert(canStandInHub(beginning.position.x,beginning.position.z));
+assert(Math.hypot(beginning.position.x-HUB_PORTALS[0].x,beginning.position.z-HUB_PORTALS[0].z)<9,'Fresh play begins near the waterfall');
+for(const node of hubDestinations) {
+  const route=hubReturnRoute(node.story), arrival=hubSpawn(hubDestinations,route.params.returnPortal);
+  assert(canStandInHub(arrival.position.x,arrival.position.z),'Portal returns must be dry and clear of buildings');
+  const dx=node.position.x-arrival.position.x,dz=node.position.z-arrival.position.z,distance=Math.hypot(dx,dz);
+  assert(distance>2.55 && distance<4,'Return next to the correct entrance, outside its plinth/interaction zone');
+  assert((Math.sin(arrival.heading)*dx+Math.cos(arrival.heading)*dz)/distance>.99,'Face the portal on return');
+  const returning={...arrival.position};
+  moveThroughHub(returning,dx/distance,dz/distance);
+  assert(Math.hypot(returning.x-node.position.x,returning.z-node.position.z)<distance-.9,'The return spawn can walk back toward its portal');
+  assert.deepEqual(hubSpawn(hubDestinations,[node.story.id]),arrival,'Array query parameters resolve the same portal');
+}
+assert.deepEqual(hubSpawn(hubDestinations,'missing-story'),beginning,'Invalid return IDs fall back safely to the waterfall');
+assert.deepEqual(hubSpawn([], 'missing-story'),beginning,'Empty catalog keeps a safe startup location');
+console.log('Hub arrivals: waterfall start, all three return routes, dry spawns and approach-facing headings passed');
+const edge={x:HUB_BOUNDS.maxX,z:0};moveThroughHub(edge,4,0);assert.equal(edge.x,HUB_BOUNDS.maxX);
+const wildlife=hub.group.getObjectByName('Forest wildlife');
+assert.equal(wildlife.children.length,9);
+for(const kind of ['butterfly','wolf','reindeer']) assert(wildlife.children.some(mesh=>mesh.userData.kind===kind));
+const wildlifeGeometry=wildlife.children.map(mesh=>{
+  assert(mesh.isMesh && !mesh.isSkinnedMesh, 'Wildlife must not need WebGL 2 skinning');
+  assert.equal(mesh.geometry.attributes.animalPivot.count,mesh.geometry.attributes.position.count);
+  assert.equal(mesh.geometry.attributes.animalMotion.count,mesh.geometry.attributes.position.count);
+  return {geometry:mesh.geometry,versions:Object.values(mesh.geometry.attributes).map(a=>a.version)};
+});
+const shaderStates=wildlife.children.map(mesh=>{
+  const shader={uniforms:{},vertexShader:'#include <beginnormal_vertex>\n#include <begin_vertex>'};
+  mesh.material.onBeforeCompile(shader);
+  return shader.uniforms;
+});
+let walked=false,grazed=false;
+for(let i=0;i<1800;i++) {
+  hub.update(i/30,{x:18,z:-25});
+  for(const [index,mesh] of wildlife.children.entries()) {
+    assert(canStandInHub(mesh.position.x,mesh.position.z),'Wildlife stays on dry, walkable ground');
+    assert(!portalApproachClear(mesh.position.x,mesh.position.z,.6),'Wildlife keeps portal entrances clear');
+    assert(mesh.position.distanceTo(new Vector3(FOREST_WILDLIFE[index].x,0,FOREST_WILDLIFE[index].z))<3,
+      'Wildlife remains inside its forest habitat');
+    walked ||= shaderStates[index].animalStride.value>.9;
+    grazed ||= shaderStates[index].animalGraze.value>.9;
+  }
+}
+assert(walked && grazed,'Wildlife alternates walking and grazing, with blended motion');
+for(const [index,mesh] of wildlife.children.entries()) {
+  assert.equal(mesh.geometry,wildlifeGeometry[index].geometry);
+  assert.deepEqual(Object.values(mesh.geometry.attributes).map(a=>a.version),wildlifeGeometry[index].versions,
+    'Wildlife never allocates/reuploads geometry during animation');
+}
+hub.update(60,{x:0,z:28});
+assert(wildlife.children.every(mesh=>!mesh.visible),'Distant forest animals stop rendering');
+assert.deepEqual(stats(hub.group),hubStats,'Roaming reuses geometry');
+const resources=new Set();
+hub.group.traverse(object=>{
+  if(!object.isMesh)return;
+  resources.add(object.geometry);
+  for(const material of Array.isArray(object.material)?object.material:[object.material]) {
+    resources.add(material);
+    if(material.map)resources.add(material.map);
+  }
+});
+const disposalCounts=new Map([...resources].map(resource=>[resource,0]));
+resources.forEach(resource=>resource.addEventListener('dispose',()=>disposalCounts.set(resource,disposalCounts.get(resource)+1)));
+disposeWorldObject(hub.group);
+assert([...disposalCounts.values()].every(count=>count===1),'All hub geometry, textures and materials are disposed once on exit');
+console.log('Expanded hub:',hubStats,'reachable/facing portals; wildlife habitats, walking/grazing, distance culling, unchanged buffers and disposal passed');

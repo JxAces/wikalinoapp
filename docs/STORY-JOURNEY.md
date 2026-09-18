@@ -28,7 +28,7 @@ Kuwentong Detective (Sandaang Damit activity 01) uses five wooden drawers and on
 
 - `components/story-world/quest-progression.ts`: answer gates, scroll positions, and world palettes.
 - `components/story-world/quest-scenery.ts`: dress drawing courtyard, rooted town, and school courtyard. Static geometry is merged by color to limit draw calls.
-- `components/story-world/story-portal-visual.ts`: animated hub gates. Uses merged stone meshes and a GLSL 1 procedural surface with no textures or WebGL 2 requirements. Each portal uses six draw calls; its fragment animation was checked in a WebGL 1 browser preview without shader errors.
+- `components/story-world/story-portal-visual.ts`: animated hub gates. Uses merged stone meshes and a GLSL 1 procedural surface with no textures or WebGL 2 requirements. Each portal uses four draw calls; its fragment animation was checked in a WebGL 1 browser preview without shader errors.
 - `components/story-library/StoryBookReader.tsx`: shared library/journey reader; `onComplete` enables sequential reading.
 - `store/useUserStore.ts`: enforces reading/prerequisites before recording an activity, and all answers before awarding story completion.
 
@@ -119,3 +119,19 @@ PWA hub interactions, story/quest/activity routes, and store activity/reward
 writes enforce the rule. The collection's read-only library remains available.
 `scripts/check-story-journey.cjs` checks final-task unlocking, direct store
 bypass attempts, replay, legacy out-of-order answers, and clearing progress.
+
+## Expanded main hub
+
+The hub is now a 74 × 72-unit exploration area, separate from the compact story-world bounds. Story 1 sits on the dry waterfall shelf at (-25, -23.5), story 2 in the forest clearing at (20, -24.5), and story 3 in the village square at (23, 12.5). `hub-layout.ts` supplies the portal centers, approach points and headings to both scenery and the engine. Each gate faces its approach, with clearings that exclude trees, mushrooms and wildlife. The hut is beside the village at (33, 7), clear of the portal; the completion chest is at (25, 23).
+
+The river blocks movement except at two bridges. Houses, the hut clearing, and the cliff backdrop also block movement. A camera-relative HUD arrow selects the first unfinished story (then the chest), names its area, reports distance, and routes across bridges. Guidance updates at four times per second; quest scroll worlds retain their existing controls and layout.
+
+Fresh play starts at (-24, -16), on the dry path facing the waterfall portal. `hub-navigation.ts` carries the story ID in the `returnPortal` route parameter. The story-room Back button, quest return portal and story-result exit return 3.4 units in front of that story's original gate, facing it. Entering a gate also records that parameter on the hub tab for native/browser Back. Unknown IDs fall back to the waterfall; loading/onboarding explicitly clear old return parameters. The camera anchor, camera heading and joystick heading initialize at the same arrival pose. Quest entry/resume positions are unchanged.
+
+Three villagers, two chickens and two birds roam locally alongside the forest wildlife below. They are ambient characters, not dialogue/quest NPCs. Geometry is merged per region/actor and distant actors are hidden. No additional GLBs, skeletal rigs or physics dependencies are loaded.
+
+The hub keeps the reference's storybook meadow direction: leafy painted grass, broad mottled tree crowns, flared trunks, spotted mushrooms, grass fans, and rolling perimeter banks. Mushrooms are now 48% of their original scale to open the sightlines. Grass reuses the existing 256px procedural meadow texture (no image download or canvas dependency). Playable ground stays level and the river/bridge routes remain unchanged. A 32,000-triangle / 24-mesh ceiling covers the hub scenery plus all 16 ambient actors, excluding existing portals and imported models.
+
+`hub-wildlife.ts` adds five butterflies, two reindeer and two wolves in the northern forest. Wings flap, legs walk, tails move, and reindeer pause to graze. Each animal is a single merged ordinary mesh with GLSL 1 pivot attributes, avoiding skeletal skinning, float textures and per-frame vertex-buffer uploads. Animals remain in small forest habitats, keep portal approaches clear, pause near the player, and stop rendering/updating beyond 26 units. Small clearings keep their walking loops clear of tree trunks. Existing villagers, chickens and birds remain.
+
+`hub-water.ts` animates river ripples, waterfall streaks and pool rings with two opaque draws. Batched forest/palm foliage sways through a shader uniform; trunks and ground stay fixed. These effects were rendered in a WebGL 1 browser preview without shader errors. Physical iPhone frame rate still needs device verification. `check-mobile-world.mjs` checks portal reachability/facing, habitat limits, grazing/walking, distance culling, unchanged animation buffers, scene budgets and resource disposal.

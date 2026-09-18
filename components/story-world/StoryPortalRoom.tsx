@@ -10,6 +10,7 @@ import type { Story } from "@/data/stories";
 import { getCabinetActivities } from "@/data/cabinet-activities";
 import { useUserStore } from "@/store/useUserStore";
 import { canEnterStory, canOpenStoryActivities } from "./quest-progression";
+import { hubReturnRoute } from "./hub-navigation";
 
 /** Lightweight vector objects float without retaining another GL context. */
 function FloatingObject({ cabinet = false, scroll = false, tree = false, locked = false, completed = 0 }: { cabinet?: boolean; scroll?: boolean; tree?: boolean; locked?: boolean; completed?: number }) {
@@ -120,7 +121,7 @@ export function StoryPortalRoom({ story }: { story: Story }) {
   return <LinearGradient colors={["#122F31", "#254C3F", "#142E2B"]} style={styles.screen}>
     <SafeAreaView style={styles.screen}>
       <View style={styles.header}>
-        <Pressable accessibilityRole="button" accessibilityLabel="Bumalik sa mga portal" onPress={() => router.replace("/landing")} style={styles.back}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Bumalik sa mga portal" onPress={() => router.replace(hubReturnRoute(story))} style={styles.back}>
           <MaterialCommunityIcons name="arrow-left" size={22} color="#F5E4B7" />
         </Pressable>
         <Text style={styles.headerLabel}>MUNDO NG KUWENTO</Text>

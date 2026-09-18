@@ -25,7 +25,7 @@ function randomSource(seed: number) {
 
 // A small raw RGBA texture works in Expo GL without Canvas, image decoding,
 // network requests or a WebGL 2 dependency. Its edges wrap seamlessly.
-function meadowTexture() {
+export function meadowTexture() {
   const size = 256;
   const pixels = new Uint8Array(size * size * 4);
   const random = randomSource(741);

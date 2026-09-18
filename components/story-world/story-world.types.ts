@@ -22,6 +22,7 @@ export type StoryWorldInput = {
 };
 
 export type StoryWorldStatus = {
+  guidance?: { label: string; degrees: number; distance: number; viaBridge: boolean };
   animation: "Idle" | "Walk";
   nearestStoryId: string | null;
   nearChest?: boolean;

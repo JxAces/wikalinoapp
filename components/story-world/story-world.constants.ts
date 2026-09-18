@@ -1,10 +1,7 @@
 import type { StoryWorldPosition } from "./story-world.types";
+import { HUB_PORTALS } from "./hub-layout";
 
-export const STORY_WORLD_POSITIONS: readonly StoryWorldPosition[] = [
-  { x: -4.8, z: 8 },
-  { x: 4.8, z: -3 },
-  { x: -4.8, z: -15 },
-];
+export const STORY_WORLD_POSITIONS: readonly StoryWorldPosition[] = HUB_PORTALS;
 
 export const STORY_WORLD_BOUNDS = {
   maxX: 7.4,
@@ -29,5 +26,5 @@ export const QUESTION_SCROLL_POSITIONS: readonly StoryWorldPosition[] = [
 ];
 
 export function worldChestPosition(quest: boolean): StoryWorldPosition {
-  return { x: 0, z: quest ? -7 : -18.85 };
+  return quest ? { x: 0, z: -7 } : { x: 25, z: 23 };
 }

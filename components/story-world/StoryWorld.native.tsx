@@ -36,8 +36,9 @@ import type {
 } from "./story-world.types";
 import { VirtualJoystick } from "./VirtualJoystick";
 import { useWorldKeyboard } from "@/hooks/useWorldKeyboard";
+import { hubReturnRoute, hubSpawn } from "./hub-navigation";
 
-import { canEnterStory, isStoryAnswered, isWorldChestUnlocked, questionScrolls, scrollTitle, storySetting, worldNodeId } from "./quest-progression";
+import { canEnterStory, isStoryAnswered, isWorldChestUnlocked, questionScrolls, scrollTitle, worldNodeId } from "./quest-progression";
 
 const EMPTY_STATUS: StoryWorldStatus = {
   animation: "Idle",
@@ -47,9 +48,8 @@ const EMPTY_STATUS: StoryWorldStatus = {
 export default function StoryWorld({ questStoryId }: { questStoryId?: string } = {}) {
   const focused = useIsFocused();
   const insets = useSafeAreaInsets();
-  const params = useLocalSearchParams<{ markahan?: string; node?: string }>();
+  const params = useLocalSearchParams<{ markahan?: string; node?: string; returnPortal?: string | string[] }>();
   const questStory = questStoryId ? getStoryById(questStoryId) : undefined;
-  const setting = storySetting(questStoryId);
   const profile = useUserStore((state) => state.profile);
   const xp = useUserStore((state) => state.xp);
   const activityResults = useUserStore((state) => state.activityResults);
@@ -79,7 +79,11 @@ export default function StoryWorld({ questStoryId }: { questStoryId?: string } =
   );
   const spawnNode = questStory ? portals.find(node => (worldNodeId(node) === params.node || (node.questionGroup && node.story.activities.slice(node.questionGroup.start, node.questionGroup.end).some(activity => activity.id === params.node)))) ?? portals.find(node => node.state === "current") : undefined;
   const forestEntrance = questStoryId === UGAT_STORY && !params.node;
-  const spawnPosition = useMemo(() => spawnNode && !forestEntrance ? { x: spawnNode.position.x, z: spawnNode.position.z + 1.7 } : undefined, [spawnNode, forestEntrance]);
+  const hubArrival = useMemo(() => hubSpawn(portals, params.returnPortal), [portals, params.returnPortal]);
+  const spawnPosition = useMemo(() => questStory
+    ? spawnNode && !forestEntrance ? { x: spawnNode.position.x, z: spawnNode.position.z + 1.7 } : undefined
+    : hubArrival.position, [questStory, spawnNode, forestEntrance, hubArrival]);
+  const spawnHeading = questStory ? undefined : hubArrival.heading;
   const answered = questStory?.activities.filter(activity => activityResults[activity.id]).length ?? 0;
   const chestUnlocked = isWorldChestUnlocked(portals);
   const chestProgress = questStory ? `${answered}/${questStory.activities.length} gawain` : `${portals.filter(node => node.state === "completed").length}/${portals.length} portal`;
@@ -138,6 +142,10 @@ export default function StoryWorld({ questStoryId }: { questStoryId?: string } =
 
   const handleStatusChange = useCallback((next: StoryWorldStatus) => {
     setStatus((current) =>
+      current.guidance?.label === next.guidance?.label &&
+      current.guidance?.degrees === next.guidance?.degrees &&
+      current.guidance?.distance === next.guidance?.distance &&
+      current.guidance?.viaBridge === next.guidance?.viaBridge &&
       current.animation === next.animation &&
       current.nearChest === next.nearChest &&
       current.nearReturnPortal === next.nearReturnPortal &&
@@ -157,6 +165,7 @@ export default function StoryWorld({ questStoryId }: { questStoryId?: string } =
           characterId,
           questStoryId,
           spawnPosition,
+          spawnHeading,
           gl,
           onError: (worldError) => {
             console.warn("Hindi ma-load ang 3D story world.", worldError);
@@ -173,7 +182,7 @@ export default function StoryWorld({ questStoryId }: { questStoryId?: string } =
         setError(worldError.message);
       }
     },
-    [characterId, focused, handleStatusChange, portals, questStoryId, spawnPosition],
+    [characterId, focused, handleStatusChange, portals, questStoryId, spawnPosition, spawnHeading],
   );
 
   const handleMove = useCallback((x: number, y: number) => {
@@ -205,6 +214,8 @@ export default function StoryWorld({ questStoryId }: { questStoryId?: string } =
       setEnteringStoryId(storyId);
       void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       if (!returning) {
+        // Keep the origin on this hub tab for native/browser Back as well as explicit exits.
+        if (!questStory && portal) router.setParams(hubReturnRoute(portal.story).params);
         // Leave the GL world before showing the book, cabinet, and quiz choices.
         router.push({ pathname: "/story-room", params: { storyId } });
         return;
@@ -215,7 +226,7 @@ export default function StoryWorld({ questStoryId }: { questStoryId?: string } =
         easing: Easing.in(Easing.cubic),
       }));
       navigationTimerRef.current = setTimeout(() => {
-        router.replace("/landing");
+        if (questStory) router.replace(hubReturnRoute(questStory));
       }, 1010);
     },
     [enteringStoryId, portalTransition, portals, questStory, ready, status.nearReturnPortal],
@@ -268,12 +279,9 @@ export default function StoryWorld({ questStoryId }: { questStoryId?: string } =
       <View pointerEvents="box-none" style={[StyleSheet.absoluteFill, styles.hudLayer]}>
         <View style={[styles.topHud, { paddingTop: insets.top + 8 }]}>
           <View style={styles.identityCard}>
-            <View style={styles.avatar}>
-              <MaterialCommunityIcons color="#F7D77A" name="account" size={20} />
-            </View>
             <View>
-              <Text style={styles.welcome}>MALIGAYANG PAGLALAKBAY</Text>
               <Text numberOfLines={1} style={styles.playerName}>{firstName}</Text>
+              <Text style={styles.levelText}>LV {level.level}</Text>
             </View>
           </View>
           <View style={styles.topActions}>
@@ -283,19 +291,20 @@ export default function StoryWorld({ questStoryId }: { questStoryId?: string } =
           </View>
         </View>
 
-        <View style={[styles.missionCard, { top: insets.top + 78 }]}>
-          <MaterialCommunityIcons color="#F7D77A" name="map-marker-path" size={17} />
-          <View style={styles.missionCopy}>
-            <Text style={styles.missionEyebrow}>{setting?.name ?? "MGA PORTAL NG KUWENTO"}</Text>
-            <Text numberOfLines={1} style={styles.missionText}>
-              {questStory ? `${questStoryId === UGAT_STORY ? "Hanapin: " : ""}${portals.filter(node => node.state === "completed").length}/${portals.length} balumbon · ${answered}/${questStory.activities.length} tamang sagot` : "Pumasok sa portal: aklat, kabinet, at balumbon."}
-            </Text>
+        {ready && questStory && <View pointerEvents="none" style={[styles.navigationCard, { top: insets.top + 58 }]}>
+          <MaterialCommunityIcons color="#F7D77A" name="script-text-outline" size={20} />
+          <Text style={styles.navigationTitle}>{portals.filter(node => node.state === "completed").length}/{portals.length} balumbon</Text>
+        </View>}
+
+        {ready && !questStory && status.guidance ? (
+          <View pointerEvents="none" accessible style={[styles.navigationCard, { top: insets.top + 58 }]} accessibilityLabel={`${status.guidance.label}, ${status.guidance.distance} metro${status.guidance.viaBridge ? ', dumaan sa tulay' : ''}`}>
+            <View style={{ transform: [{ rotate: `${status.guidance.degrees}deg` }] }}>
+              <MaterialCommunityIcons name="arrow-up-bold" size={23} color="#F7D77A" />
+            </View>
+            <Text numberOfLines={1} style={styles.navigationTitle}>{status.guidance.label.split(" · ")[0]} · {status.guidance.distance} m</Text>
+            {status.guidance.viaBridge && <MaterialCommunityIcons name="bridge" color="#D0DFC0" size={18} />}
           </View>
-          <View style={styles.levelBadge}>
-            <Text style={styles.levelText}>LV {level.level}</Text>
-            <Text style={styles.xpText}>{xp} XP</Text>
-          </View>
-        </View>
+        ) : null}
 
         {!ready ? (
           <View style={styles.loadingCard}>
@@ -305,7 +314,11 @@ export default function StoryWorld({ questStoryId }: { questStoryId?: string } =
           </View>
         ) : null}
 
-        {ready && questStory && status.nearReturnPortal ? (
+        {ready && status.nearChest ? (
+          <View style={[styles.storyPrompt, { bottom: insets.bottom + 164 }]}>
+            <ChestRewardPrompt unlocked={chestUnlocked} progress={chestProgress} quest={Boolean(questStory)} nearby onClaim={claimChest} />
+          </View>
+        ) : ready && questStory && status.nearReturnPortal ? (
           <View style={[styles.storyPrompt, { bottom: insets.bottom + 164 }]}>
             <MaterialCommunityIcons name="exit-run" color="#F7D77A" size={24} />
             <View style={styles.storyPromptCopy}>
@@ -362,9 +375,6 @@ export default function StoryWorld({ questStoryId }: { questStoryId?: string } =
           </View>
         ) : null}
 
-        {ready && <View style={[styles.storyPrompt, { top: insets.top + 138, bottom: undefined }]}>
-          <ChestRewardPrompt unlocked={chestUnlocked} progress={chestProgress} quest={Boolean(questStory)} nearby={Boolean(status.nearChest)} onClaim={claimChest} />
-        </View>}
         <View style={[styles.controls, { bottom: insets.bottom + 16 }]}>
           <VirtualJoystick disabled={!ready || Boolean(enteringStoryId)} onMove={handleMove} />
         </View>
@@ -472,6 +482,8 @@ function FallbackWorld({
 
 const styles = StyleSheet.create({
   hudLayer: { zIndex: 1 },
+  navigationCard: { position: "absolute", left: 18, maxWidth: "65%", paddingHorizontal: 10, paddingVertical: 7, gap: 7, borderRadius: 20, backgroundColor: "rgba(24,63,52,0.82)", flexDirection: "row", alignItems: "center" },
+  navigationTitle: { color: "#FFF9E9", fontWeight: "800", fontSize: 11, flexShrink: 1 },
   avatar: {
     alignItems: "center",
     backgroundColor: "rgba(255,255,255,0.1)",

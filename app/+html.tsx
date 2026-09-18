@@ -11,7 +11,7 @@ export default function Html({ children }: PropsWithChildren) {
       <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
       <meta name="apple-mobile-web-app-title" content="Wikalinggo" />
       <link rel="manifest" href="/manifest.webmanifest" />
-      <link rel="apple-touch-icon" href="/icons/wikalinggo-flat-apple.png" />
+      <link rel="apple-touch-icon" sizes="180x180" href="/icons/wikalinggo-buddy-v2-180.png" />
       <title>Wikalinggo · Mundo ng mga Kuwento</title>
       <ScrollViewStyleReset />
     </head>

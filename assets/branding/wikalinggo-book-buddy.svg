@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <title>Wikalinggo — book buddy</title>
+  <desc>A friendly open book with curious eyes and a gold bookmark tongue on a forest green background.</desc>
+  <rect width="1024" height="1024" fill="#184C3C"/>
+  <!-- Broad page silhouettes also form a W; no fonts or raster effects. -->
+  <path d="M202 333 Q352 292 512 375 Q672 292 822 333 L796 700 Q644 673 512 748 Q380 673 228 700Z" fill="#EFBF38"/>
+  <path d="M214 292 Q365 259 512 345 L512 704 Q371 627 238 651Z" fill="#FFF9ED"/>
+  <path d="M512 345 Q659 259 810 292 L786 651 Q653 627 512 704Z" fill="#F6E8BD"/>
+  <!-- One turned corner gives the character an inquisitive raised eyebrow. -->
+  <path d="M704 285 L803 292 L797 382 Q743 367 704 285Z" fill="#EFBF38"/>
+  <path d="M511 363 L511 489" fill="none" stroke="#D8CDAA" stroke-width="10" stroke-linecap="round"/>
+  <rect x="359" y="423" width="43" height="72" rx="21.5" fill="#184C3C"/>
+  <rect x="622" y="411" width="43" height="72" rx="21.5" fill="#184C3C"/>
+  <path d="M438 548 Q513 619 588 548 Q579 636 514 642 Q449 637 438 548Z" fill="#184C3C"/>
+  <path d="M492 606 Q514 598 540 606 L540 681 L516 666 L492 681Z" fill="#EFBF38"/>
+  <path d="M296 545 L338 552 M688 542 L730 535" fill="none" stroke="#EFBF38" stroke-width="13" stroke-linecap="round"/>
+</svg>

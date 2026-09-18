@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <title>Wikalinggo Book Buddy</title>
+  <desc>A curious smiling storybook with a curled page and a coral bookmark. Flat original vector artwork.</desc>
+  <rect width="1024" height="1024" fill="#164D3D"/>
+  <g transform="rotate(-5 512 512)">
+    <!-- A visible gold cover makes the book readable even at launcher size. -->
+    <path d="M155 315 Q325 272 508 362 Q697 272 869 315 L840 714 Q660 691 514 784 Q361 693 184 714Z" fill="#F4C44E"/>
+    <path d="M174 263 Q342 228 507 325 L512 716 Q347 641 197 667Z" fill="#FFF9E9"/>
+    <path d="M507 325 Q670 228 851 263 L826 667 Q670 641 512 716Z" fill="#F2E5BD"/>
+    <!-- Broad folded corner, deliberately flat rather than glossy. -->
+    <path d="M738 256 L851 263 L843 384 Q779 357 738 256Z" fill="#F4C44E"/>
+    <path d="M738 256 Q752 331 843 384 L769 370Z" fill="#DEAB35"/>
+    <path d="M507 350 L510 495" fill="none" stroke="#DECE9E" stroke-width="10" stroke-linecap="round"/>
+    <!-- Asymmetric brows and large pupils give the small icon personality. -->
+    <path d="M314 402 Q343 384 373 396 M627 384 Q660 363 690 381" fill="none" stroke="#164D3D" stroke-width="15" stroke-linecap="round"/>
+    <rect x="322" y="431" width="57" height="89" rx="28.5" fill="#164D3D"/>
+    <rect x="631" y="418" width="57" height="89" rx="28.5" fill="#164D3D"/>
+    <circle cx="342" cy="452" r="8" fill="#FFF9E9"/>
+    <circle cx="651" cy="439" r="8" fill="#FFF9E9"/>
+    <ellipse cx="286" cy="550" rx="28" ry="14" fill="#F4C44E"/>
+    <ellipse cx="729" cy="538" rx="28" ry="14" fill="#F4C44E"/>
+    <path d="M421 557 Q511 581 601 552 Q591 656 512 657 Q438 652 421 557Z" fill="#164D3D"/>
+    <path d="M474 627 Q509 613 547 626 L547 728 L511 706 L474 728Z" fill="#EF785E"/>
+    <path d="M214 692 Q369 676 460 735 M566 735 Q678 679 815 691" fill="none" stroke="#164D3D" stroke-width="8" stroke-linecap="round"/>
+  </g>
+</svg>

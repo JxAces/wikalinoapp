@@ -28,7 +28,7 @@
     },
     "web": {
       "output": "static",
-      "favicon": "./assets/images/wikalinggo-flat-favicon.png"
+      "favicon": "./public/icons/wikalinggo-buddy-v2-48.png"
     },
     "plugins": [
       "expo-router",

@@ -1,3 +1,5 @@
+import { createHubWorld, HUB_BOUNDS, HUB_AREAS, hubWaypoint, moveThroughHub } from "./hub-world";
+import { HUB_PORTALS, HUB_START_HEADING, HUB_START_POSITION } from "./hub-layout";
 import { Platform } from "react-native";
 import type { ExpoWebGLRenderingContext } from "expo-gl";
 import {
@@ -71,6 +73,7 @@ import { isWorldChestUnlocked, storySetting, worldNodeId } from "./quest-progres
 type StoryWorldEngineOptions = {
   questStoryId?: string;
   spawnPosition?: { x: number; z: number };
+  spawnHeading?: number;
   characterId: PlayerCharacterId;
   gl: ExpoWebGLRenderingContext;
   onError: (error: Error) => void;
@@ -91,7 +94,7 @@ type AnimatedStoryScroll = {
 };
 
 const GL_VERSION = 0x1f02;
-const START_POSITION = new Vector3(0, 0, 12.2);
+const QUEST_START_POSITION = new Vector3(0, 0, 12.2);
 const tempCameraPosition = new Vector3();
 const tempCameraTarget = new Vector3();
 const tempObject = new Object3D();
@@ -203,12 +206,15 @@ function makeRendererContext(
 }
 
 export class StoryWorldEngine {
+  private hub: ReturnType<typeof createHubWorld> | null = null;
+  private guidance: StoryWorldStatus["guidance"];
+  private lastGuidanceAt = 0;
   private activeAnimation: StoryWorldStatus["animation"] = "Idle";
   private storyGates: ReturnType<typeof createStoryPortal>[] = [];
   private animatedStoryScrolls: AnimatedStoryScroll[] = [];
   private animationFrame: number | null = null;
   private camera: PerspectiveCamera;
-  private cameraAnchor = START_POSITION.clone();
+  private cameraAnchor = new Vector3();
   private cameraHeading = INITIAL_CHARACTER_HEADING;
   private movementHeading = INITIAL_CHARACTER_HEADING;
   private movementDirection = new Vector3();
@@ -266,10 +272,6 @@ export class StoryWorldEngine {
     this.renderer.toneMapping = ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.1;
 
-    if (options.spawnPosition) {
-      this.character.position.set(options.spawnPosition.x, 0, options.spawnPosition.z);
-      this.cameraAnchor.copy(this.character.position);
-    }
     this.createScene();
     this.start();
     void this.loadWorldModels();
@@ -349,23 +351,35 @@ export class StoryWorldEngine {
     const sunlight = new DirectionalLight(night ? 0xb4d6f4 : 0xfff0c9, night ? 1.1 : MEADOW_LIGHTING.sunlightIntensity);
     sunlight.position.set(-6, 11, 8);
     this.scene.add(sunlight);
-    const meadow = night ? createUgatForest() : village ? createForgottenVillage() : createMeadowEnvironment(Platform.OS !== "web");
+    if (!this.options.questStoryId) this.hub = createHubWorld();
+    const meadow = this.hub?.group ?? (night ? createUgatForest() : village ? createForgottenVillage() : createMeadowEnvironment(Platform.OS !== "web"));
     // Static scenery never needs its local matrices recomposed each frame.
-    meadow.traverse(object => { object.updateMatrix(); object.matrixAutoUpdate = false; });
+    if (!this.hub) meadow.traverse(object => { object.updateMatrix(); object.matrixAutoUpdate = false; });
     this.scene.add(meadow);
 
     if (this.options.questStoryId && !night && !village) this.scene.add(createQuestScenery(this.options.questStoryId));
     this.addPath();
-    if (!this.options.spawnPosition) this.character.position.copy(START_POSITION);
-    this.character.rotation.y = INITIAL_CHARACTER_HEADING;
+    this.placeCharacterAtSpawn();
     this.character.add(this.characterVisual);
     this.scene.add(this.character);
     this.updateCamera(0);
   }
 
+  private placeCharacterAtSpawn() {
+    const quest = Boolean(this.options.questStoryId);
+    const position = this.options.spawnPosition ?? (quest ? QUEST_START_POSITION : HUB_START_POSITION);
+    const heading = this.options.spawnHeading ?? (quest ? INITIAL_CHARACTER_HEADING : HUB_START_HEADING);
+    this.character.position.set(position.x, 0, position.z);
+    this.character.rotation.y = heading;
+    // Align immediately; do not sweep the camera across the map from the old spawn.
+    this.cameraAnchor.copy(this.character.position);
+    this.cameraHeading = heading;
+    this.movementHeading = heading;
+  }
+
   private addPath() {
     // The maze corridors are the route; a straight trail would cross walls.
-    if (this.options.questStoryId === DRESS_MAZE_STORY || this.options.questStoryId === UGAT_STORY) return;
+    if (!this.options.questStoryId || this.options.questStoryId === DRESS_MAZE_STORY || this.options.questStoryId === UGAT_STORY) return;
     const curvePoints = [
       new Vector3(0, 0.015, 13.2),
       ...this.options.portals.map(({ position }) => new Vector3(position.x, 0.015, position.z)),
@@ -458,9 +472,10 @@ export class StoryWorldEngine {
   }
 
   private addStoryGates() {
-    for (const portal of this.options.portals) {
+    for (const [index, portal] of this.options.portals.entries()) {
       const gate = createStoryPortal(portal.story.id, portal.state);
       gate.group.position.set(portal.position.x, 0, portal.position.z);
+      gate.group.rotation.y = HUB_PORTALS[index]?.heading ?? 0;
       this.scene.add(gate.group);
       this.storyGates.push(gate);
     }
@@ -593,7 +608,7 @@ export class StoryWorldEngine {
     }
     const clearing = new Group();
     clearing.name = "Hut in the far meadow clearing";
-    clearing.position.set(STORY_HUT_PLACEMENT.x, STORY_HUT_PLACEMENT.y, STORY_HUT_PLACEMENT.z);
+    clearing.position.set(33, STORY_HUT_PLACEMENT.y, 7);
     clearing.rotation.y = STORY_HUT_PLACEMENT.rotation;
     clearing.add(hut);
     this.scene.add(clearing);
@@ -654,6 +669,21 @@ export class StoryWorldEngine {
     }
     this.returnGate?.update(elapsed);
     this.updateCamera(delta);
+    this.hub?.update(elapsed, this.character.position);
+    if (this.hub && elapsed - this.lastGuidanceAt >= 0.25) {
+      this.lastGuidanceAt = elapsed;
+      const index = this.options.portals.findIndex(portal => portal.state !== "completed");
+      const target = index >= 0 ? this.options.portals[index].position : worldChestPosition(false);
+      const waypoint = hubWaypoint(this.character.position, target);
+      const angle = Math.atan2(waypoint.x-this.character.position.x, waypoint.z-this.character.position.z);
+      this.guidance = {
+        label: index >= 0 ? `${index+1}. ${HUB_AREAS[index] ?? "Portal"}` : "Kunin ang gantimpala",
+        degrees: Math.round(Math.atan2(Math.sin(this.cameraHeading-angle), Math.cos(this.cameraHeading-angle))*180/Math.PI/5)*5,
+        distance: Math.round(Math.hypot(target.x-this.character.position.x,target.z-this.character.position.z)),
+        viaBridge: waypoint !== target,
+      };
+      this.emitStatus();
+    }
     try {
       const { drawingBufferWidth: width, drawingBufferHeight: height } = this.options.gl;
       if (width !== this.viewportWidth || height !== this.viewportHeight) {
@@ -713,17 +743,20 @@ export class StoryWorldEngine {
       const directionX = this.movementDirection.x;
       const directionZ = this.movementDirection.z;
       const speed = 3.15;
+      const bounds = this.options.questStoryId ? STORY_WORLD_BOUNDS : HUB_BOUNDS;
       const nextX = MathUtils.clamp(
         this.character.position.x + directionX * speed * delta,
-        STORY_WORLD_BOUNDS.minX,
-        STORY_WORLD_BOUNDS.maxX,
+        bounds.minX,
+        bounds.maxX,
       );
       const nextZ = MathUtils.clamp(
         this.character.position.z + directionZ * speed * delta,
-        STORY_WORLD_BOUNDS.minZ,
-        STORY_WORLD_BOUNDS.maxZ,
+        bounds.minZ,
+        bounds.maxZ,
       );
-      if (this.options.questStoryId === DRESS_MAZE_STORY) {
+      if (!this.options.questStoryId) {
+        moveThroughHub(this.character.position, nextX-this.character.position.x, nextZ-this.character.position.z);
+      } else if (this.options.questStoryId === DRESS_MAZE_STORY) {
         moveThroughDressMaze(this.character.position, nextX - this.character.position.x, nextZ - this.character.position.z);
       } else if (this.options.questStoryId === UGAT_STORY) {
         moveThroughUgat(this.character.position, nextX - this.character.position.x, nextZ - this.character.position.z);
@@ -829,6 +862,7 @@ export class StoryWorldEngine {
   private emitStatus() {
     this.options.onStatusChange({
       animation: this.activeAnimation,
+      guidance: this.guidance,
       nearestStoryId: this.lastNearestStoryId,
       nearChest: this.nearChest,
       nearReturnPortal: this.nearReturnPortal,

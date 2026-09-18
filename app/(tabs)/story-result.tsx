@@ -41,6 +41,7 @@ import {
   StoryRewardVisual,
 } from "../../components/three/integrations/StoryRewardVisual";
 import { canEnterStory } from "../../components/story-world/quest-progression";
+import { hubReturnRoute } from "../../components/story-world/hub-navigation";
 
 export default function StoryResultScreen() {
   const { storyId } =
@@ -261,7 +262,7 @@ export default function StoryResultScreen() {
           }
           onPress={() =>
             router.replace(
-              "/landing",
+              hubReturnRoute(story),
             )
           }
         >

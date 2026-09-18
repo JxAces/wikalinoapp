@@ -6,12 +6,22 @@ const path = require('node:path');
 const vm = require('node:vm');
 const ts = require('typescript');
 const three = require('three');
+const layoutModule = { exports: {} };
+vm.runInNewContext(ts.transpileModule(fs.readFileSync(path.join(__dirname, '../components/story-world/hub-layout.ts'), 'utf8'), {
+  compilerOptions: { module: ts.ModuleKind.CommonJS },
+}).outputText, { module: layoutModule, exports: layoutModule.exports });
 const constantsModule = { exports: {} };
 const constantsCode = ts.transpileModule(fs.readFileSync(path.join(__dirname, '../components/story-world/story-world.constants.ts'), 'utf8'), {
   compilerOptions: { module: ts.ModuleKind.CommonJS },
 }).outputText;
-vm.runInNewContext(constantsCode, { module: constantsModule, exports: constantsModule.exports });
+vm.runInNewContext(constantsCode, { module: constantsModule, exports: constantsModule.exports,
+  require: name => { assert.equal(name, './hub-layout'); return layoutModule.exports; } });
 const constants = constantsModule.exports;
+const cameraModule = { exports: {} };
+vm.runInNewContext(ts.transpileModule(fs.readFileSync(path.join(__dirname, '../components/story-world/story-world-camera.ts'), 'utf8'), {
+  compilerOptions: { module: ts.ModuleKind.CommonJS },
+}).outputText, { module: cameraModule, exports: cameraModule.exports,
+  require: name => { assert.equal(name, 'three'); return three; } });
 const code = ts.transpileModule(fs.readFileSync(path.join(__dirname, '../components/story-world/StoryWorldEngine.native.ts'), 'utf8'), {
   compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
 }).outputText;
@@ -20,6 +30,8 @@ vm.runInNewContext(code, {
   module: moduleResult, exports: moduleResult.exports, __DEV__: false,
   require: name => name === 'three' ? three : name === 'react-native' ? { Platform: { OS: 'ios' } }
     : name === './story-world.constants' ? constants
+    : name === './hub-layout' ? layoutModule.exports
+    : name === './story-world-camera' ? cameraModule.exports
     : name === './quest-progression' ? { worldNodeId: node => node.id ?? node.story.id }
     : name === './load-explorer.native' ? { loadStoryScrollModel: async () => new three.Group() }
     : name === './story-portal-visual' ? { createStoryPortal: id => { const group = new three.Group(); group.name = id; return { group }; } }
@@ -47,11 +59,49 @@ async function run(quest, stopAt, failure) {
   return calls;
 }
 (async () => {
+  function spawn(options) {
+    const engine=Object.create(StoryWorldEngine.prototype);
+    engine.options=options;
+    engine.character=new three.Group();
+    engine.cameraAnchor=new three.Vector3(0,0,12.2);
+    engine.camera=new three.PerspectiveCamera();
+    engine.placeCharacterAtSpawn();
+    engine.updateCamera(0);
+    assert(engine.cameraAnchor.equals(engine.character.position),'Camera starts at the spawn without a cross-map sweep');
+    assert.equal(engine.cameraHeading,engine.character.rotation.y);
+    assert.equal(engine.movementHeading,engine.character.rotation.y,'Joystick starts aligned with the arrival camera');
+    const forward=engine.camera.getWorldDirection(new three.Vector3());
+    assert(Math.hypot(engine.camera.position.x-engine.character.position.x,engine.camera.position.z-engine.character.position.z)>7);
+    assert(forward.x*Math.sin(engine.character.rotation.y)+forward.z*Math.cos(engine.character.rotation.y)>.9,
+      'Initial camera looks in the character heading');
+    return engine;
+  }
+  const firstArrival=spawn({});
+  assert.equal(firstArrival.character.position.x,layoutModule.exports.HUB_START_POSITION.x);
+  assert.equal(firstArrival.character.position.z,layoutModule.exports.HUB_START_POSITION.z);
+  assert.equal(spawn({questStoryId:'m1-story-2'}).character.position.z,12.2,'Quest entry is not moved to hub coordinates');
+  const returned=spawn({spawnPosition:{x:19.6,z:12.5},spawnHeading:Math.PI/2});
+  assert.equal(returned.character.position.x,19.6);
+  assert.equal(returned.character.position.z,12.5);
+  const resumedQuest=spawn({questStoryId:'m1-story-1',spawnPosition:{x:1.6,z:4.7}});
+  assert.equal(resumedQuest.character.position.z,4.7,'Question resume positions remain supported');
+  console.log('Hub/quest spawn: correct entry, explicit return position, camera and joystick alignment passed');
   assert.deepEqual(await run(false), ['addExplorer', 'addStoryGates', 'addTropicalHut', 'addTreasureChest', 'ready']);
   assert.deepEqual(await run(true), ['addExplorer', 'addStoryScrolls', 'addTreasureChest', 'ready']);
   assert.deepEqual(await run(false, 'addExplorer'), ['addExplorer'], 'Leaving must prevent subsequent loads and ready callbacks');
   assert.deepEqual(await run(false, null, 'addExplorer'), ['addExplorer', 'error']);
   assert.deepEqual(await run(false, 'addExplorer', 'addExplorer'), ['addExplorer'], 'Disposed screens must not receive errors');
+  const hub = Object.create(StoryWorldEngine.prototype);
+  hub.scene = new three.Scene(); hub.storyGates = [];
+  hub.options = { portals: constants.STORY_WORLD_POSITIONS.map((position,index)=>({ position, story:{id:`story-${index}`}, state:'current' })) };
+  hub.addStoryGates();
+  assert.equal(hub.storyGates.length,3);
+  hub.storyGates.forEach((gate,index)=>{
+    const placement=layoutModule.exports.HUB_PORTALS[index];
+    assert.equal(gate.group.position.x,placement.x);
+    assert.equal(gate.group.position.z,placement.z);
+    assert.equal(gate.group.rotation.y,placement.heading,'Rendered gates use the shared approach-facing headings');
+  });
   const engine = Object.create(StoryWorldEngine.prototype);
   engine.options = { questStoryId: 'm1-story-1', portals: [] };
   engine.scene = new three.Scene();
