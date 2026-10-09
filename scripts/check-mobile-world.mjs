@@ -25,14 +25,28 @@ const { mergeColoredScenery } = await import(moduleUrl('merge-colored-scenery'))
 const { createMeadowEnvironment } = await import(moduleUrl('story-world-environment'));
 const { createStoryPortal } = await import(moduleUrl('story-portal-visual'));
 const { disposeWorldObject } = await import(moduleUrl('dispose-world-object'));
+const { createWelcomeGuide, WELCOME_PAGES } = await import(moduleUrl('welcome-guide'));
+const guide = createWelcomeGuide({x:-24,z:-16},Math.PI);
+assert.equal(WELCOME_PAGES.length,5);
+assert(WELCOME_PAGES.join(' ').includes('“Utos ng Hari.”'));
+assert.equal(guide.update(0),false);
+const origin = guide.group.position.clone();
+for(let i=0;i<150;i++) guide.update(1/60);
+assert.equal(guide.update(.01),true,'Guide finishes approaching before dialogue');
+assert(Math.abs(guide.group.position.distanceTo(origin)-3)<.01);
+const standing = guide.group.position.clone();guide.update(2);
+assert(Math.hypot(guide.group.position.x-standing.x,guide.group.position.z-standing.z)<1e-8,'Guide stays put during reading');
+let guideDraws=0;guide.group.traverse(o=>{if(o.isMesh){guideDraws++;assert(!o.isSkinnedMesh);}});
+assert(guideDraws<=5,'Guide is lightweight and uses no skinning shaders');
+disposeWorldObject(guide.group);
 const { canStandInDressMaze, moveThroughDressMaze } = await import(moduleUrl('dress-maze'));
 const { createDressMaze } = await import(moduleUrl('dress-maze-visual'));
-const { QUESTION_SCROLL_POSITIONS, RETURN_PORTAL_POSITION, worldChestPosition } = await import(moduleUrl('story-world.constants'));
+const { QUESTION_SCROLL_POSITIONS, RETURN_PORTAL_POSITION, STORY_WORLD_BOUNDS, worldChestPosition } = await import(moduleUrl('story-world.constants'));
 async function load(name) {
-  const bytes = fs.readFileSync(new URL(`../assets/models/wikalino-${name}-explorer.glb`, import.meta.url));
+  const bytes = fs.readFileSync(new URL(name === 'student-girl' ? '../assets/models/girl2.glb' : `../assets/models/wikalino-${name}-explorer.glb`, import.meta.url));
   return new GLTFLoader().parseAsync(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength), '');
 }
-for (const name of ['indigenous', 'muslim', 'batang-pinoy']) {
+for (const name of ['indigenous', 'muslim', 'batang-pinoy', 'student-girl']) {
   const gltf = await load(name);
   const root = gltf.scene;
   root.scale.setScalar(1.37);
@@ -130,7 +144,8 @@ console.log('Native meadow:', stats(meadow), 'Full meadow:', stats(full), 'Porta
 console.log('Mobile batching, pose fidelity, shared colors, idle, cancellation and disposal passed');
 
 // Flood the actual collision layout, proving progression and the exit are reachable.
-const step = 0.2, minX = -7.4, minZ = -19.2, columns = 75, rows = 164;
+const step = 0.2, minX = STORY_WORLD_BOUNDS.minX, minZ = STORY_WORLD_BOUNDS.minZ;
+const columns = Math.round((STORY_WORLD_BOUNDS.maxX-minX)/step)+1, rows = Math.round((STORY_WORLD_BOUNDS.maxZ-minZ)/step)+1;
 const cell = point => [Math.round((point.x - minX) / step), Math.round((point.z - minZ) / step)];
 const startCell = cell({ x: -1.6, z: 9.7 });
 const queue = [startCell], visited = new Set([startCell.join(',')]);
@@ -147,20 +162,21 @@ for (const point of [...QUESTION_SCROLL_POSITIONS, ...QUESTION_SCROLL_POSITIONS.
   assert(canStandInDressMaze(point.x, point.z), 'A destination or resume spawn must not intersect a partition');
   assert(visited.has(cell(point).join(',')), 'Every scroll, chest and return portal is reachable');
 }
-const walker = { x: -1.6, z: 8 };
-moveThroughDressMaze(walker, 0, -4);
-assert(walker.z > 6.7, 'A large movement step cannot pass through a thin maze partition');
+const walker = { x: 0, z: 9 };
+moveThroughDressMaze(walker, 8, 0);
+assert(walker.x < 4 && canStandInDressMaze(walker.x,walker.z), 'Large steps cannot cross roadside clothing racks');
 moveThroughDressMaze(walker, 1, -1);
-assert(walker.x > -1 && canStandInDressMaze(walker.x, walker.z), 'Player can slide along a wall');
+assert(walker.z < 8.2 && canStandInDressMaze(walker.x,walker.z), 'Player can slide beside a rack');
 const maze = createDressMaze();
 assert.equal(stats(maze).meshes, 1, 'All dress colors and partitions share one draw call');
-assert(maze.userData.garmentCount >= 90, 'Clothing racks contain a dense variety of garments');
+assert(maze.userData.garmentCount >= 80, 'Clothing racks contain a dense variety of garments');
 assert(stats(maze).triangles < 20000, 'Maze geometry stays within a small phone budget');
 console.log('Dress maze:', stats(maze), 'all destinations reachable; collision, sliding and batching passed');
 disposeWorldObject(maze);
-const { createUgatForest, canStandInUgat, moveThroughUgat, UGAT_SWAMPS } = await import(moduleUrl('ugat-forest'));
+const { createUgatForest, canStandInUgat, moveThroughUgat, UGAT_ROOT_BEDS } = await import(moduleUrl('ugat-forest'));
 const { UGAT_SCROLL_POSITIONS } = await import(moduleUrl('story-world.constants'));
-const forest = createUgatForest();
+const ugatWorld = createUgatForest();
+const forest = ugatWorld.group;
 const forestQueue = [cell({x:-3.8,z:9.2})], forestVisited = new Set([forestQueue[0].join(',')]);
 for(let head=0;head<forestQueue.length;head++) {
   const [x,z]=forestQueue[head];
@@ -170,16 +186,53 @@ for(let head=0;head<forestQueue.length;head++) {
     forestVisited.add(key);forestQueue.push([nx,nz]);
   }
 }
-for(const point of [...UGAT_SCROLL_POSITIONS,...UGAT_SCROLL_POSITIONS.map(point=>({x:point.x,z:point.z+1.7})),RETURN_PORTAL_POSITION,worldChestPosition(true)]) {
+for(const point of [...UGAT_SCROLL_POSITIONS,...UGAT_SCROLL_POSITIONS.map(point=>({x:point.x,z:point.z+1.7})),RETURN_PORTAL_POSITION,worldChestPosition(true,"m1-story-2")]) {
   assert(canStandInUgat(point.x,point.z),'Forest destinations and resume positions must be dry and clear');
   assert(forestVisited.has(cell(point).join(',')),'All forest scrolls, chest and exit have a dry route');
 }
-for(const pool of UGAT_SWAMPS) assert(!canStandInUgat(pool.x,pool.z),'Swamp interiors block walking');
-const forestWalker={x:0,z:9};moveThroughUgat(forestWalker,0,-6);
-assert(forestWalker.z>7.4,'Movement cannot tunnel through swamp water');
-assert(stats(forest).meshes<=12 && stats(forest).triangles<20000,'Night forest stays within mobile scene budget');
-console.log('Ugat forest:',stats(forest),'dry routes, safe spawns and swamp collision passed');
+for(const bed of UGAT_ROOT_BEDS) assert(!canStandInUgat(bed.x,bed.z),'Tangled root beds block walking');
+const forestWalker={x:0,z:UGAT_ROOT_BEDS[0].z};moveThroughUgat(forestWalker,-7,0);
+assert(forestWalker.x>UGAT_ROOT_BEDS[0].x+UGAT_ROOT_BEDS[0].rx,'Movement cannot tunnel through roadside root beds');
+assert(stats(forest).meshes<=9 && stats(forest).triangles<26000,'Daylight forest stays within mobile scene budget');
+const {UGAT_PATH,UGAT_MEMORIES,UGAT_DAYLIGHT,UGAT_FAMILY,ugatMemoryNear}=await import(moduleUrl('ugat-layout'));
+assert(UGAT_DAYLIGHT.sky>0xaaaaaa && UGAT_DAYLIGHT.ambientIntensity>=.45,'Ugat uses readable daylight');
+for(const point of UGAT_MEMORIES)assert(!canStandInUgat(point.x,point.z),'Memory furnishings block walking');
+assert(canStandInUgat(0,12.2)&&forestVisited.has(cell({x:0,z:12.2}).join(',')),'Default quest entry connects to the forest route');
+for(let i=1;i<UGAT_PATH.length;i++) {
+  const [ax,az]=UGAT_PATH[i-1],[bx,bz]=UGAT_PATH[i],steps=Math.ceil(Math.hypot(bx-ax,bz-az)/.1);
+  for(let step=0;step<=steps;step++)assert(canStandInUgat(ax+(bx-ax)*step/steps,az+(bz-az)*step/steps),'Visible paths stay outside roots, trunks and furnishings');
+}
+for(const memory of UGAT_MEMORIES) {
+  assert(canStandInUgat(memory.approach.x,memory.approach.z),'Memory inspection points remain walkable');
+  assert(forestVisited.has(cell(memory.approach).join(',')),'All story memories can be inspected');
+  assert.equal(ugatMemoryNear(memory.approach.x,memory.approach.z),memory.id);
+}
+assert.equal(ugatMemoryNear(0,12.2),undefined,'No memory popup at the entry');
+for(const person of UGAT_FAMILY)assert(!canStandInUgat(person.x,person.z),'Memory actors cannot be walked through');
+const memories=forest.getObjectByName('Four domestic memories from Ugat');
+assert.equal(memories.material.map.image.data.byteLength,262144,'All furnishings share one small texture atlas');
+const memoryShader={uniforms:{},vertexShader:'#include <begin_vertex>'};memories.material.onBeforeCompile(memoryShader);
+const family=forest.getObjectByName('Lolo remembers Tasing and Ricky');
+assert.equal(stats(family).meshes,3,'One ordinary mesh per memory character');
+family.traverse(o=>assert(!o.isSkinnedMesh,'Memory characters require no bone textures'));
+const elder=family.getObjectByName('Lolo').children[0];
+const elderShader={uniforms:{},vertexShader:'#include <begin_vertex>\n#include <beginnormal_vertex>'};elder.material.onBeforeCompile(elderShader);
+assert.equal(elderShader.uniforms.personSeated.value,1,'Lolo is seated on the sofa');
+const renewal=forest.getObjectByName('Three shoots of renewal');
+const renewalShader={uniforms:{},vertexShader:'#include <begin_vertex>'};renewal.material.onBeforeCompile(renewalShader);
+const forestVersions=[];forest.traverse(o=>{if(o.isMesh)forestVersions.push([o.geometry,Object.values(o.geometry.attributes).map(a=>a.version)]);});
+ugatWorld.setProgress(0);ugatWorld.update(0);ugatWorld.setProgress(1);
+for(let frame=1;frame<=180;frame++)ugatWorld.update(frame/30);
+assert(renewalShader.uniforms.renewalGrowth.value>.99,'Completed groups grow all three shoots');
+assert.equal(memoryShader.uniforms.memoryTime.value,6,'Cloth and paper animate through the shared scene clock');
+assert.equal(elderShader.uniforms.personTime.value,6,'The family uses the shared scene clock');
+assert.equal(renewalShader.uniforms.renewalTime.value,6,'Seedlings share the scene clock');
+for(const [geometry,versions] of forestVersions)assert.deepEqual(Object.values(geometry.attributes).map(a=>a.version),versions,'Forest animation never uploads new vertex buffers');
+const forestResources=new Set();forest.traverse(o=>{if(!o.isMesh)return;forestResources.add(o.geometry);forestResources.add(o.material);for(const value of Object.values(o.material))if(value?.isTexture)forestResources.add(value);});
+const forestDisposed=new Map([...forestResources].map(r=>[r,0]));forestResources.forEach(r=>r.addEventListener('dispose',()=>forestDisposed.set(r,forestDisposed.get(r)+1)));
+console.log('Ugat forest:',stats(forest),'story memories, family, safe routes, root collision and static GPU buffers passed');
 disposeWorldObject(forest);
+assert([...forestDisposed.values()].every(n=>n===1),'All daylight world textures and geometry are released on exit');
 const {createForgottenVillage,canStandInVillage,moveThroughVillage,VILLAGE_BUILDINGS}=await import(moduleUrl('forgotten-village'));
 const village=createForgottenVillage();
 const villageQueue=[cell({x:-1.6,z:9.7})],villageVisited=new Set([villageQueue[0].join(',')]);
@@ -197,27 +250,136 @@ for(const point of [...QUESTION_SCROLL_POSITIONS,...QUESTION_SCROLL_POSITIONS.ma
 }
 for(const building of VILLAGE_BUILDINGS) assert(!canStandInVillage(building.x,building.z));
 const villager={x:0,z:8};moveThroughVillage(villager,6,0);
-assert(villager.x<3.8 && canStandInVillage(villager.x,villager.z),'Movement stops at house walls without tunneling');
+assert(villager.x<4.1 && canStandInVillage(villager.x,villager.z),'Movement stops at house walls without tunneling');
 assert(stats(village).meshes<=2&&stats(village).triangles<15000,'Village scenery stays inexpensive for phones');
 console.log('Forgotten village:',stats(village),'all objectives reachable; buildings block movement');
 disposeWorldObject(village);
 
+const {createStoryPromenade,createStoryAvenue,createStoryRouteGround}=await import(moduleUrl('story-route-visual'));
+const {STORY_ROUTE_SAMPLES,STORY_ROUTE_SCROLLS,storyRouteHalfWidth,storyRouteX}=await import(moduleUrl('story-route-layout'));
+const {DRESS_MAZE_WALLS}=await import(moduleUrl('dress-maze'));
+const {UGAT_FURNISHINGS,UGAT_TREES}=await import(moduleUrl('ugat-layout'));
+for(const [id,canStand] of [['m1-story-1',canStandInDressMaze],['m1-story-2',canStandInUgat],['m1-story-3',canStandInVillage]]) {
+  // Check the whole paved width, not merely a single connected center line.
+  for(const [x,z] of STORY_ROUTE_SAMPLES) for(const offset of [-storyRouteHalfWidth(z),0,storyRouteHalfWidth(z)]) {
+    assert(canStand(x+offset,z),`${id}: scenery must leave the entire pavement clear at ${x+offset},${z}`);
+  }
+  for(const p of STORY_ROUTE_SCROLLS) {
+    assert(Math.abs(p.x-storyRouteX(p.z))<.001,'Every scroll is on the pavement center');
+    assert(Math.abs(p.x-storyRouteX(p.z+1.7))<storyRouteHalfWidth(p.z+1.7)-.42,'Question resume stays on the pavement');
+  }
+  const promenade=createStoryPromenade(id),sizes=stats(promenade);
+  assert.equal(sizes.meshes,2);assert(sizes.triangles<7000,'Road and hedges use a small shared budget');
+  promenade.traverse(o=>{if(o.isMesh){assert(o.geometry.attributes.position.array.every(Number.isFinite));assert(!o.material.isShaderMaterial,'Pavement needs no advanced GPU features');}});
+  disposeWorldObject(promenade);
+}
+assert(DRESS_MAZE_WALLS.every(p=>Math.abs(p.x)-p.w/2>3),'All garment racks stand off the road');
+assert(VILLAGE_BUILDINGS.every(p=>Math.abs(p.x)-p.w/2>3),'All village buildings, including school, stand off the road');
+for(const rect of [...UGAT_MEMORIES,...UGAT_FURNISHINGS]) assert(Math.abs(rect.x)-rect.w/2>2.5,'Ugat furnishings frame the route instead of crossing it');
+assert(UGAT_TREES.every(([x,z])=>Math.abs(x-storyRouteX(z))>3.5),'Tree trunks frame rather than cross the road');
+const avenue=createStoryAvenue({value:0}),routeGround=createStoryRouteGround('m1-story-1');
+assert(stats(avenue).meshes===1 && stats(avenue).triangles<5000,'Framing trees share one lightweight draw');
+console.log('All three story promenades: full-width clearance, central scrolls, side scenes and budget passed',stats(avenue));
+disposeWorldObject(avenue);disposeWorldObject(routeGround);
+
 const { createHubWorld, canStandInHub, moveThroughHub, hubWaypoint, HUB_BOUNDS, HUB_HOUSES } = await import(moduleUrl('hub-world'));
 const { STORY_WORLD_POSITIONS } = await import(moduleUrl('story-world.constants'));
-const { HUB_PORTALS, HUB_START_POSITION, portalApproachClear } = await import(moduleUrl('hub-layout'));
+const { HUB_PORTALS, HUB_START_POSITION, HUB_TRAILS, distanceToHubTrail, portalApproachClear } = await import(moduleUrl('hub-layout'));
 const { hubSpawn, hubStartRoute, hubReturnRoute } = await import(moduleUrl('hub-navigation'));
 const { FOREST_WILDLIFE } = await import(moduleUrl('hub-wildlife'));
 const hub = createHubWorld();
 const hubStats = stats(hub.group);
+const water=hub.group.getObjectByName('Flowing river and waterfall');
+assert.equal(stats(water).meshes,2,'Water, spray and foam stay within two draw calls');
+assert(stats(water).triangles<450,'Curved water meshes remain inexpensive');
+const [riverWater,fallWater]=water.children;
+assert.equal(riverWater.material.flowMap,fallWater.material.flowMap,'River and falls share their ripple texture');
+assert(riverWater.material.flowMap.image.data.byteLength<=65536,'Flow texture stays within 64 KiB');
+assert(!riverWater.material.transparent && fallWater.material.forceSinglePass,'Only the small falling sheet uses one transparency pass');
+const waterBuffers=water.children.map(mesh=>Object.values(mesh.geometry.attributes).map(a=>a.version));
+hub.update(4,{x:-24,z:-16});
+assert.equal(fallWater.material.uniforms.time.value,4,'Water animates using the elapsed time');
+for(const [index,mesh] of water.children.entries()) assert.deepEqual(Object.values(mesh.geometry.attributes).map(a=>a.version),waterBuffers[index],'Animating water never reuploads geometry');
+assert(!canStandInHub(-17,-29),'The pool outlet cannot be walked through');
+assert(canStandInHub(-13,-8)&&canStandInHub(-13,18),'Both bridge crossings stay open');
 const hubGround = hub.group.getObjectByName('Painted leafy grass and rolling banks');
 assert(hubGround?.material.map, 'Hub uses painted grass');
 assert.equal(hubGround.material.map.image.width, 256, 'Grass texture stays small');
+const groundMap=hubGround.material.terrainMap.image;
+assert(groundMap.data.byteLength<=1024*1024,'Baked paths and shade use at most 1 MiB before mipmaps');
+for(const trail of HUB_TRAILS) for(const [x,z] of trail) {
+  const u=Math.round((x/110+.5)*(groundMap.width-1)),v=Math.round((.5-(z+4)/120)*(groundMap.height-1));
+  assert(groundMap.data[(v*groundMap.width+u)*4+3]>200,'Visible dirt paths meet every navigation waypoint');
+}
+const { HUB_GROUND_STONES } = await import(moduleUrl('hub-ground'));
+assert(HUB_GROUND_STONES.length>=24,'Scatter stones around the hub');
+for(const stone of HUB_GROUND_STONES) {
+  assert(canStandInHub(stone.x,stone.z),'Stones sit on dry land');
+  assert(distanceToHubTrail(stone.x,stone.z)>stone.radius+1.5&&!portalApproachClear(stone.x,stone.z,stone.radius),'Stones leave trails and portal approaches clear');
+}
 assert(hub.group.getObjectByName('Storybook mushroom gardens'), 'Fantasy undergrowth is present');
 const terrainPositions=hubGround.geometry.attributes.position;
 for(let i=0;i<terrainPositions.count;i++){ const x=terrainPositions.getX(i),z=terrainPositions.getZ(i);if(x>=-36&&x<=38&&z>=-40&&z<=32)assert(Math.abs(terrainPositions.getY(i)+.07)<1e-6,'Playable ground stays level'); }
 console.log('Textured hub geometry:',hubStats);
 assert(hubStats.meshes <= 24, 'Hub scenery and all 16 living actors stay batched');
-assert(hubStats.triangles < 32000, 'Textured hub stays below the previous native meadow triangle count');
+const residents=hub.group.getObjectByName('Village residents');
+const residentStats=stats(residents);
+assert.equal(residentStats.meshes,3,'Each articulated human needs just one draw call');
+assert(residentStats.triangles<4500,'All three detailed residents stay under 4.5k triangles');
+assert(hubStats.triangles-residentStats.triangles<36000,'Static scenery and wildlife keep their existing budget');
+assert(hubStats.triangles<40000,'Hub plus more detailed human residents stays under 40k triangles');
+const people=residents.children.map(group=>{
+  const mesh=group.children[0];assert(mesh.isMesh&&!mesh.isSkinnedMesh,'Human animation works without skinning or float textures');
+  assert.equal(mesh.geometry.attributes.personPart.count,mesh.geometry.attributes.position.count);
+  assert.equal(mesh.geometry.attributes.personFlex.count,mesh.geometry.attributes.position.count);
+  const shader={uniforms:{},vertexShader:'#include <beginnormal_vertex>\n#include <begin_vertex>'};
+  mesh.material.onBeforeCompile(shader);
+  return {group,mesh,uniforms:shader.uniforms,versions:Object.values(mesh.geometry.attributes).map(a=>a.version)};
+});
+let personWalked=false,personPaused=false;
+for(let frame=0;frame<900;frame++) {
+  hub.update(frame/30,{x:23,z:20});
+  for(const person of people) {
+    const p=person.group.position;
+    assert(canStandInHub(p.x,p.z)&&!portalApproachClear(p.x,p.z),'Residents remain on dry land and outside portal approaches');
+    personWalked ||= person.uniforms.personStride.value>.9;
+    personPaused ||= frame>200&&person.uniforms.personStride.value<.1;
+  }
+}
+assert(personWalked&&personPaused,'People alternate walking and resting');
+const nearby={x:people[0].group.position.x+.8,z:people[0].group.position.z};
+const before=people[0].group.position.clone();
+for(let frame=900;frame<990;frame++)hub.update(frame/30,nearby);
+assert(people[0].group.position.distanceTo(before)<.001,'Residents stop walking near the player');
+const facing=people[0].group.rotation.y;
+assert(Math.sin(facing)>.9,'A paused nearby resident turns toward the player');
+for(const person of people) assert.deepEqual(Object.values(person.mesh.geometry.attributes).map(a=>a.version),person.versions,'Human animation never reuploads geometry');
+hub.update(34,{x:-24,z:-16});
+assert(residents.children.every(group=>!group.visible),'Distant villagers stop rendering');
+console.log('Human villagers:',residentStats,'walking, idle, facing player, safe paths and static GPU buffers passed');
+const { HUB_VEGETATION, canPlantInHub } = await import(moduleUrl('hub-vegetation'));
+const { minimapPoint, minimapHeading, minimapRoute } = await import(moduleUrl('hub-minimap'));
+const trees=HUB_VEGETATION.filter(p=>!p.bush);
+console.log('Hub planting:',hub.group.userData.vegetation);
+assert(trees.length>=65,'Plant trees throughout the hub, not just the original few groves');
+assert(HUB_VEGETATION.filter(p=>p.bush).length>=20,'Add scattered bushes');
+for(const region of ['forest','meadow','village']) assert(trees.filter(p=>p.region===region).length>=5,`${region} has trees`);
+const forestDensity=trees.filter(p=>p.region==='forest').length/(36*26);
+const outsideDensity=trees.filter(p=>p.region!=='forest').length/(74*72-36*26);
+assert(forestDensity>outsideDensity,'Forest remains the densest region');
+for(const plant of HUB_VEGETATION) assert(canPlantInHub(plant.x,plant.z,plant.bush?1.9:2.7),'Planting protects paths, wildlife, water and entrances');
+assert.equal(minimapHeading(Math.PI),0,'North-facing player points up');
+assert.equal(minimapHeading(Math.PI/2),90,'East-facing player points right');
+for(const p of [...HUB_PORTALS,HUB_START_POSITION,worldChestPosition(false)]) {
+  const mapped=minimapPoint(p);assert(mapped.x>5&&mapped.x<95&&mapped.y>5&&mapped.y<95,'Map markers stay inside its frame');
+}
+for(const from of [HUB_START_POSITION,...HUB_PORTALS.map(p=>p.approach)]) for(const target of [...HUB_PORTALS,worldChestPosition(false)]) {
+  const route=minimapRoute(from,target);assert.deepEqual(route[0],from);assert.deepEqual(route.at(-1),target);
+  for(let i=1;i<route.length;i++) {
+    const a=route[i-1],b=route[i],steps=Math.max(1,Math.ceil(Math.hypot(b.x-a.x,b.z-a.z)/.2));
+    for(let step=0;step<=steps;step++) assert(canStandInHub(a.x+(b.x-a.x)*step/steps,a.z+(b.z-a.z)*step/steps),'Minimap routes use bridges and avoid houses');
+  }
+}
 for (const portal of HUB_PORTALS) {
   assert(canStandInHub(portal.approach.x,portal.approach.z), 'Portal approach must be dry and unobstructed');
   const dx=portal.approach.x-portal.x,dz=portal.approach.z-portal.z;
@@ -236,7 +398,15 @@ for(let head=0;head<hubQueue.length;head++) {
 for(const p of [...STORY_WORLD_POSITIONS,worldChestPosition(false)]) assert(hubVisited.has(`${p.x},${p.z}`),'Every hub portal and chest is reachable over a bridge');
 assert(!canStandInHub(-13,0),'River requires a bridge');
 assert(canStandInHub(-13,-8)&&canStandInHub(-13,18),'Both bridges are walkable');
-assert(!canStandInHub(HUB_HOUSES[0].x,HUB_HOUSES[0].z),'Houses block movement');
+for(const house of HUB_HOUSES) {
+  assert(!canStandInHub(house.x,house.z),'Houses block movement');
+  assert(!canStandInHub(house.x,house.z+2.8),'Front steps block movement');
+}
+assert(canStandInHub(33,7),'The former tropical hut site is walkable');
+const houses=hub.group.getObjectByName('Raised village houses with woven walls and thatched roofs');
+assert.equal(houses.userData.houseCount,3,'Keep three homes around the village square');
+assert.equal(stats(houses).meshes,1,'All houses share one draw call');
+assert(houses.material.map.image.data.byteLength<=256*1024,'House materials use a small mobile texture atlas');
 const hubWalker={...HUB_START_POSITION};
 for(const target of [...STORY_WORLD_POSITIONS,worldChestPosition(false)]) {
   let steps=0;
@@ -307,7 +477,7 @@ hub.group.traverse(object=>{
   resources.add(object.geometry);
   for(const material of Array.isArray(object.material)?object.material:[object.material]) {
     resources.add(material);
-    if(material.map)resources.add(material.map);
+    for(const value of Object.values(material))if(value?.isTexture)resources.add(value);
   }
 });
 const disposalCounts=new Map([...resources].map(resource=>[resource,0]));

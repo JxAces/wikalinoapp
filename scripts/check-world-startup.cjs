@@ -6,17 +6,16 @@ const path = require('node:path');
 const vm = require('node:vm');
 const ts = require('typescript');
 const three = require('three');
-const layoutModule = { exports: {} };
-vm.runInNewContext(ts.transpileModule(fs.readFileSync(path.join(__dirname, '../components/story-world/hub-layout.ts'), 'utf8'), {
-  compilerOptions: { module: ts.ModuleKind.CommonJS },
-}).outputText, { module: layoutModule, exports: layoutModule.exports });
-const constantsModule = { exports: {} };
-const constantsCode = ts.transpileModule(fs.readFileSync(path.join(__dirname, '../components/story-world/story-world.constants.ts'), 'utf8'), {
-  compilerOptions: { module: ts.ModuleKind.CommonJS },
-}).outputText;
-vm.runInNewContext(constantsCode, { module: constantsModule, exports: constantsModule.exports,
-  require: name => { assert.equal(name, './hub-layout'); return layoutModule.exports; } });
-const constants = constantsModule.exports;
+function loadLayout(name) {
+  const module = {exports:{}};
+  vm.runInNewContext(ts.transpileModule(fs.readFileSync(path.join(__dirname, '../components/story-world/'+name+'.ts'),'utf8'), {
+    compilerOptions:{module:ts.ModuleKind.CommonJS},
+  }).outputText,{module,exports:module.exports,require:specifier=>loadLayout(specifier.slice(2))});
+  return module.exports;
+}
+const layoutModule = {exports:loadLayout('hub-layout')};
+const constants = loadLayout('story-world.constants');
+const ugatModule = {exports:loadLayout('ugat-layout')};
 const cameraModule = { exports: {} };
 vm.runInNewContext(ts.transpileModule(fs.readFileSync(path.join(__dirname, '../components/story-world/story-world-camera.ts'), 'utf8'), {
   compilerOptions: { module: ts.ModuleKind.CommonJS },
@@ -31,6 +30,8 @@ vm.runInNewContext(code, {
   require: name => name === 'three' ? three : name === 'react-native' ? { Platform: { OS: 'ios' } }
     : name === './story-world.constants' ? constants
     : name === './hub-layout' ? layoutModule.exports
+    : name === './ugat-layout' ? ugatModule.exports
+    : name === './ugat-forest' ? { UGAT_STORY: constants.UGAT_STORY }
     : name === './story-world-camera' ? cameraModule.exports
     : name === './quest-progression' ? { worldNodeId: node => node.id ?? node.story.id }
     : name === './load-explorer.native' ? { loadStoryScrollModel: async () => new three.Group() }
@@ -86,7 +87,7 @@ async function run(quest, stopAt, failure) {
   const resumedQuest=spawn({questStoryId:'m1-story-1',spawnPosition:{x:1.6,z:4.7}});
   assert.equal(resumedQuest.character.position.z,4.7,'Question resume positions remain supported');
   console.log('Hub/quest spawn: correct entry, explicit return position, camera and joystick alignment passed');
-  assert.deepEqual(await run(false), ['addExplorer', 'addStoryGates', 'addTropicalHut', 'addTreasureChest', 'ready']);
+  assert.deepEqual(await run(false), ['addExplorer', 'addStoryGates', 'addTreasureChest', 'ready'], 'Hub skips the removed hut asset');
   assert.deepEqual(await run(true), ['addExplorer', 'addStoryScrolls', 'addTreasureChest', 'ready']);
   assert.deepEqual(await run(false, 'addExplorer'), ['addExplorer'], 'Leaving must prevent subsequent loads and ready callbacks');
   assert.deepEqual(await run(false, null, 'addExplorer'), ['addExplorer', 'error']);
@@ -110,6 +111,13 @@ async function run(quest, stopAt, failure) {
   assert(gate, 'A quest world adds the return portal even before tasks are completed');
   assert.equal(gate.position.x, constants.RETURN_PORTAL_POSITION.x);
   assert.equal(gate.position.z, constants.RETURN_PORTAL_POSITION.z);
+  assert.equal(gate.position.x, 0, 'Return portal is centered on the entry pavement');
+  assert.equal(gate.rotation.y, Math.PI, 'Return portal faces players approaching from the story road');
+  for (const questStoryId of ['m1-story-1','m1-story-2','m1-story-3']) {
+    const arrival=spawn({questStoryId});
+    assert(gate.position.z>arrival.camera.position.z+1,'The centered gate stays behind the initial camera, not over the player');
+    assert(gate.position.distanceTo(arrival.character.position)>constants.STORY_INTERACTION_DISTANCE,'New arrivals do not immediately receive the return prompt');
+  }
   assert.equal(engine.options.portals.length, 0, 'Return portal must not count toward chest requirements');
   assert(gate.position.z > constants.QUESTION_SCROLL_POSITIONS[0].z + 1.7, 'Return portal sits behind the entry spawn');
   assert(gate.position.z <= constants.STORY_WORLD_BOUNDS.maxZ && gate.position.x >= constants.STORY_WORLD_BOUNDS.minX, 'Return portal is reachable');
@@ -135,6 +143,22 @@ async function run(quest, stopAt, failure) {
   engine.character.position.copy(gate.position);
   engine.updateCharacter(0);
   assert(!engine.nearReturnPortal, 'No phantom return interaction in a world without the gate');
+  engine.options.questStoryId = constants.UGAT_STORY;
+  for (const memory of ugatModule.exports.UGAT_MEMORIES) {
+    engine.character.position.set(memory.approach.x,0,memory.approach.z);
+    engine.updateCharacter(0);
+    assert.equal(engine.ugatMemory,memory.id,'Memory proximity reaches the native UI status');
+    const previous=statusChanges;engine.updateCharacter(0);
+    assert.equal(statusChanges,previous,'Idle memory inspection does not repeatedly update React');
+  }
+  engine.character.position.set(0,0,12.2);engine.updateCharacter(0);
+  assert.equal(engine.ugatMemory,undefined,'Leaving the memory hides its action');
+  const ugatChest=constants.worldChestPosition(true,constants.UGAT_STORY);
+  engine.character.position.set(ugatChest.x,0,ugatChest.z);engine.updateCharacter(0);
+  assert(engine.nearChest,'The relocated Ugat chest uses the same interaction position as the model');
+  engine.character.position.set(0,0,-8.75);engine.updateCharacter(0);
+  assert(!engine.nearChest,'The chest prompt does not obscure the final memory');
+  console.log('Ugat memories: proximity, stable status, leaving and relocated reward passed');
   console.log('Return portal: creation, reachable entry placement, proximity and stable status checks passed');
   console.log('World startup: sequential hub/quest loading, cancellation, and failure handling passed');
 })().catch(error => { console.error(error); process.exitCode = 1; });

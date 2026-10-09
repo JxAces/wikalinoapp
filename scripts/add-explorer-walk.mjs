@@ -12,8 +12,11 @@ const smooth = (a, b, value) => {
   return t * t * (3 - 2 * t);
 };
 
-for (const character of ["indigenous", "muslim", "batang-pinoy"]) {
-  const file = path.join(root, `assets/models/wikalino-${character}-explorer.glb`);
+const characters = ["indigenous", "muslim", "batang-pinoy", "student-girl"];
+const requested = process.argv.slice(2);
+assert(requested.every(character => characters.includes(character)), "Unknown character ID");
+for (const character of requested.length ? requested : characters) {
+  const file = path.join(root, character === "student-girl" ? "assets/models/girl2.glb" : `assets/models/wikalino-${character}-explorer.glb`);
   const source = fs.readFileSync(file);
   assert.equal(source.readUInt32LE(0), 0x46546c67);
   const jsonLength = source.readUInt32LE(12);
@@ -60,6 +63,12 @@ for (const character of ["indigenous", "muslim", "batang-pinoy"]) {
     const y = (source.readFloatLE(offset + 4) - position.min[1]) / height;
     // Keep hands, arms and everything above the hips on the stationary root.
     let lowerBody = (1 - smooth(0.38, 0.50, y)) * (1 - smooth(0.105, 0.15, Math.abs(x)) * smooth(0.28, 0.36, y));
+    if (character === "student-girl") {
+      // Blend to the stationary skirt hem before the upper thighs. Hands hang
+      // beside the skirt and must never be pulled along with a stepping leg.
+      lowerBody *= 1 - smooth(0.30, 0.36, y);
+      if (y > 0.30 && Math.abs(x) > 0.105) lowerBody = 0;
+    }
     if (character === "batang-pinoy" && y > 0.30) {
       assert.equal(colorAccessor.componentType, 5121);
       const offset = colorStart + i * (colorView.byteStride ?? 4);
@@ -118,8 +127,8 @@ for (const character of ["indigenous", "muslim", "batang-pinoy"]) {
       for (let frame = 0; frame < frames; frame++) {
         const phase = frame / (frames - 1) * Math.PI * 2 + (joint >= 4 ? Math.PI : 0);
         const stride = name === "Walk" ? Math.sin(phase) : 0;
-        const hip = stride * (character === "muslim" ? 0.17 : 0.24);
-        const knee = -Math.max(0, stride) * (character === "muslim" ? 0.22 : 0.34);
+        const hip = stride * (character === "muslim" ? 0.17 : character === "student-girl" ? 0.20 : 0.24);
+        const knee = -Math.max(0, stride) * (character === "muslim" ? 0.22 : character === "student-girl" ? 0.28 : 0.34);
         const angle = [hip, knee, -hip - knee][(joint - 1) % 3];
         values[frame * 4] = Math.sin(angle / 2);
         values[frame * 4 + 3] = Math.cos(angle / 2);

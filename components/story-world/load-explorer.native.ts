@@ -23,7 +23,7 @@ export type ExplorerModel = {
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const explorerAsset = require("../../assets/models/quaternius_cc0-male-character-1161.glb");
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const kangarooExplorerAsset = require("../../assets/models/wikalino-kangaroo-explorer.glb");
+const girlExplorerAsset = require("../../assets/models/girl2.glb");
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const indigenousExplorerAsset = require("../../assets/models/wikalino-indigenous-explorer.glb");
 // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -34,8 +34,6 @@ const batangPinoyExplorerAsset = require("../../assets/models/wikalino-batang-pi
 const storyScrollAsset = require("../../assets/models/wikalino-story-scroll.glb");
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const treasureChestAsset = require("../../assets/models/wikalino-treasure-chest.glb");
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const tropicalHutAsset = require("../../assets/models/wikalino-tropical-hut.glb");
 
 type CharacterPalette = {
   pants: number;
@@ -100,8 +98,8 @@ function prepareCharacterMaterials(scene: Group, palette: CharacterPalette) {
 export async function loadExplorerModel(
   characterId: PlayerCharacterId,
 ): Promise<ExplorerModel> {
-  if (characterId === "kangaroo") {
-    return loadKangarooExplorer();
+  if (characterId === "student-girl") {
+    return loadStaticExplorer(girlExplorerAsset, 2.25);
   }
   if (characterId === "indigenous") {
     return loadStaticExplorer(indigenousExplorerAsset, 2.25);
@@ -227,31 +225,6 @@ function prepareVertexColoredModel(scene: Group, roughness: number) {
   });
 }
 
-async function loadKangarooExplorer(): Promise<ExplorerModel> {
-  const gltf = await loadBundledGlb(kangarooExplorerAsset);
-  prepareVertexColoredModel(gltf.scene, 0.82);
-
-  const bounds = new Box3().setFromObject(gltf.scene);
-  const center = bounds.getCenter(new Vector3());
-  const height = Math.max(bounds.getSize(new Vector3()).y, 0.001);
-  const model = new Group();
-  const standingPose = gltf.scene;
-  const walkingPose = gltf.scene.clone(true);
-  standingPose.position.set(-center.x, -bounds.min.y, -center.z);
-  walkingPose.position.copy(standingPose.position);
-  standingPose.visible = true;
-  walkingPose.visible = false;
-  model.add(standingPose, walkingPose);
-  model.scale.setScalar(2.05 / height);
-
-  return {
-    locomotionStyle: "hop",
-    scene: model,
-    standingPose,
-    walkingPose,
-  };
-}
-
 export async function loadStoryScrollModel(): Promise<Group> {
   const gltf = await loadBundledGlb(storyScrollAsset);
   const bounds = new Box3().setFromObject(gltf.scene);
@@ -271,19 +244,6 @@ export async function loadTreasureChestModel(): Promise<Group> {
   const center = bounds.getCenter(new Vector3());
   const width = Math.max(bounds.getSize(new Vector3()).x, 0.001);
   const scale = 2.05 / width;
-  gltf.scene.position.set(-center.x * scale, -bounds.min.y * scale, -center.z * scale);
-  gltf.scene.scale.setScalar(scale);
-  return gltf.scene;
-}
-
-export async function loadTropicalHutModel(): Promise<Group> {
-  const gltf = await loadBundledGlb(tropicalHutAsset);
-  prepareVertexColoredModel(gltf.scene, 0.9);
-
-  const bounds = new Box3().setFromObject(gltf.scene);
-  const center = bounds.getCenter(new Vector3());
-  const height = Math.max(bounds.getSize(new Vector3()).y, 0.001);
-  const scale = 3.1 / height;
   gltf.scene.position.set(-center.x * scale, -bounds.min.y * scale, -center.z * scale);
   gltf.scene.scale.setScalar(scale);
   return gltf.scene;

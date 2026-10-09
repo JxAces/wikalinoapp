@@ -12,8 +12,8 @@ const compiled = ts.transpileModule(source, {
 }).outputText.replace(/from "three"/g, `from ${JSON.stringify(new URL("../node_modules/three/build/three.module.js", import.meta.url).href)}`);
 const { prepareCompatibleSkinning } = await import(`data:text/javascript;base64,${Buffer.from(compiled).toString("base64")}`);
 
-for (const name of ["indigenous", "muslim", "batang-pinoy"]) {
-  const bytes = fs.readFileSync(new URL(`../assets/models/wikalino-${name}-explorer.glb`, import.meta.url));
+for (const name of ["indigenous", "muslim", "batang-pinoy", "student-girl"]) {
+  const bytes = fs.readFileSync(new URL(name === "student-girl" ? "../assets/models/girl2.glb" : `../assets/models/wikalino-${name}-explorer.glb`, import.meta.url));
   const gltf = await new GLTFLoader().parseAsync(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength), "");
   const originalMeshes = [];
   gltf.scene.traverse(object => { if (object.isSkinnedMesh) originalMeshes.push(object); });

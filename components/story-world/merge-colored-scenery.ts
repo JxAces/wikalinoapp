@@ -20,6 +20,7 @@ export function mergeColoredScenery(root: Group) {
   });
   for (const meshes of batches.values()) {
     if (meshes.length < 2) continue;
+    const treeSurfaces = meshes.some(mesh => mesh.geometry.hasAttribute("treeSurface"));
     const geometries = meshes.map(mesh => {
       const geometry = mesh.geometry.clone();
       geometry.applyMatrix4(new Matrix4().multiplyMatrices(inverse, mesh.matrixWorld));
@@ -36,7 +37,11 @@ export function mergeColoredScenery(root: Group) {
         color.toArray(colors, i * 3);
       }
       for (const name of Object.keys(geometry.attributes)) {
-        if (name !== "position" && name !== "normal") geometry.deleteAttribute(name);
+        if (name !== "position" && name !== "normal" && !(treeSurfaces && (name === "uv" || name === "treeSurface"))) geometry.deleteAttribute(name);
+      }
+      if (treeSurfaces) {
+        if (!geometry.hasAttribute("uv")) geometry.setAttribute("uv", new Float32BufferAttribute(new Float32Array(count * 2), 2));
+        if (!geometry.hasAttribute("treeSurface")) geometry.setAttribute("treeSurface", new Float32BufferAttribute(new Float32Array(count), 1));
       }
       geometry.setAttribute("color", new Float32BufferAttribute(colors, 3));
       if (!geometry.index) geometry.setIndex(new BufferAttribute(Uint32Array.from({ length: count }, (_, i) => i), 1));

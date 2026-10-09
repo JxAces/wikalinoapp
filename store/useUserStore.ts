@@ -25,6 +25,7 @@ const USER_STORE_STORAGE_KEY = "wikalino-user-store";
 
 const emptyUserData = () => ({
   profile: null,
+  welcomeCompleted: false,
 
   xp: 0,
 
@@ -99,6 +100,8 @@ type UserStore = {
    */
 
   profile: UserProfile | null;
+  welcomeCompleted: boolean;
+  completeWelcome: () => void;
 
   setProfile: (
     profile: UserProfile,
@@ -230,11 +233,14 @@ export const useUserStore =
          */
 
         profile: null,
+        welcomeCompleted: false,
+        completeWelcome: () => set({ welcomeCompleted: true }),
 
         setProfile: (profile) =>
-          set({
+          set((state) => ({
             profile,
-          }),
+            welcomeCompleted: state.profile ? state.welcomeCompleted : false,
+          })),
 
         updateProfile: (payload) =>
           set((state) => ({
@@ -644,7 +650,7 @@ export const useUserStore =
       {
         name: USER_STORE_STORAGE_KEY,
 
-        version: 4,
+        version: 5,
 
         storage: createJSONStorage(
           () => AsyncStorage,
@@ -667,6 +673,8 @@ export const useUserStore =
 
           return {
             ...state,
+            // Existing players keep their progress and do not repeat onboarding.
+            welcomeCompleted: state.welcomeCompleted ?? Boolean(oldProfile),
 
             profile: oldProfile
               ? {

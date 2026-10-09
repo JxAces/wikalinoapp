@@ -32,7 +32,7 @@ export default function ProgressScreen() {
   const [lineupOpen, setLineupOpen] = useState(false);
   const [draftCharacter, setDraftCharacter] = useState<PlayerCharacterId>(DEFAULT_PLAYER_CHARACTER);
   const selectedCharacter = profile?.character ?? DEFAULT_PLAYER_CHARACTER;
-  const characterTitle = PLAYER_CHARACTER_OPTIONS.find(item => item.id === selectedCharacter)?.title ?? "Mag-aaral";
+  const characterTitle = PLAYER_CHARACTER_OPTIONS.find(item => item.id === selectedCharacter)?.title ?? "1";
   const level = getLevelInfo(xp);
   const totalStars = stories.reduce((sum, story) => sum + getStoryStars(story.id), 0);
   const completedCount = stories.filter(story => completedStoryIds.includes(story.id)).length;

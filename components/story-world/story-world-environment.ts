@@ -7,9 +7,6 @@ import {
 import { mergeColoredScenery } from "./merge-colored-scenery";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 
-/** The hut stays behind every scroll and outside the walkable rectangle.
- * Use a parent group: rotating a normalized GLB itself also rotates its offset. */
-export const STORY_HUT_PLACEMENT = { x: -4.8, y: 0.02, z: -25.1, rotation: 0.45 };
 export const MEADOW_LIGHTING = {
   sky: 0xb9dfc5, fog: 0xc6dec0, fogDensity: 0.016,
   hemisphereSky: 0xf3f7dc, hemisphereGround: 0x526336,
@@ -223,8 +220,8 @@ export function createMeadowEnvironment(lowDetail = false) {
   for (let i = 0; i < (lowDetail ? 130 : 220); i++) {
     const x = (i % 2 ? -1 : 1) * (6.2 + random() * 9);
     const z = 14 - random() * 44;
-    // Leave a small lawn around the hut's foundation.
-    if (Math.hypot(x - STORY_HUT_PLACEMENT.x, z - STORY_HUT_PLACEMENT.z) < 3.1) continue;
+    // Keep an open lawn at the far end of the trail.
+    if (Math.hypot(x + 4.8, z + 25.1) < 3.1) continue;
     const y = meadowHeight(x, z);
     if (i % 14 === 0) {
       shrub.add(sphere, [x, y + 0.3, z], [0.65, 0.48, 0.56]);

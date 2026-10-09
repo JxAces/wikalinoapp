@@ -35,6 +35,10 @@ import type {
   StoryWorldStatus,
 } from "./story-world.types";
 import { VirtualJoystick } from "./VirtualJoystick";
+import { HubMinimap } from "./HubMinimap";
+import { WelcomeDialogue } from "./WelcomeDialogue";
+import { UgatMemoryNote, UgatMemoryPrompt } from "./UgatMemoryNote";
+import { UGAT_MEMORIES, type UgatMemory } from "./ugat-layout";
 import { useWorldKeyboard } from "@/hooks/useWorldKeyboard";
 import { hubReturnRoute, hubSpawn } from "./hub-navigation";
 
@@ -50,7 +54,11 @@ export default function StoryWorld({ questStoryId }: { questStoryId?: string } =
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ markahan?: string; node?: string; returnPortal?: string | string[] }>();
   const questStory = questStoryId ? getStoryById(questStoryId) : undefined;
+  const daylightWorld = questStoryId === UGAT_STORY;
   const profile = useUserStore((state) => state.profile);
+  const welcomeCompleted = useUserStore(state => state.welcomeCompleted);
+  const completeWelcome = useUserStore(state => state.completeWelcome);
+  const needsWelcome = Boolean(profile) && !welcomeCompleted && !questStory;
   const xp = useUserStore((state) => state.xp);
   const activityResults = useUserStore((state) => state.activityResults);
   const requestedMarkahan = Number(params.markahan);
@@ -67,6 +75,7 @@ export default function StoryWorld({ questStoryId }: { questStoryId?: string } =
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<StoryWorldStatus>(EMPTY_STATUS);
   const [enteringStoryId, setEnteringStoryId] = useState<string | null>(null);
+  const [memoryNote,setMemoryNote] = useState<UgatMemory|null>(null);
   const portalTransition = useSharedValue(0);
 
   const portals = useMemo<StoryWorldPortal[]>(
@@ -78,11 +87,11 @@ export default function StoryWorld({ questStoryId }: { questStoryId?: string } =
     [activityResults, questStory, stories],
   );
   const spawnNode = questStory ? portals.find(node => (worldNodeId(node) === params.node || (node.questionGroup && node.story.activities.slice(node.questionGroup.start, node.questionGroup.end).some(activity => activity.id === params.node)))) ?? portals.find(node => node.state === "current") : undefined;
-  const forestEntrance = questStoryId === UGAT_STORY && !params.node;
+  const questEntrance = Boolean(questStory) && !params.node;
   const hubArrival = useMemo(() => hubSpawn(portals, params.returnPortal), [portals, params.returnPortal]);
   const spawnPosition = useMemo(() => questStory
-    ? spawnNode && !forestEntrance ? { x: spawnNode.position.x, z: spawnNode.position.z + 1.7 } : undefined
-    : hubArrival.position, [questStory, spawnNode, forestEntrance, hubArrival]);
+    ? spawnNode && !questEntrance ? { x: spawnNode.position.x, z: spawnNode.position.z + 1.7 } : undefined
+    : hubArrival.position, [questStory, spawnNode, questEntrance, hubArrival]);
   const spawnHeading = questStory ? undefined : hubArrival.heading;
   const answered = questStory?.activities.filter(activity => activityResults[activity.id]).length ?? 0;
   const chestUnlocked = isWorldChestUnlocked(portals);
@@ -107,6 +116,7 @@ export default function StoryWorld({ questStoryId }: { questStoryId?: string } =
     (node) => worldNodeId(node) === status.nearestStoryId,
   );
   const returningToHub = enteringStoryId === RETURN_PORTAL_ID;
+  const nearbyMemory = daylightWorld ? UGAT_MEMORIES.find(memory=>memory.id===status.ugatMemory) : undefined;
 
   useEffect(() => {
     if (__DEV__) console.info("[Wikalino world UI] mounted");
@@ -124,6 +134,7 @@ export default function StoryWorld({ questStoryId }: { questStoryId?: string } =
     useCallback(() => {
       portalTransition.set(0);
       setEnteringStoryId(null);
+      setMemoryNote(null);
       engineRef.current?.start();
       return () => {
         if (navigationTimerRef.current) clearTimeout(navigationTimerRef.current);
@@ -142,10 +153,11 @@ export default function StoryWorld({ questStoryId }: { questStoryId?: string } =
 
   const handleStatusChange = useCallback((next: StoryWorldStatus) => {
     setStatus((current) =>
-      current.guidance?.label === next.guidance?.label &&
-      current.guidance?.degrees === next.guidance?.degrees &&
-      current.guidance?.distance === next.guidance?.distance &&
-      current.guidance?.viaBridge === next.guidance?.viaBridge &&
+      current.minimap?.x === next.minimap?.x &&
+      current.minimap?.z === next.minimap?.z &&
+      current.minimap?.heading === next.minimap?.heading &&
+      current.welcomePhase === next.welcomePhase &&
+      current.ugatMemory === next.ugatMemory &&
       current.animation === next.animation &&
       current.nearChest === next.nearChest &&
       current.nearReturnPortal === next.nearReturnPortal &&
@@ -161,7 +173,9 @@ export default function StoryWorld({ questStoryId }: { questStoryId?: string } =
         engineRef.current?.dispose();
         setError(null);
         setReady(false);
+        setStatus(EMPTY_STATUS);
         engineRef.current = new StoryWorldEngine({
+          welcome: needsWelcome,
           characterId,
           questStoryId,
           spawnPosition,
@@ -182,14 +196,24 @@ export default function StoryWorld({ questStoryId }: { questStoryId?: string } =
         setError(worldError.message);
       }
     },
-    [characterId, focused, handleStatusChange, portals, questStoryId, spawnPosition, spawnHeading],
+    [characterId, focused, handleStatusChange, portals, questStoryId, spawnPosition, spawnHeading, needsWelcome],
   );
 
   const handleMove = useCallback((x: number, y: number) => {
     inputRef.current = { ...inputRef.current, x, y };
     engineRef.current?.setInput(inputRef.current);
   }, []);
-  useWorldKeyboard(focused && ready && !enteringStoryId, handleMove);
+  useWorldKeyboard(focused && ready && !enteringStoryId && !needsWelcome && !memoryNote, handleMove);
+  const openMemory = () => {
+    if(!nearbyMemory)return;
+    inputRef.current={x:0,y:0};
+    engineRef.current?.setInput(inputRef.current);
+    setMemoryNote(nearbyMemory);
+  };
+  const finishWelcome = () => {
+    engineRef.current?.finishWelcome();
+    completeWelcome();
+  };
   useEffect(() => {
     const subscription = AppState.addEventListener("change", state => {
       if (state === "active" && focused) engineRef.current?.start();
@@ -202,7 +226,7 @@ export default function StoryWorld({ questStoryId }: { questStoryId?: string } =
     (storyId: string) => {
       const returning = storyId === RETURN_PORTAL_ID && Boolean(questStory);
       const portal = portals.find(node => worldNodeId(node) === storyId);
-      if (enteringStoryId || (returning ? !ready || !status.nearReturnPortal : !portal || portal.state === "locked")) {
+      if (needsWelcome || enteringStoryId || (returning ? !ready || !status.nearReturnPortal : !portal || portal.state === "locked")) {
         return;
       }
       inputRef.current = { x: 0, y: 0 };
@@ -229,7 +253,7 @@ export default function StoryWorld({ questStoryId }: { questStoryId?: string } =
         if (questStory) router.replace(hubReturnRoute(questStory));
       }, 1010);
     },
-    [enteringStoryId, portalTransition, portals, questStory, ready, status.nearReturnPortal],
+    [enteringStoryId, portalTransition, portals, questStory, ready, status.nearReturnPortal, needsWelcome],
   );
 
   const transitionBackdropStyle = useAnimatedStyle(() => ({
@@ -268,7 +292,7 @@ export default function StoryWorld({ questStoryId }: { questStoryId?: string } =
 
   return (
     <View style={styles.root}>
-      <StatusBar style="light" />
+      <StatusBar style={questStory ? "dark" : "light"} />
       {focused && <RenderSurface
         key={`${characterId}:${questStoryId ?? "hub"}`}
         msaaSamples={0}
@@ -277,11 +301,11 @@ export default function StoryWorld({ questStoryId }: { questStoryId?: string } =
       />}
 
       <View pointerEvents="box-none" style={[StyleSheet.absoluteFill, styles.hudLayer]}>
-        <View style={[styles.topHud, { paddingTop: insets.top + 8 }]}>
+        <View pointerEvents={needsWelcome?"none":"auto"} accessibilityElementsHidden={needsWelcome} importantForAccessibility={needsWelcome?"no-hide-descendants":"auto"} style={[styles.topHud, { paddingTop: insets.top + 8, opacity: needsWelcome?0:1 }]}>
           <View style={styles.identityCard}>
-            <View>
-              <Text numberOfLines={1} style={styles.playerName}>{firstName}</Text>
-              <Text style={styles.levelText}>LV {level.level}</Text>
+            <View style={questStory && styles.daylightIdentity}>
+              <Text numberOfLines={1} style={[styles.playerName, questStory && styles.daylightPlayerName]}>{firstName}</Text>
+              <Text style={[styles.levelText, questStory && styles.daylightLevelText]}>LV {level.level}</Text>
             </View>
           </View>
           <View style={styles.topActions}>
@@ -296,15 +320,7 @@ export default function StoryWorld({ questStoryId }: { questStoryId?: string } =
           <Text style={styles.navigationTitle}>{portals.filter(node => node.state === "completed").length}/{portals.length} balumbon</Text>
         </View>}
 
-        {ready && !questStory && status.guidance ? (
-          <View pointerEvents="none" accessible style={[styles.navigationCard, { top: insets.top + 58 }]} accessibilityLabel={`${status.guidance.label}, ${status.guidance.distance} metro${status.guidance.viaBridge ? ', dumaan sa tulay' : ''}`}>
-            <View style={{ transform: [{ rotate: `${status.guidance.degrees}deg` }] }}>
-              <MaterialCommunityIcons name="arrow-up-bold" size={23} color="#F7D77A" />
-            </View>
-            <Text numberOfLines={1} style={styles.navigationTitle}>{status.guidance.label.split(" · ")[0]} · {status.guidance.distance} m</Text>
-            {status.guidance.viaBridge && <MaterialCommunityIcons name="bridge" color="#D0DFC0" size={18} />}
-          </View>
-        ) : null}
+        {ready && !questStory && !needsWelcome && status.minimap && <HubMinimap portals={portals} player={status.minimap} top={insets.top+62} />}
 
         {!ready ? (
           <View style={styles.loadingCard}>
@@ -314,7 +330,7 @@ export default function StoryWorld({ questStoryId }: { questStoryId?: string } =
           </View>
         ) : null}
 
-        {ready && status.nearChest ? (
+        {needsWelcome ? null : ready && status.nearChest ? (
           <View style={[styles.storyPrompt, { bottom: insets.bottom + 164 }]}>
             <ChestRewardPrompt unlocked={chestUnlocked} progress={chestProgress} quest={Boolean(questStory)} nearby onClaim={claimChest} />
           </View>
@@ -375,10 +391,15 @@ export default function StoryWorld({ questStoryId }: { questStoryId?: string } =
           </View>
         ) : null}
 
-        <View style={[styles.controls, { bottom: insets.bottom + 16 }]}>
-          <VirtualJoystick disabled={!ready || Boolean(enteringStoryId)} onMove={handleMove} />
-        </View>
+        {!needsWelcome && <View style={[styles.controls, { bottom: insets.bottom + 16 }]}>
+          <VirtualJoystick disabled={!ready || Boolean(enteringStoryId) || Boolean(memoryNote)} onMove={handleMove} />
+        </View>}
+        {ready && nearbyMemory && !enteringStoryId && <UgatMemoryPrompt memory={nearbyMemory} bottom={insets.bottom} onPress={openMemory} />}
       </View>
+
+      {daylightWorld && <UgatMemoryNote memory={focused?memoryNote:null} bottom={insets.bottom} onClose={()=>setMemoryNote(null)} />}
+
+      {focused && ready && needsWelcome && <WelcomeDialogue speaking={status.welcomePhase==="speaking"} bottom={insets.bottom} onFinish={finishWelcome} />}
 
       {returningToHub ? (
         <Animated.View
@@ -541,6 +562,9 @@ const styles = StyleSheet.create({
     width: 39,
   },
   identityCard: { alignItems: "center", flex: 1, flexDirection: "row" },
+  daylightIdentity: { alignSelf: "flex-start", backgroundColor: "#F4F0D5", borderRadius: 10, paddingHorizontal: 10, paddingVertical: 5 },
+  daylightPlayerName: { color: "#203F36" },
+  daylightLevelText: { color: "#485D35" },
   levelBadge: { alignItems: "flex-end", marginLeft: 8 },
   levelText: { color: "#F7D77A", fontSize: 9, fontWeight: "900" },
   loadingCard: {

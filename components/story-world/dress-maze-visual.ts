@@ -36,10 +36,10 @@ function garment(index: number) {
   return geometry;
 }
 
-/** Dense clothing-market racks follow the existing maze collision layout. */
+/** Patterned clothing galleries line both sides of the clear story road. */
 export function createDressMaze() {
   const root = new Group();
-  root.name = "Sandaang Damit — clothing rack maze";
+  root.name = "Sandaang Damit — roadside clothing galleries";
   const parts = new Map<number, BufferGeometry[]>();
   const transform = new Object3D();
   function add(color: number, geometry: BufferGeometry, x: number, y: number, z: number, angle = 0) {

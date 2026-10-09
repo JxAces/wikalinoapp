@@ -1,5 +1,4 @@
-import { BufferGeometry, Color, CylinderGeometry, Float32BufferAttribute, Group, Mesh, MeshLambertMaterial, PlaneGeometry, SphereGeometry } from "three";
-import { meadowTexture } from "./story-world-environment";
+import { BufferGeometry, Color, CylinderGeometry, Float32BufferAttribute, Group, Mesh, MeshLambertMaterial, SphereGeometry, type Texture } from "three";
 import { mergeColoredScenery } from "./merge-colored-scenery";
 import { portalApproachClear } from "./hub-layout";
 
@@ -7,13 +6,14 @@ export const HUB_MUSHROOM_SCALE = 0.48;
 
 /** A closed, ridged leaf with an arched centerline, visible from below as well as above. */
 export function villagePalmFrond(length: number, width: number, rise: number) {
-  const vertices: number[] = [], indices: number[] = [];
+  const vertices: number[] = [], indices: number[] = [], uv: number[] = [];
   const segments = 5;
   for (let ring = 0; ring <= segments; ring++) {
     const t = ring / segments;
     const span = .018 + Math.sin(Math.PI * t) * width;
     const x = t * length, y = Math.sin(Math.PI * t) * rise - .48 * t * t;
     vertices.push(x,y+span*.3,0, x,y,span, x,y-span*.14,0, x,y,-span);
+    uv.push(t,.5, t,1, t,.5, t,0);
     if (ring === segments) continue;
     for (let side = 0; side < 4; side++) {
       const a = ring * 4 + side, b = ring * 4 + (side + 1) % 4;
@@ -24,16 +24,19 @@ export function villagePalmFrond(length: number, width: number, rise: number) {
   indices.push(0,2,1, 0,3,2, end,end+1,end+2, end,end+2,end+3);
   const geometry = new BufferGeometry();
   geometry.setAttribute("position",new Float32BufferAttribute(vertices,3));
+  geometry.setAttribute("uv",new Float32BufferAttribute(uv,2));
   geometry.setIndex(indices); geometry.computeVertexNormals();
   return mottled(geometry,.1);
 }
 
 /** Gentle canopy wind after batching, using a uniform instead of JS vertex edits. */
-export function addCanopyWind(root: Group, time: { value: number }) {
+export function addCanopyWind(root: Group, time: { value: number }, treeTexture?: Texture) {
   root.traverse(object => {
     if (!(object instanceof Mesh) || !(object.material instanceof MeshLambertMaterial)) return;
     const p = object.geometry.getAttribute("position"), c = object.geometry.getAttribute("color");
     if (!c) return;
+    const hasTreeDetail = Boolean(treeTexture && object.geometry.hasAttribute("treeSurface"));
+    if (hasTreeDetail) object.material.map = treeTexture!;
     const weights = new Float32Array(p.count);
     for (let i = 0; i < p.count; i++) {
       // Only high, green foliage moves. Brown trunks and low shrubs stay planted.
@@ -43,37 +46,35 @@ export function addCanopyWind(root: Group, time: { value: number }) {
     object.geometry.setAttribute("canopyWeight", new Float32BufferAttribute(weights, 1));
     object.material.onBeforeCompile = shader => {
       shader.uniforms.canopyTime = time;
-      shader.vertexShader = "attribute float canopyWeight; uniform float canopyTime;\n" + shader.vertexShader
+      shader.vertexShader = "attribute float canopyWeight; uniform float canopyTime;\n" +
+        (hasTreeDetail ? "attribute float treeSurface; varying float vTreeSurface;\n" : "") + shader.vertexShader
         .replace("#include <begin_vertex>", `#include <begin_vertex>
+          ${hasTreeDetail ? "vTreeSurface = treeSurface;" : ""}
           float breeze = sin(canopyTime * 1.15 + position.x * 0.31 + position.z * 0.2);
           transformed.x += breeze * canopyWeight * 0.085;
-          transformed.z += cos(canopyTime * 0.8 + position.z * 0.25) * canopyWeight * 0.045;`);
+          transformed.z += cos(canopyTime * 0.8 + position.z * 0.25) * canopyWeight * 0.045;
+          transformed.y += sin(canopyTime * 3.4 + position.x * 2.7 + position.z * 3.2) * canopyWeight * 0.012;`);
+      if (hasTreeDetail) {
+        shader.fragmentShader = "varying float vTreeSurface;\n" + shader.fragmentShader
+          .replace("#include <map_fragment>", `
+            if (vTreeSurface > 2.5) {
+              float edge = abs(vMapUv.y * 2.0 - 1.0);
+              float leafletCenter = abs(fract(vMapUv.x * 26.0 + edge * 0.75) - 0.5);
+              if (edge > 0.08 && leafletCenter > 0.36 * (1.0 - edge * 0.7)) discard;
+              diffuseColor.rgb *= 0.78 + 0.22 * (1.0 - edge);
+            } else if (vTreeSurface > 0.5) {
+              bool leaf = vTreeSurface > 1.5;
+              vec2 tile = fract(vMapUv * (leaf ? vec2(3.0,2.0) : vec2(2.0,1.8)));
+              vec2 atlas = vec2((leaf ? 0.504 : 0.004) + tile.x * 0.492, 0.004 + tile.y * 0.992);
+              vec4 detail = texture2D(map, atlas);
+              if (leaf && detail.a < 0.28) discard;
+              diffuseColor.rgb *= detail.rgb;
+            }
+          `);
+      }
     };
-    object.material.customProgramCacheKey = () => "wikalinggo-canopy-wind-v1";
+    object.material.customProgramCacheKey = () => hasTreeDetail ? "wikalino-tree-detail-wind-v2" : "wikalinggo-canopy-wind-v2";
   });
-}
-
-/** Painted grass is one shared 256px texture; playable ground remains level. */
-export function createHubGrass() {
-  const texture = meadowTexture();
-  texture.repeat.set(24, 26);
-  const terrain = new PlaneGeometry(110, 120, 26, 30);
-  terrain.rotateX(-Math.PI / 2); terrain.translate(0, 0, -4);
-  const position = terrain.getAttribute("position");
-  const colors = new Float32Array(position.count * 3);
-  for (let i = 0; i < position.count; i++) {
-    const x = position.getX(i), z = position.getZ(i);
-    const edge = Math.max(-x - 38, x - 40, -z - 42, z - 34, 0);
-    const rise = Math.min(1, edge / 10);
-    position.setY(i, -.07 + rise * rise * (4 + Math.sin(x * .16 + z * .12) * 1.8));
-    const shade = .96 + Math.sin(x * .19 + z * .24) * .06;
-    colors.set([shade, shade, shade * .94], i * 3);
-  }
-  terrain.setAttribute("color", new Float32BufferAttribute(colors, 3));
-  terrain.computeVertexNormals();
-  const material = new MeshLambertMaterial({map: texture, vertexColors: true});
-  const mesh = new Mesh(terrain, material); mesh.name = "Painted leafy grass and rolling banks";
-  return mesh;
 }
 
 /** Local vertex color variation makes foliage/bark feel painted, without extra materials. */

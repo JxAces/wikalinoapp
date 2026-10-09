@@ -2,27 +2,27 @@ export const PLAYER_CHARACTER_OPTIONS = [
   {
     description: "Puting uniporme, itim na pantalon at sapatos.",
     id: "student",
-    title: "Mag-aaral",
+    title: "1",
   },
   {
-    description: "Masiglang kangaroo na tumatalon sa mundo ng mga kuwento.",
-    id: "kangaroo",
-    title: "Kangaroo",
+    description: "Puting blusa, asul na palda at laso, at itim na sapatos.",
+    id: "student-girl",
+    title: "2",
   },
   {
     description: "Katutubong manlalakbay para sa mundo ng mga kuwento.",
     id: "indigenous",
-    title: "Katutubong Explorer",
+    title: "3",
   },
   {
     description: "Manlalakbay na may tradisyonal na kasuotang Muslim.",
     id: "muslim",
-    title: "Muslim Explorer",
+    title: "4",
   },
   {
     description: "Batang Pilipino na may salakot at pulang kasuotan.",
     id: "batang-pinoy",
-    title: "Batang Pinoy",
+    title: "5",
   },
 ] as const;
 

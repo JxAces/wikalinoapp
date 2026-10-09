@@ -37,6 +37,25 @@ const { hubReturnRoute, hubSpawn } = load(path.join(root, "components/story-worl
 
 async function check() {
   await store.persist.rehydrate();
+  const { PLAYER_CHARACTER_OPTIONS, isPlayerCharacterId } = load(path.join(root, "data/player-characters.ts"));
+  assert.deepEqual(PLAYER_CHARACTER_OPTIONS.map(p=>p.title),["1","2","3","4","5"]);
+  assert(!isPlayerCharacterId("kangaroo"));
+  assert.equal(store.getState().welcomeCompleted,false);
+  store.getState().setProfile({fullName:"New reader",pangkat:"Baitang 7",character:"student"});
+  assert.equal(store.getState().welcomeCompleted,false,"New player gets the welcome scene");
+  store.getState().completeWelcome();
+  await store.persist.rehydrate();
+  assert.equal(store.getState().welcomeCompleted,true,"Welcome stays completed after reload");
+  store.getState().updateProfile({character:"student-girl"});
+  assert.equal(store.getState().welcomeCompleted,true,"Changing character does not repeat welcome");
+  const migrated = await store.persist.getOptions().migrate({profile:{fullName:"Returning",pangkat:"7",character:"kangaroo"},xp:123,activityResults:{sample:{attempts:2}}},4);
+  assert.equal(migrated.profile.character,"student","Retired kangaroo switches to character 1");
+  assert.equal(migrated.welcomeCompleted,true,"Existing players skip the new-player scene");
+  assert.equal(migrated.xp,123);assert.equal(migrated.activityResults.sample.attempts,2);
+  store.getState().clearProfile();
+  store.getState().setProfile({fullName:"Another reader",pangkat:"Baitang 7",character:"student"});
+  assert.equal(store.getState().welcomeCompleted,false,"New profile can see welcome again");
+  console.log("Numbered lineup, kangaroo migration, first-time welcome and persistence passed");
   const stories = getAllStories();
   assert.equal(stories.length, 3);
   const destinations=stories.map((story,index)=>({story,position:STORY_WORLD_POSITIONS[index]}));
@@ -53,9 +72,9 @@ async function check() {
   const compact = questionScrolls(stories[0], {});
   for (let i = 1; i < compact.length; i++) {
     const gap = Math.hypot(compact[i].position.x - compact[i - 1].position.x, compact[i].position.z - compact[i - 1].position.z);
-    assert(gap < 6.5 && gap > 2 * STORY_INTERACTION_DISTANCE, "Scrolls should be close without overlapping interaction zones");
+    assert(gap < 8.2 && gap > 2 * STORY_INTERACTION_DISTANCE, "Scrolls should be close without overlapping interaction zones");
   }
-  assert(Math.abs(compact[2].position.z - worldChestPosition(true).z) <= 5, "Quest chest is just beyond the last scroll");
+  assert(Math.abs(compact[2].position.z - worldChestPosition(true).z) <= 6, "Quest chest is just beyond the last scroll");
   assert.equal(STORY_WORLD_POSITIONS[2].x, 23, "Third hub portal is in the village");
   assert.equal(worldChestPosition(false).z, 23, "Hub reward is in the village square");
   store.getState().clearGameProgress();

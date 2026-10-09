@@ -1,4 +1,5 @@
 import type { Story } from "@/data/stories";
+import type { UgatMemoryId } from "./ugat-layout";
 
 export type StoryWorldPosition = {
   x: number;
@@ -22,7 +23,9 @@ export type StoryWorldInput = {
 };
 
 export type StoryWorldStatus = {
-  guidance?: { label: string; degrees: number; distance: number; viaBridge: boolean };
+  ugatMemory?: UgatMemoryId;
+  welcomePhase?: "approaching" | "speaking";
+  minimap?: StoryWorldPosition & { heading: number };
   animation: "Idle" | "Walk";
   nearestStoryId: string | null;
   nearChest?: boolean;

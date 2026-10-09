@@ -67,8 +67,8 @@ export function worldNodeId(node: StoryWorldPortal) {
 }
 
 export const STORY_SETTINGS = {
-  "m1-story-1": { name: "Labirinto ng Sandaang Damit", sky: 0xf3d8be, ground: 0xc8aa86, path: 0xf6dfb0, accent: 0xeab469 },
-  "m1-story-2": { name: "Gubat ng Magkakabuhol na Ugat", sky: 0x06141f, ground: 0x142e2b, path: 0x436d61, accent: 0x83c7a0 },
+  "m1-story-1": { name: "Landas ng Sandaang Damit", sky: 0xf3d8be, ground: 0xc8aa86, path: 0xf6dfb0, accent: 0xeab469 },
+  "m1-story-2": { name: "Ugat · Ang Bagong Araw", sky: 0xd4e8ce, ground: 0x859c54, path: 0xc7b083, accent: 0xa6bb68 },
   "m1-story-3": { name: "Nayon ng mga Nakalimutang Kuwento", sky: 0xa7b2ac, ground: 0x777d70, path: 0xc5b794, accent: 0xcabb91 },
 } as const;
 

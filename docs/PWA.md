@@ -13,7 +13,7 @@ routes), with `/index.html` as the navigation fallback. Serve `sw.js` with
 Expo development server as the installed/offline production version.
 
 The web app shares the mobile Three.js world: five selectable characters,
-walking/hopping, floating scrolls, completion circles, the tropical hut, chest,
+walking, floating scrolls, completion circles, textured village houses, chest,
 and the interactive reward coin. Character previews support drag rotation.
 Use the touch joystick on a phone or WASD/arrow keys on a keyboard. The loading
 book and portal use the existing React Native animations in the browser.

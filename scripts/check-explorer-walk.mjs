@@ -3,8 +3,8 @@ import assert from "node:assert/strict";
 import { AnimationMixer, Vector3 } from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 
-for (const name of ["indigenous", "muslim", "batang-pinoy"]) {
-  const url = new URL(`../assets/models/wikalino-${name}-explorer.glb`, import.meta.url);
+for (const name of ["indigenous", "muslim", "batang-pinoy", "student-girl"]) {
+  const url = new URL(name === "student-girl" ? "../assets/models/girl2.glb" : `../assets/models/wikalino-${name}-explorer.glb`, import.meta.url);
   const bytes = fs.readFileSync(url);
   const gltf = await new GLTFLoader().parseAsync(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength), "");
   let mesh;
@@ -34,6 +34,9 @@ for (const name of ["indigenous", "muslim", "batang-pinoy"]) {
       assert([point.x, point.y, point.z].every(Number.isFinite));
       floor = Math.min(floor, point.y);
       if (base.y > 1.05) headError = Math.max(headError, point.distanceTo(base));
+      if (name === "student-girl" && (base.y >= 0.684 || (base.y > 0.57 && Math.abs(base.x) > 0.20))) {
+        assert(point.distanceTo(base) < 0.00001, "Girl student: skirt, hands or upper body follows the leg rig");
+      }
       if (name === "batang-pinoy" && base.y > 0.57) {
         const color = mesh.geometry.attributes.color;
         if (color.getY(i) > color.getX(i) * 0.20) {

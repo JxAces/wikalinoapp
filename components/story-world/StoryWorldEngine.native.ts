@@ -1,4 +1,5 @@
-import { createHubWorld, HUB_BOUNDS, HUB_AREAS, hubWaypoint, moveThroughHub } from "./hub-world";
+import { createHubWorld, HUB_BOUNDS, moveThroughHub } from "./hub-world";
+import { createWelcomeGuide } from "./welcome-guide";
 import { HUB_PORTALS, HUB_START_HEADING, HUB_START_POSITION } from "./hub-layout";
 import { Platform } from "react-native";
 import type { ExpoWebGLRenderingContext } from "expo-gl";
@@ -7,7 +8,6 @@ import {
   AmbientLight,
   BoxGeometry,
   BufferGeometry,
-  CatmullRomCurve3,
   CircleGeometry,
   Clock,
   Color,
@@ -19,7 +19,6 @@ import {
   MathUtils,
   Mesh,
   MeshBasicMaterial,
-  MeshLambertMaterial,
   MeshStandardMaterial,
   Object3D,
   PerspectiveCamera,
@@ -35,7 +34,7 @@ import {
   followHeading,
   INITIAL_CHARACTER_HEADING,
 } from "./story-world-camera";
-import { createMeadowEnvironment, MEADOW_LIGHTING, STORY_HUT_PLACEMENT } from "./story-world-environment";
+import { MEADOW_LIGHTING } from "./story-world-environment";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 
 import {
@@ -48,7 +47,6 @@ import {
 import {
   loadExplorerModel,
   loadStoryScrollModel,
-  loadTropicalHutModel,
   loadTreasureChestModel,
 } from "./load-explorer.native";
 import type { PlayerCharacterId } from "@/data/player-characters";
@@ -64,13 +62,16 @@ import type {
 } from "./story-world.types";
 
 import { createStoryPortal } from "./story-portal-visual";
-import { createQuestScenery } from "./quest-scenery";
+import { createDressMaze } from "./dress-maze-visual";
+import { createStoryPromenade, createStoryAvenue, createStoryRouteGround } from "./story-route-visual";
 import { DRESS_MAZE_STORY, moveThroughDressMaze } from "./dress-maze";
 import { createUgatForest, moveThroughUgat, UGAT_STORY } from "./ugat-forest";
+import { UGAT_DAYLIGHT, ugatMemoryNear } from "./ugat-layout";
 import { createForgottenVillage, moveThroughVillage, VILLAGE_STORY } from "./forgotten-village";
 import { isWorldChestUnlocked, storySetting, worldNodeId } from "./quest-progression";
 
 type StoryWorldEngineOptions = {
+  welcome?: boolean;
   questStoryId?: string;
   spawnPosition?: { x: number; z: number };
   spawnHeading?: number;
@@ -97,7 +98,6 @@ const GL_VERSION = 0x1f02;
 const QUEST_START_POSITION = new Vector3(0, 0, 12.2);
 const tempCameraPosition = new Vector3();
 const tempCameraTarget = new Vector3();
-const tempObject = new Object3D();
 
 function mergeGeometryParts(parts: BufferGeometry[], label: string) {
   const merged = mergeGeometries(parts, false);
@@ -206,9 +206,14 @@ function makeRendererContext(
 }
 
 export class StoryWorldEngine {
+  private welcomeGuide: ReturnType<typeof createWelcomeGuide> | null = null;
+  private welcomePhase: StoryWorldStatus["welcomePhase"];
   private hub: ReturnType<typeof createHubWorld> | null = null;
-  private guidance: StoryWorldStatus["guidance"];
-  private lastGuidanceAt = 0;
+  private avenueTime = {value:0};
+  private ugat: ReturnType<typeof createUgatForest> | null = null;
+  private ugatMemory: StoryWorldStatus["ugatMemory"];
+  private minimap: StoryWorldStatus["minimap"];
+  private lastMinimapAt = 0;
   private activeAnimation: StoryWorldStatus["animation"] = "Idle";
   private storyGates: ReturnType<typeof createStoryPortal>[] = [];
   private animatedStoryScrolls: AnimatedStoryScroll[] = [];
@@ -278,6 +283,7 @@ export class StoryWorldEngine {
   }
 
   setInput(input: StoryWorldInput) {
+    if (this.welcomeGuide) { this.input = {x:0,y:0}; return; }
     if (Math.hypot(this.input.x, this.input.y) <= 0.06 && Math.hypot(input.x, input.y) > 0.06) {
       // Keep the view's direction at the start of a gesture. Recomputing this
       // while the camera turns would make holding sideways spiral endlessly.
@@ -286,8 +292,19 @@ export class StoryWorldEngine {
     this.input = input;
   }
 
+  finishWelcome() {
+    if (!this.welcomeGuide) return;
+    this.welcomeGuide.group.removeFromParent();
+    disposeWorldObject(this.welcomeGuide.group);
+    this.welcomeGuide = null;
+    this.welcomePhase = undefined;
+    this.input = {x:0,y:0};
+    this.emitStatus();
+  }
+
   updatePortals(portals: StoryWorldPortal[]) {
     this.options.portals = portals;
+    this.ugat?.setProgress(portals.length ? portals.filter(p => p.state === "completed").length / portals.length : 0);
     if (this.chestLock) this.chestLock.visible = !isWorldChestUnlocked(portals);
     for (const gate of this.storyGates) {
       const portal = portals.find(portal => portal.story.id === gate.storyId);
@@ -339,25 +356,35 @@ export class StoryWorldEngine {
 
   private createScene() {
     const setting = storySetting(this.options.questStoryId);
-    const night = this.options.questStoryId === UGAT_STORY;
+    const ugat = this.options.questStoryId === UGAT_STORY;
     const village = this.options.questStoryId === VILLAGE_STORY;
-    this.scene.background = new Color(setting?.sky ?? MEADOW_LIGHTING.sky);
-    this.scene.fog = new FogExp2(setting?.sky ?? MEADOW_LIGHTING.fog, village ? 0.029 : MEADOW_LIGHTING.fogDensity);
+    this.scene.background = new Color(ugat ? UGAT_DAYLIGHT.sky : setting?.sky ?? MEADOW_LIGHTING.sky);
+    this.scene.fog = new FogExp2(ugat ? UGAT_DAYLIGHT.fog : setting?.sky ?? MEADOW_LIGHTING.fog,
+      ugat ? UGAT_DAYLIGHT.fogDensity : village ? 0.029 : MEADOW_LIGHTING.fogDensity);
     this.scene.add(new HemisphereLight(
-      night ? 0x91c1d9 : MEADOW_LIGHTING.hemisphereSky, night ? 0x203c39 : MEADOW_LIGHTING.hemisphereGround,
-      night ? 0.8 : MEADOW_LIGHTING.hemisphereIntensity,
+      ugat ? UGAT_DAYLIGHT.hemisphereSky : MEADOW_LIGHTING.hemisphereSky,
+      ugat ? UGAT_DAYLIGHT.hemisphereGround : MEADOW_LIGHTING.hemisphereGround,
+      ugat ? UGAT_DAYLIGHT.hemisphereIntensity : MEADOW_LIGHTING.hemisphereIntensity,
     ));
-    this.scene.add(new AmbientLight(night ? 0x6b9eae : 0xfff8e7, night ? 0.35 : MEADOW_LIGHTING.ambientIntensity));
-    const sunlight = new DirectionalLight(night ? 0xb4d6f4 : 0xfff0c9, night ? 1.1 : MEADOW_LIGHTING.sunlightIntensity);
+    this.scene.add(new AmbientLight(ugat ? UGAT_DAYLIGHT.ambient : 0xfff8e7, ugat ? UGAT_DAYLIGHT.ambientIntensity : MEADOW_LIGHTING.ambientIntensity));
+    const sunlight = new DirectionalLight(ugat ? UGAT_DAYLIGHT.sun : 0xfff0c9, ugat ? UGAT_DAYLIGHT.sunIntensity : MEADOW_LIGHTING.sunlightIntensity);
     sunlight.position.set(-6, 11, 8);
     this.scene.add(sunlight);
     if (!this.options.questStoryId) this.hub = createHubWorld();
-    const meadow = this.hub?.group ?? (night ? createUgatForest() : village ? createForgottenVillage() : createMeadowEnvironment(Platform.OS !== "web"));
+    if (ugat) {
+      this.ugat = createUgatForest();
+      const portals = this.options.portals;
+      this.ugat.setProgress(portals.length ? portals.filter(p => p.state === "completed").length / portals.length : 0);
+    }
+    const meadow = this.hub?.group ?? this.ugat?.group ?? (village ? createForgottenVillage() : new Group());
     // Static scenery never needs its local matrices recomposed each frame.
     if (!this.hub) meadow.traverse(object => { object.updateMatrix(); object.matrixAutoUpdate = false; });
     this.scene.add(meadow);
 
-    if (this.options.questStoryId && !night && !village) this.scene.add(createQuestScenery(this.options.questStoryId));
+    if (this.options.questStoryId && !ugat) {
+      this.scene.add(createStoryRouteGround(this.options.questStoryId),createStoryAvenue(this.avenueTime));
+      if (!village) this.scene.add(createDressMaze());
+    }
     this.addPath();
     this.placeCharacterAtSpawn();
     this.character.add(this.characterVisual);
@@ -378,35 +405,7 @@ export class StoryWorldEngine {
   }
 
   private addPath() {
-    // The maze corridors are the route; a straight trail would cross walls.
-    if (!this.options.questStoryId || this.options.questStoryId === DRESS_MAZE_STORY || this.options.questStoryId === UGAT_STORY) return;
-    const curvePoints = [
-      new Vector3(0, 0.015, 13.2),
-      ...this.options.portals.map(({ position }) => new Vector3(position.x, 0.015, position.z)),
-      new Vector3(0, 0.015, worldChestPosition(Boolean(this.options.questStoryId)).z),
-    ];
-    const curve = new CatmullRomCurve3(curvePoints, false, "catmullrom", 0.35);
-    const geometry = new BoxGeometry(0.82, 0.08, 1.05);
-    const material = new MeshLambertMaterial({ color: storySetting(this.options.questStoryId)?.path ?? 0xd3bd82 });
-    const stoneGeometries: BufferGeometry[] = [];
-    const count = this.options.questStoryId ? 32 : 58;
-    for (let index = 0; index < count; index += 1) {
-      const progress = index / (count - 1);
-      const point = curve.getPoint(progress);
-      const tangent = curve.getTangent(progress);
-      tempObject.position.copy(point);
-      tempObject.rotation.set(0, Math.atan2(tangent.x, tangent.z), 0);
-      const alternatingScale = index % 3 === 0 ? 1.12 : 0.96;
-      tempObject.scale.set(alternatingScale, 1, 0.9);
-      tempObject.updateMatrix();
-      const stoneGeometry = geometry.clone();
-      stoneGeometry.applyMatrix4(tempObject.matrix);
-      stoneGeometries.push(stoneGeometry);
-    }
-    const mergedGeometry = mergeGeometryParts(stoneGeometries, "landas");
-    geometry.dispose();
-    const stones = new Mesh(mergedGeometry, material);
-    this.scene.add(stones);
+    if (this.options.questStoryId) this.scene.add(createStoryPromenade(this.options.questStoryId));
   }
 
   private async loadWorldModels() {
@@ -414,7 +413,6 @@ export class StoryWorldEngine {
       const stages: [string, () => void | Promise<void>][] = [
         [`character:${this.options.characterId}`, () => this.addExplorer()],
         [this.options.questStoryId ? "scrolls" : "portals", () => this.options.questStoryId ? this.addStoryScrolls() : this.addStoryGates()],
-        ...(!this.options.questStoryId ? [["hut", () => this.addTropicalHut()] as [string, () => Promise<void>]] : []),
         ["chest", () => this.addTreasureChest()],
       ];
       // Stagger GLB decoding and first uploads instead of creating every
@@ -429,6 +427,14 @@ export class StoryWorldEngine {
       }
       if (this.disposed) {
         return;
+      }
+      if (this.options.welcome && !this.options.questStoryId) {
+        this.input = {x:0,y:0};
+        this.welcomeGuide = createWelcomeGuide(this.character.position,this.character.rotation.y);
+        this.welcomeGuide.update(0);
+        this.scene.add(this.welcomeGuide.group);
+        this.welcomePhase = "approaching";
+        this.emitStatus();
       }
       this.options.onReady();
       if (__DEV__) console.info("[Wikalino world] ready");
@@ -490,6 +496,7 @@ export class StoryWorldEngine {
 
     this.returnGate = createStoryPortal(RETURN_PORTAL_ID);
     this.returnGate.group.position.set(RETURN_PORTAL_POSITION.x, 0, RETURN_PORTAL_POSITION.z);
+    this.returnGate.group.rotation.y = Math.PI;
     this.scene.add(this.returnGate.group);
 
     this.options.portals.forEach((portal, index) => {
@@ -585,7 +592,7 @@ export class StoryWorldEngine {
       return;
     }
     chest.position.y += 0.04;
-    const position = worldChestPosition(Boolean(this.options.questStoryId));
+    const position = worldChestPosition(Boolean(this.options.questStoryId),this.options.questStoryId);
     chest.position.x += position.x;
     chest.position.z += position.z;
     chest.rotation.y = 0.08;
@@ -598,20 +605,6 @@ export class StoryWorldEngine {
     this.chestLock.position.set(position.x, 1.85, position.z);
     this.chestLock.visible = !isWorldChestUnlocked(this.options.portals);
     this.scene.add(this.chestLock);
-  }
-
-  private async addTropicalHut() {
-    const hut = await loadTropicalHutModel();
-    if (this.disposed) {
-      disposeWorldObject(hut);
-      return;
-    }
-    const clearing = new Group();
-    clearing.name = "Hut in the far meadow clearing";
-    clearing.position.set(33, STORY_HUT_PLACEMENT.y, 7);
-    clearing.rotation.y = STORY_HUT_PLACEMENT.rotation;
-    clearing.add(hut);
-    this.scene.add(clearing);
   }
 
   private updateScrollAppearance(
@@ -662,6 +655,10 @@ export class StoryWorldEngine {
     const workStarted = __DEV__ ? performance.now() : 0;
     const delta = Math.min(this.clock.getDelta(), 0.1);
     const elapsed = this.clock.elapsedTime;
+    if (this.welcomeGuide?.update(delta) && this.welcomePhase === "approaching") {
+      this.welcomePhase = "speaking";
+      this.emitStatus();
+    }
     this.updateCharacter(delta);
     this.animateStoryScrolls(delta, elapsed);
     for (const gate of this.storyGates) {
@@ -670,19 +667,17 @@ export class StoryWorldEngine {
     this.returnGate?.update(elapsed);
     this.updateCamera(delta);
     this.hub?.update(elapsed, this.character.position);
-    if (this.hub && elapsed - this.lastGuidanceAt >= 0.25) {
-      this.lastGuidanceAt = elapsed;
-      const index = this.options.portals.findIndex(portal => portal.state !== "completed");
-      const target = index >= 0 ? this.options.portals[index].position : worldChestPosition(false);
-      const waypoint = hubWaypoint(this.character.position, target);
-      const angle = Math.atan2(waypoint.x-this.character.position.x, waypoint.z-this.character.position.z);
-      this.guidance = {
-        label: index >= 0 ? `${index+1}. ${HUB_AREAS[index] ?? "Portal"}` : "Kunin ang gantimpala",
-        degrees: Math.round(Math.atan2(Math.sin(this.cameraHeading-angle), Math.cos(this.cameraHeading-angle))*180/Math.PI/5)*5,
-        distance: Math.round(Math.hypot(target.x-this.character.position.x,target.z-this.character.position.z)),
-        viaBridge: waypoint !== target,
-      };
-      this.emitStatus();
+    this.ugat?.update(elapsed);
+    this.avenueTime.value=elapsed;
+    // A small SVG map needs only four updates per second, not a second GL scene.
+    if (this.hub && elapsed - this.lastMinimapAt >= 0.25) {
+      this.lastMinimapAt = elapsed;
+      const next = { x: Math.round(this.character.position.x*10)/10,
+        z: Math.round(this.character.position.z*10)/10, heading: Math.round(this.cameraHeading*100)/100 };
+      if (!this.minimap || next.x!==this.minimap.x || next.z!==this.minimap.z || next.heading!==this.minimap.heading) {
+        this.minimap = next;
+        this.emitStatus();
+      }
     }
     try {
       const { drawingBufferWidth: width, drawingBufferHeight: height } = this.options.gl;
@@ -826,13 +821,15 @@ export class StoryWorldEngine {
         nearestId = worldNodeId(portal);
       }
     }
-    const chestPosition = worldChestPosition(Boolean(this.options.questStoryId));
+    const chestPosition = worldChestPosition(Boolean(this.options.questStoryId),this.options.questStoryId);
     const nearChest = Math.hypot(this.character.position.x - chestPosition.x, this.character.position.z - chestPosition.z) < STORY_INTERACTION_DISTANCE;
     const nearReturnPortal = Boolean(this.returnGate) && Math.hypot(this.character.position.x - RETURN_PORTAL_POSITION.x, this.character.position.z - RETURN_PORTAL_POSITION.z) < STORY_INTERACTION_DISTANCE;
-    if (nearestId !== this.lastNearestStoryId || nearChest !== this.nearChest || nearReturnPortal !== this.nearReturnPortal) {
+    const ugatMemory = this.options.questStoryId === UGAT_STORY ? ugatMemoryNear(this.character.position.x,this.character.position.z) : undefined;
+    if (nearestId !== this.lastNearestStoryId || nearChest !== this.nearChest || nearReturnPortal !== this.nearReturnPortal || ugatMemory !== this.ugatMemory) {
       this.lastNearestStoryId = nearestId;
       this.nearChest = nearChest;
       this.nearReturnPortal = nearReturnPortal;
+      this.ugatMemory = ugatMemory;
       this.emitStatus();
     }
   }
@@ -862,7 +859,9 @@ export class StoryWorldEngine {
   private emitStatus() {
     this.options.onStatusChange({
       animation: this.activeAnimation,
-      guidance: this.guidance,
+      minimap: this.minimap,
+      welcomePhase: this.welcomePhase,
+      ugatMemory: this.ugatMemory,
       nearestStoryId: this.lastNearestStoryId,
       nearChest: this.nearChest,
       nearReturnPortal: this.nearReturnPortal,
