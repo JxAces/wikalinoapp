@@ -4,6 +4,7 @@
  * The untouched source is kept outside the app bundle in .source-models.
  */
 import fs from 'node:fs';
+import { Buffer } from 'node:buffer';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as THREE from 'three';
@@ -94,7 +95,7 @@ function extract(poly, planes) {
 const faceCut = [p => p[1] - 1.568, p => hairline(p[0]) + 0.006 - p[1], p => p[2] - 0.012, p => 0.155 - Math.abs(p[0] - centerX)];
 const strayCut = [p => 0.680 - p[1], p => 0.033 - Math.abs(p[0] - centerX)];
 const yAbove = y => p => p[1] - y, yBelow = y => p => y - p[1];
-const zAbove = z => p => p[2] - z, zBelow = z => p => z - p[2];
+const zBelow = z => p => z - p[2];
 const xWithin = x => p => x - Math.abs(p[0] - centerX);
 const colors = [
   { color: 'hair', planes: [yAbove(1.568), p => p[1] - hairline(p[0]) + 0.006] },
