@@ -64,21 +64,21 @@ try {
     activity: conflict, responses, completed, hasDraft: Object.keys(responses).length > 0, onChange() {}, onComplete() {}, onBack() {},
   }));
   const firstRound = renderConflict();
-  assert.equal((firstRound.match(/role="radio"/g) ?? []).length, 4, 'Round 1 begins with character choices only');
-  assert(firstRound.includes('aria-label="Susunod na round →"') && firstRound.includes('aria-disabled="true"'), 'An unanswered round cannot advance');
+  assert.equal((firstRound.match(/role="radio"/g) ?? []).length, 4, 'Yugto 1 begins with character choices only');
+  assert(firstRound.includes('aria-label="Susunod na yugto →"') && firstRound.includes('aria-disabled="true"'), 'An unanswered stage cannot advance');
   const scaleTags = firstRound.match(/<svg\b[^>]*>/g) ?? [];
-  assert.equal(scaleTags.length, 1, 'Round displays one balance scale');
-  assert(scaleTags.every(tag => tag.includes('aria-hidden="true"') && !/\saccessible=/.test(tag)), 'Scale uses valid decorative SVG attributes');
-  const reasonRound = renderConflict({ 'round-1-character': 'A' });
+  assert.equal(scaleTags.length, 0, 'The removed balance scale is not rendered');
+  assert(!firstRound.includes('HAMON 01') && !firstRound.includes('Round'), 'Old Hamon and Round labels are removed');
+  const reasonRound = renderConflict({ 'round-1-character': 'A', 'jumble-jojo': 'JOJO' });
   assert.equal((reasonRound.match(/role="radio"/g) ?? []).length, 8, 'Choosing a character reveals the four reasons');
   assert(reasonRound.includes('Piliin din ang dahilan bago magpatuloy.'));
-  const secondRound = renderConflict({ 'round-1-character': 'A', 'round-1-reason': 'B' });
+  const secondRound = renderConflict({ 'round-1-character': 'A', 'round-1-reason': 'B', 'jumble-jojo': 'JOJO' });
   assert(secondRound.includes('Pag-unawa sa kalagayan'), 'Draft resumes at the first unfinished round');
   assert.equal((secondRound.match(/role="radio"/g) ?? []).length, 4);
-  const completeResponses = { 'round-1-character': 'A', 'round-1-reason': 'B', 'round-2': 'B', 'round-3': 'C' };
+  const completeResponses = { 'round-1-character': 'A', 'round-1-reason': 'B', 'round-2': 'B', 'round-3': 'C', 'jumble-jojo': 'JOJO', 'jumble-minyong': 'MINYONG' };
   const conflictReview = renderConflict(completeResponses, true);
-  for (const value of ['Ang iyong mga sagot', 'Baguhin ang Round 1', 'Baguhin ang Round 2', 'Baguhin ang Round 3', 'Naka-save na ang iyong mga sagot']) assert(conflictReview.includes(value));
-  for (const field of conflict.fields) assert(conflictReview.includes(field.options.find(option => option.value === completeResponses[field.id]).label), 'Review preserves every saved answer');
+  for (const value of ['Ang iyong mga sagot', 'Baguhin ang Yugto 1', 'Baguhin ang Yugto 2', 'Baguhin ang Yugto 3', 'Naka-save na ang iyong mga sagot']) assert(conflictReview.includes(value));
+  for (const field of conflict.fields.filter(field => !field.id.startsWith('jumble-'))) assert(conflictReview.includes(field.options.find(option => option.value === completeResponses[field.id]).label), 'Review preserves every saved answer');
   assert(renderConflict(completeResponses).includes('Balikan bago tapusin'), 'A fully answered draft opens review without marking completion');
   const { ActivityCabinetCard } = load("components/story-cabinet/ActivityCabinetCard.tsx");
   for (const completed of [false, true]) {
@@ -98,4 +98,4 @@ try {
   Module._load = originalLoad;
   console.error = originalError;
 }
-console.log("PASS: Cabinet SVG accessibility, Ugat tree rotations, Utos round reveal/resume/review, and the original warning negative control.");
+console.log("PASS: Cabinet SVG accessibility, Ugat tree rotations, Utos Yugto and jumble gates, removed scale, resume/review, and the original warning negative control.");

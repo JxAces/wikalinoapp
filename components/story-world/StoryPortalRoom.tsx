@@ -9,7 +9,7 @@ import { WikalinoBrand } from "@/components/ui/WikalinoBrand";
 import Svg, { Circle, Ellipse, G, Path, Rect } from "react-native-svg";
 
 import type { Story } from "@/data/stories";
-import { getCabinetActivities } from "@/data/cabinet-activities";
+import { getCabinetActivities, isCabinetResponseComplete } from "@/data/cabinet-activities";
 import { useUserStore } from "@/store/useUserStore";
 import { Alert } from "@/utils/app-alert";
 import { canEnterStory, canOpenStoryActivities, canOpenStoryQuiz } from "./quest-progression";
@@ -115,7 +115,11 @@ export function StoryPortalRoom({ story }: { story: Story }) {
   const quizUnlocked = canOpenStoryQuiz(story.id, reading, answers, cabinetResponses);
   const answered = story.activities.filter(activity => answers[activity.id]).length;
   const cabinetTasks = getCabinetActivities(story.id);
-  const cabinetCompleted = cabinetTasks.filter(activity => cabinetResponses[activity.id]?.completedAt).length;
+  const cabinetCompleted = cabinetTasks.filter(activity => {
+    const response = cabinetResponses[activity.id];
+    return response?.completedAt && (story.id !== "m1-story-3" ||
+      Boolean(response.responses && isCabinetResponseComplete(activity, response.responses)));
+  }).length;
   const isUgat = story.id === "m1-story-2";
   const isUtos = story.id === "m1-story-3";
   const activityIcon = isUtos ? 'crown-outline' : isUgat ? 'tree-outline' : 'wardrobe-outline';

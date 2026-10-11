@@ -1,11 +1,11 @@
 import { getAllStories, type Story } from "@/data/stories";
 import { needsWardrobeDressing } from "@/data/sandaang-wardrobe";
-import { getCabinetActivities } from "@/data/cabinet-activities";
+import { getCabinetActivities, isCabinetResponseComplete } from "@/data/cabinet-activities";
 import type { StoryWorldPortal } from "./story-world.types";
 import { QUESTION_SCROLL_POSITIONS, UGAT_SCROLL_POSITIONS, UGAT_STORY } from "./story-world.constants";
 
 type Answers = Record<string, unknown>;
-type CabinetProgress = Record<string, { storyId: string; completedAt: string | null } | undefined>;
+type CabinetProgress = Record<string, { storyId: string; completedAt: string | null; responses?: Record<string, string> } | undefined>;
 
 export function isWorldChestUnlocked(portals: StoryWorldPortal[]) {
   return portals.length > 0 && portals.every(portal => portal.state === "completed");
@@ -32,7 +32,8 @@ export function canOpenStoryQuiz(storyId: string, readingCompleted: readonly str
   const activities = getCabinetActivities(storyId);
   return activities.length > 0 && activities.every(activity => {
     const response = cabinetResponses[activity.id];
-    return response?.storyId === storyId && Boolean(response.completedAt);
+    return response?.storyId === storyId && Boolean(response.completedAt) &&
+      (storyId !== "m1-story-3" || Boolean(response.responses && isCabinetResponseComplete(activity, response.responses)));
   });
 }
 

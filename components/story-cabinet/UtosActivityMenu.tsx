@@ -1,25 +1,27 @@
-import { AppTheme } from "@/constants/colors";
+import { AppTheme } from '@/constants/colors';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { AccessibilityInfo, Animated, AppState, Easing, Platform, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import Svg, { Defs, Ellipse, LinearGradient, Path, Stop } from 'react-native-svg';
 
 import type { CabinetActivity } from '@/data/cabinet-activities';
 
-type MenuActivity = { activity: CabinetActivity; completed: boolean; hasDraft: boolean };
+type MenuActivity = { activity: CabinetActivity; completed: boolean; hasDraft: boolean; locked: boolean };
 type Props = { activities: MenuActivity[]; onSelect: (activity: CabinetActivity) => void };
 
-const summaries: Record<string, { description: string; detail: string }> = {
-  'utos-conflict': { description: 'Sino ang naaapektuhan? Suriin ang sitwasyon at piliin ang dahilan.', detail: '3 round · Tunggalian' },
-  'utos-meanings': { description: 'Tuklasin ang tatlong kahulugan sa likod ng “Utos ng Hari.”', detail: '3 kahulugan · Interpretasyon' },
-  'utos-sequence': { description: 'Ayusin ang anim na pangyayari upang mabuo ang daloy ng kuwento.', detail: '6 story card · Pagkakasunod-sunod' },
-  'utos-stand-up': { description: 'Unawain ang pahayag ni Jojo at ipahayag ang sariling paninindigan.', detail: 'Interpretasyon · Pagninilay' },
-};
+// The adjoining tabs and sockets form one crown, with one target for each activity.
+const crownSections = [
+  'M50 80 L200 150 L270 65 L400 20 V120 C372 104 372 158 400 142 V235 H290 C306 207 252 207 268 235 H100 Z',
+  'M400 20 L530 65 L600 150 L750 80 L700 235 H560 C576 263 522 263 538 235 H400 V142 C372 158 372 104 400 120 Z',
+  'M100 235 H268 C252 207 306 207 290 235 H400 V310 C428 294 428 348 400 332 V420 Q250 420 120 385 Z',
+  'M400 235 H538 C522 263 576 263 560 235 H700 L680 385 Q550 420 400 420 V332 C428 348 428 294 400 310 Z',
+];
 
-/** Presentation only: navigation and saved responses remain owned by the cabinet screen. */
 export function UtosActivityMenu({ activities, onSelect }: Props) {
   const { width } = useWindowDimensions();
   const [focusedId, setFocusedId] = useState<string | null>(null);
   const [float] = useState(() => new Animated.Value(0));
+  const gradientId = `utos-crown-${useId().replace(/[^a-zA-Z0-9_-]/g, '')}`;
   useEffect(() => {
     let mounted = true;
     let reducedMotion = true;
@@ -41,107 +43,47 @@ export function UtosActivityMenu({ activities, onSelect }: Props) {
   }, [float]);
   const completed = activities.filter(item => item.completed).length;
   return <View style={styles.menu}>
-    <View pointerEvents="none" aria-hidden accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={[styles.roll, styles.topRoll]}>
-      <View style={styles.rollCap} /><View style={styles.rollShine} /><View style={styles.rollCap} />
-    </View>
-    <View style={styles.intro}>
-      <View pointerEvents="none" aria-hidden accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={styles.heroCrown}>
-        <View style={styles.rule} /><MaterialCommunityIcons name="star-four-points" size={18} color={AppTheme.primary} /><View style={styles.rule} />
+    <Text accessibilityLiveRegion="polite" style={styles.progress}>{completed}/{activities.length} gawaing kumpleto</Text>
+    <Animated.View style={[styles.crown, { transform: [{ translateY: float.interpolate({ inputRange: [0, 1], outputRange: [0, -5] }) }] }]}>
+      <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+        <Svg width="100%" height="100%" viewBox="0 0 800 480" aria-hidden={true} accessible={Platform.OS === 'web' ? undefined : false}>
+          <Defs><LinearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1"><Stop offset="0" stopColor="#FFF0A9" /><Stop offset="0.48" stopColor="#EBC45F" /><Stop offset="1" stopColor="#D4A445" /></LinearGradient></Defs>
+          <Ellipse cx="400" cy="449" rx="267" ry="14" fill={AppTheme.dark} opacity="0.12" />
+          {activities.map((item, index) => <Path key={`glow-${item.activity.id}`} d={crownSections[index]} fill="none" stroke="#F3CE64" strokeWidth={item.completed ? 17 : 0} opacity="0.3" />)}
+          {activities.map((item, index) => <Path key={item.activity.id} d={crownSections[index]} fill={item.completed ? `url(#${gradientId})` : item.locked ? AppTheme.panelStrong : AppTheme.surfaceSoft} stroke={item.completed ? '#B3862E' : AppTheme.border} strokeWidth="4" strokeLinejoin="round" />)}
+          <Path d="M144 365 Q270 396 374 395 M427 395 Q553 396 656 365" fill="none" stroke={AppTheme.primary} strokeWidth="5" opacity="0.35" strokeLinecap="round" />
+          <Path d="M270 87 L281 111 L270 135 L259 111 Z M530 87 L541 111 L530 135 L519 111 Z" fill={AppTheme.primary} opacity="0.42" />
+        </Svg>
       </View>
-      <Text accessibilityRole="header" style={styles.heading}>Apat na hamon.{"\n"}Isang mas malalim na pag-unawa.</Text>
-      <Text style={styles.introCopy}>Pumili ng lumulutang na korona upang buksan ang isang gawain.</Text>
-    </View>
-
-    <View style={styles.progress}>
-      <Text accessibilityLiveRegion="polite" style={styles.progressText}>{completed} sa {activities.length} na gawain ang kumpleto</Text>
-      <View style={styles.markers}>
-        {activities.map((item, index) => <View key={item.activity.id} accessible accessibilityLabel={`Hamon ${index + 1}: ${item.completed ? 'Kumpleto at naka-save' : 'Hindi pa kumpleto'}`} style={styles.marker}>
-          <View aria-hidden accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={styles.markerCrown}>
-            <MaterialCommunityIcons name={item.completed ? 'crown' : 'crown-outline'} size={26} color={AppTheme.primary} />
-            {item.completed && <View style={styles.markerCheck}><MaterialCommunityIcons name="check-circle" size={14} color={AppTheme.primary} /></View>}
-          </View>
-          <Text style={styles.markerNumber}>{index + 1}</Text>
-        </View>)}
-      </View>
-    </View>
-
-    <View style={[styles.cards, width >= 760 && styles.grid]}>
       {activities.map((item, index) => {
-        const { activity, hasDraft } = item;
-        const summary = summaries[activity.id];
-        const status = item.completed ? 'Kumpleto · Naka-save' : hasDraft ? 'May naka-save na sagot' : 'Hindi pa nasisimulan';
-        const action = item.completed ? 'Balikan' : hasDraft ? 'Ipagpatuloy' : 'Simulan';
-        return <Pressable key={activity.id} accessibilityRole="button" accessibilityLabel={`Hamon ${index + 1}. ${activity.title}. ${status}. ${action}.`}
-          onPress={() => onSelect(activity)} onFocus={() => setFocusedId(activity.id)} onBlur={() => setFocusedId(null)}
-          style={({ pressed }) => [styles.card, width >= 760 && styles.gridCard, focusedId === activity.id && styles.focused, pressed && styles.pressed]}>
-          <View pointerEvents="none" aria-hidden accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={styles.floatingStage}>
-            <Animated.View style={{ transform: [{ translateY: float.interpolate({ inputRange: [0, 1], outputRange: [0, -6] }) }] }}>
-              <MaterialCommunityIcons name="crown" size={80} color={AppTheme.primary} />
-              {item.completed && <View style={styles.crownCheck}><MaterialCommunityIcons name="check-circle" size={20} color={AppTheme.primary} /></View>}
-            </Animated.View>
-            <View style={styles.crownShadow} />
-          </View>
-          <View style={styles.cardTop}>
-            <Text style={styles.eyebrow}>HAMON {String(index + 1).padStart(2, '0')}</Text>
-          </View>
-          <Text style={styles.cardTitle}>{activity.title}</Text>
-          <Text style={styles.description}>{summary?.description ?? activity.description}</Text>
-          <Text style={styles.detail}>{summary?.detail ?? 'Pagsusuri ng kuwento'}</Text>
-          <View style={styles.cardBottom}>
-            <View style={styles.statusRow}>
-              <MaterialCommunityIcons name={item.completed ? 'check-circle-outline' : hasDraft ? 'pencil-outline' : 'circle-outline'} size={16} color={item.completed ? AppTheme.primary : AppTheme.primary} />
-              <Text style={[styles.status, item.completed && styles.doneText]}>{status}</Text>
-            </View>
-            <View style={styles.action}><Text style={styles.actionText}>{action}</Text><MaterialCommunityIcons name="arrow-right" size={18} color={AppTheme.primary} /></View>
+        const status = item.locked ? 'Nakakandado. Tapusin muna ang naunang gawain.' : item.completed ? 'Kumpleto. Balikan o baguhin ang sagot.' : item.hasDraft ? 'May draft. Ituloy ang gawain.' : 'Simulan ang gawain.';
+        return <Pressable key={item.activity.id} testID={`utos-crown-section-${index + 1}`}
+          accessibilityRole="button" accessibilityLabel={`${item.activity.title}. ${status}`} accessibilityState={{ disabled: item.locked }}
+          disabled={item.locked} onPress={() => onSelect(item.activity)} onFocus={() => setFocusedId(item.activity.id)} onBlur={() => setFocusedId(null)}
+          style={({ pressed }) => [styles.section, { left: index % 2 ? '50%' : 0, top: index < 2 ? 0 : '50%' }, focusedId === item.activity.id && styles.focused, pressed && styles.pressed]}>
+          <View style={[styles.sectionCopy, index % 2 ? styles.rightCopy : styles.leftCopy, index < 2 ? styles.upperCopy : styles.lowerCopy]}>
+            <MaterialCommunityIcons name={item.locked ? 'lock' : item.completed ? 'check-circle' : 'puzzle-outline'} size={width < 360 ? 17 : 22} color={item.locked ? AppTheme.muted : AppTheme.primary} />
+            <Text style={[styles.title, width < 600 && styles.titleMedium, width < 360 && styles.titleCompact]}>{item.activity.title}</Text>
           </View>
         </Pressable>;
       })}
-    </View>
-    <View style={styles.footer}>
-      <MaterialCommunityIcons name="content-save-outline" size={19} color={AppTheme.primary} />
-      <Text style={styles.footerText}>Naka-save sa device na ito ang iyong mga sagot. Ipakita ang mga ito sa guro para sa pagsusuri.</Text>
-    </View>
-    <View pointerEvents="none" aria-hidden accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={[styles.roll, styles.bottomRoll]}>
-      <View style={styles.rollCap} /><View style={styles.rollShine} /><View style={styles.rollCap} />
-    </View>
+    </Animated.View>
+    {activities.some(item => item.locked) && <Text style={styles.lockHint}>Tapusin muna ang naunang gawain upang mabuksan ang susunod na bahagi.</Text>}
   </View>;
 }
 
 const styles = StyleSheet.create({
-  menu: { width: '100%', maxWidth: 920, alignSelf: 'center', marginVertical: 16, backgroundColor: AppTheme.surfaceSoft, borderWidth: 2, borderColor: AppTheme.border, paddingHorizontal: 12, paddingTop: 30, paddingBottom: 18, shadowColor: AppTheme.dark, shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.14, shadowRadius: 5, elevation: 2 },
-  intro: { alignItems: 'center', paddingTop: 2 },
-  heroCrown: { flexDirection: 'row', alignItems: 'center', gap: 18, marginBottom: 14 },
-  rule: { width: 42, height: 1, backgroundColor: AppTheme.surfaceSoft },
-  heading: { color: AppTheme.text, fontSize: 24, lineHeight: 31, fontWeight: '800', textAlign: 'center', maxWidth: 600 },
-  introCopy: { color: AppTheme.muted, fontSize: 14, lineHeight: 22, textAlign: 'center', maxWidth: 550, marginTop: 10 },
-  progress: { alignItems: 'center', marginTop: 20, marginBottom: 22, gap: 8 },
-  progressText: { color: AppTheme.text, fontSize: 13, lineHeight: 20, fontWeight: '700' },
-  markers: { flexDirection: 'row', justifyContent: 'center', gap: 22 },
-  marker: { alignItems: 'center', gap: 2 }, markerCrown: { position: 'relative' },
-  markerCheck: { position: 'absolute', right: -4, bottom: -2, borderRadius: 8, backgroundColor: AppTheme.surfaceSoft },
-  markerNumber: { fontSize: 11, fontWeight: '700', color: AppTheme.muted },
-  cards: { gap: 24 }, grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
-  card: { borderWidth: 2, borderColor: 'transparent', borderRadius: 12, paddingHorizontal: 10, paddingBottom: 18 },
-  gridCard: { width: '48%' },
-  focused: { borderColor: AppTheme.primary, outlineColor: AppTheme.primary, outlineStyle: 'solid', outlineWidth: 3, outlineOffset: 3 },
-  pressed: { backgroundColor: AppTheme.selected },
-  floatingStage: { height: 110, alignItems: 'center', justifyContent: 'center', marginBottom: 6 },
-  crownShadow: { width: 56, height: 6, borderRadius: 28, backgroundColor: AppTheme.surfaceSoft, opacity: 0.18, marginTop: 1 },
-  crownCheck: { position: 'absolute', bottom: 5, right: -4, backgroundColor: AppTheme.surfaceSoft, borderRadius: 12 },
-  roll: { position: 'absolute', left: -10, right: -10, height: 22, borderRadius: 12, borderWidth: 1, borderColor: AppTheme.border, backgroundColor: AppTheme.panelStrong, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', shadowColor: AppTheme.dark, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.15, shadowRadius: 3, elevation: 3 },
-  topRoll: { top: -11 }, bottomRoll: { bottom: -11 },
-  rollCap: { width: 13, height: 20, borderRadius: 10, borderWidth: 2, borderColor: AppTheme.border, backgroundColor: AppTheme.surfaceSoft },
-  rollShine: { flex: 1, height: 5, backgroundColor: AppTheme.surfaceSoft, alignSelf: 'flex-start', marginTop: 3, opacity: 0.8 },
-  cardTop: { alignItems: 'center' },
-  eyebrow: { color: AppTheme.muted, fontSize: 11, lineHeight: 17, letterSpacing: 1.5, fontWeight: '800' },
-  cardTitle: { color: AppTheme.text, fontSize: 22, lineHeight: 29, fontWeight: '800', marginTop: 13, textAlign: 'center' },
-  description: { color: AppTheme.muted, fontSize: 15, lineHeight: 23, marginTop: 8, textAlign: 'center' },
-  detail: { color: AppTheme.text, fontSize: 12, lineHeight: 19, fontWeight: '600', marginTop: 13, marginBottom: 18, textAlign: 'center' },
-  cardBottom: { marginTop: 'auto', borderTopWidth: 1, borderColor: AppTheme.border, paddingTop: 12, flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'space-between', columnGap: 12, rowGap: 10 },
-  statusRow: { flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 1 },
-  status: { color: AppTheme.muted, fontSize: 12, lineHeight: 18, flexShrink: 1 }, doneText: { color: AppTheme.success },
-  action: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 6 },
-  actionText: { color: AppTheme.text, fontSize: 14, lineHeight: 20, fontWeight: '800' },
-  footer: { flexDirection: 'row', gap: 10, paddingVertical: 24, alignItems: 'flex-start' },
-  footerText: { flex: 1, color: AppTheme.muted, fontSize: 12, lineHeight: 20 },
+  menu: { width: '100%', maxWidth: 850, alignSelf: 'center', paddingTop: 22, paddingBottom: 30 },
+  progress: { color: AppTheme.text, fontSize: 13, fontWeight: '700', textAlign: 'center', marginBottom: 18 },
+  crown: { width: '100%', aspectRatio: 5 / 3 },
+  section: { position: 'absolute', width: '50%', height: '50%', borderRadius: 16, borderWidth: 2, borderColor: 'transparent' },
+  sectionCopy: { position: 'absolute', alignItems: 'center', gap: 5 },
+  leftCopy: { left: '19%', right: '6%' }, rightCopy: { left: '6%', right: '19%' },
+  upperCopy: { top: '50%' }, lowerCopy: { top: '18%' },
+  title: { color: AppTheme.text, fontSize: 17, lineHeight: 23, fontWeight: '900', textAlign: 'center' },
+  titleMedium: { fontSize: 13, lineHeight: 18 },
+  titleCompact: { fontSize: 11, lineHeight: 16 },
+  focused: { borderColor: AppTheme.primary, outlineColor: AppTheme.primary, outlineStyle: 'solid', outlineWidth: 2, outlineOffset: 2 },
+  pressed: { opacity: 0.78 },
+  lockHint: { color: AppTheme.muted, fontSize: 12, lineHeight: 20, maxWidth: 500, textAlign: 'center', alignSelf: 'center', paddingHorizontal: 14 },
 });

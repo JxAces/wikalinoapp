@@ -26,6 +26,7 @@ import { WikalinoBrand } from "@/components/ui/WikalinoBrand";
 import styles from "@/components/activity-player/styles";
 import { SandaangSewingGame } from "@/components/activity-player/sandaang-sewing-game";
 import { SandaangWardrobeGame } from "@/components/activity-player/sandaang-wardrobe-game";
+import { UtosQuizGames } from "@/components/activity-player/utos-quiz-games";
 import type { ChoiceActivity as SewingActivity } from "../../data/story-types";
 
 import {
@@ -167,6 +168,8 @@ function ActivityPlayerSession({
   const completeActivity = useUserStore((state) => state.completeActivity);
   const completeStory = useUserStore((state) => state.completeStory);
   const activityResults = useUserStore((state) => state.activityResults);
+  const utosQuizGames = useUserStore((state) => state.utosQuizGames);
+  const saveUtosQuizGame = useUserStore((state) => state.saveUtosQuizGame);
   const savedResult = activity ? activityResults[activity.id] : undefined;
   const submitted = Boolean(savedResult);
   const correct = savedResult?.correct ?? false;
@@ -499,6 +502,23 @@ function ActivityPlayerSession({
   const completedGroupQuestions = currentStory.activities
     .slice(group.start, group.end)
     .filter((item) => Boolean(activityResults[item.id])).length;
+
+  if (currentStory.id === "m1-story-3" && isChoiceActivity(currentActivity)) {
+    return <UtosQuizGames
+      storyTitle={currentStory.title}
+      storyAuthor={currentStory.author}
+      level={group.index}
+      activity={currentActivity}
+      questionIndex={activityIndex - group.start}
+      totalQuestions={group.end - group.start}
+      results={activityResults}
+      game={utosQuizGames[String(group.index)]}
+      onGameChange={game => saveUtosQuizGame(group.index, game)}
+      onAnswer={submitAnswer}
+      onContinue={continueMission}
+      onBack={() => router.replace({ pathname: "/quest-world", params: { storyId, node: group.id } })}
+    />;
+  }
 
   if (isUgatQuiz && group.index === 1 && isChoiceActivity(currentActivity)) {
     return <UgatPathGame

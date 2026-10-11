@@ -26,6 +26,9 @@ npm-debug.*
 yarn-debug.*
 yarn-error.*
 
+# Local review screenshots, test output, and temporary exports
+/tmp/
+
 # macOS
 .DS_Store
 *.pem

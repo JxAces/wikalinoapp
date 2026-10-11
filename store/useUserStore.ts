@@ -1,6 +1,7 @@
 import { canAnswerQuestion, canEnterStory, canOpenStoryActivities, canOpenStoryQuiz, isStoryAnswered, questionGroup } from "../components/story-world/quest-progression";
 import { isWardrobeDressed } from "../data/sandaang-wardrobe";
-import { getCabinetActivity, isCabinetResponseComplete } from "../data/cabinet-activities";
+import { canOpenCabinetActivity, getCabinetActivity, isCabinetResponseComplete } from "../data/cabinet-activities";
+import { isUtosQuizGameComplete, normalizeUtosQuizGameState, type UtosQuizGameState } from "../data/utos-quiz-games";
 import { getAssessmentSummary, gradeAssessmentAnswer, type AssessmentAnswer } from "../utils/assessment";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { create } from "zustand";
@@ -40,6 +41,8 @@ const emptyUserData = () => ({
   activityResults: {},
 
   cabinetResponses: {},
+
+  utosQuizGames: {},
 
   unlockedCollectibleIds: [],
 
@@ -144,6 +147,8 @@ type UserStore = {
   >;
 
   cabinetResponses: Record<string, CabinetResponse>;
+  utosQuizGames: Record<string, UtosQuizGameState>;
+  saveUtosQuizGame: (level: number, game: UtosQuizGameState) => void;
   saveCabinetResponse: (payload: {
     storyId: string;
     activityId: string;
@@ -283,10 +288,25 @@ export const useUserStore =
 
         cabinetResponses: {},
 
+        utosQuizGames: {},
+
+        saveUtosQuizGame: (level, game) =>
+          set(state => {
+            const story = getStoryById("m1-story-3");
+            if (!story || !Number.isInteger(level) || level < 0 || level > 2 ||
+              !canOpenStoryQuiz(story.id, state.readingCompletedStoryIds, state.activityResults, state.cabinetResponses)) return state;
+            const start = [0, 3, 6][level];
+            if (!canAnswerQuestion(story, start, state.activityResults)) return state;
+            const normalized = normalizeUtosQuizGameState(level, game);
+            if (!normalized) return state;
+            return { utosQuizGames: { ...state.utosQuizGames, [String(level)]: normalized } };
+          }),
+
         saveCabinetResponse: ({ storyId, activityId, responses, groupName, complete = false }) =>
           set(state => {
             const activity = getCabinetActivity(storyId, activityId);
-            if (!activity || !canOpenStoryActivities(storyId, state.readingCompletedStoryIds, state.activityResults)) return state;
+            if (!activity || !canOpenStoryActivities(storyId, state.readingCompletedStoryIds, state.activityResults) ||
+              !canOpenCabinetActivity(activity, state.cabinetResponses)) return state;
             const cleaned = Object.fromEntries(activity.fields.map(field => [field.id, typeof responses[field.id] === "string" ? responses[field.id] : ""]));
             if (complete && !isCabinetResponseComplete(activity, cleaned)) return state;
             return {
@@ -367,6 +387,8 @@ export const useUserStore =
             }
 
             const activity = story.activities[index];
+            if (storyId === "m1-story-3" &&
+              !isUtosQuizGameComplete(questionGroup(story, index).index, state.utosQuizGames[String(questionGroup(story, index).index)])) return state;
             const correct = gradeAssessmentAnswer(activity, answer);
             if (correct === null) return state;
             const xpEarned = correct ? activity.xp + 5 : 0;
@@ -498,6 +520,8 @@ export const useUserStore =
             activityResults: {},
 
             cabinetResponses: {},
+
+            utosQuizGames: {},
 
             unlockedCollectibleIds: [],
 
@@ -635,7 +659,7 @@ export const useUserStore =
       {
         name: USER_STORE_STORAGE_KEY,
 
-        version: 6,
+        version: 7,
 
         storage: createJSONStorage(
           () => AsyncStorage,
@@ -709,6 +733,11 @@ export const useUserStore =
               })),
 
             cabinetResponses: state.cabinetResponses ?? {},
+
+            utosQuizGames: Object.fromEntries([0, 1, 2].flatMap(level => {
+              const game = normalizeUtosQuizGameState(level, state.utosQuizGames?.[String(level)]);
+              return game ? [[String(level), game]] : [];
+            })),
 
             unlockedCollectibleIds:
               state.unlockedCollectibleIds ??

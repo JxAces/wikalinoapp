@@ -114,11 +114,39 @@ export function getCabinetActivity(storyId: string, activityId: string) {
   return cabinetActivities.find(activity => activity.storyId === storyId && activity.id === activityId);
 }
 
-export function isCabinetResponseComplete(activity: CabinetActivity, responses: Record<string, string>) {
-  if (activity.id === 'utos-sequence' && new Set(activity.fields.map(field => responses[field.id])).size !== 6) return false;
+export function isCabinetResponseComplete(activity: CabinetActivity, responses: Record<string, string> | null | undefined) {
+  if (!responses || typeof responses !== 'object' || Array.isArray(responses)) return false;
+  if (activity.id === 'utos-conflict' &&
+    (responses['jumble-jojo'] !== 'JOJO' || responses['jumble-minyong'] !== 'MINYONG')) return false;
+  if (activity.id === 'utos-meanings' &&
+    (responses.literal !== 'B' || responses.power !== 'A' || responses.interpretation !== 'A')) return false;
+  if (activity.id === 'utos-sequence') {
+    const order = Array.from({ length: 6 }, (_, index) => responses[`position-${index + 1}`]);
+    if (new Set(order).size !== 6 || !order.every((value, index) => value === String.fromCharCode(65 + index))) return false;
+  }
+  if (activity.id === 'utos-stand-up' &&
+    (responses.meaning !== 'A' || !Array.from({ length: 6 }, (_, index) => responses[`minyong-face-${index}`] === String(index)).every(Boolean))) return false;
   if (activity.id === 'ugat-tree-map' && !ugatZones.every(zone => ugatIdeaCards.some(card => responses[`card-${card.id}`] === zone.id))) return false;
   return activity.fields.every(field => {
     const value = responses[field.id];
     return typeof value === "string" && value.trim().length > 0 && (!field.options || field.options.some(option => option.value === value));
+  });
+}
+
+type CabinetProgress = Record<string, {
+  storyId: string;
+  responses?: Record<string, string>;
+  completedAt: string | null;
+} | undefined>;
+
+/** A saved draft or an outdated completion cannot unlock the next crown section. */
+export function canOpenCabinetActivity(activity: CabinetActivity, saved: CabinetProgress) {
+  if (activity.storyId !== 'm1-story-3') return true;
+  const activities = getCabinetActivities(activity.storyId);
+  const index = activities.findIndex(item => item.id === activity.id);
+  return index >= 0 && activities.slice(0, index).every(previous => {
+    const response = saved[previous.id];
+    return response?.storyId === activity.storyId && Boolean(response.completedAt) &&
+      isCabinetResponseComplete(previous, response.responses);
   });
 }

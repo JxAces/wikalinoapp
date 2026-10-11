@@ -37,13 +37,38 @@ const { useUserStore: store } = load(path.join(root, "store/useUserStore.ts"));
 const { hubReturnRoute, hubSpawn } = load(path.join(root, "components/story-world/hub-navigation.ts"));
 const { getAssessmentSummary, gradeAssessmentAnswer } = load(path.join(root, "utils/assessment.ts"));
 const { isWardrobeDressed, needsWardrobeDressing } = load(path.join(root, "data/sandaang-wardrobe.ts"));
+const { createUtosQuizGameState, findUtosMatchMove, swapUtosMatchTiles, UTOS_CHARACTERS, UTOS_RIDDLES, isUtosQuizGameComplete } = load(path.join(root, "data/utos-quiz-games.ts"));
 
 function cabinetAnswers(activity) {
   return Object.fromEntries(activity.fields.map((field, index) => [field.id,
-    activity.id === 'utos-sequence' ? String.fromCharCode(65 + index)
+    field.id === 'jumble-jojo' ? 'JOJO'
+      : field.id === 'jumble-minyong' ? 'MINYONG'
+      : field.id.startsWith('minyong-face-') ? field.id.slice('minyong-face-'.length)
+      : activity.id === 'utos-meanings' ? ({ literal: 'B', power: 'A', interpretation: 'A' })[field.id]
+      : activity.id === 'utos-conflict' ? ({ 'round-1-character': 'A', 'round-1-reason': 'B', 'round-2': 'B', 'round-3': 'C' })[field.id]
+      : activity.id === 'utos-sequence' ? String.fromCharCode(65 + index)
       : activity.id === 'ugat-tree-map' && field.id.startsWith('card-')
         ? ugatZones[ugatIdeaCards.findIndex(card => `card-${card.id}` === field.id) % ugatZones.length].id
         : field.options ? field.options[0].value : "Patunay mula sa kuwento."]));
+}
+
+function completeUtosPregame(story, questionIndex = 0) {
+  if (story.id !== 'm1-story-3') return;
+  const level = questionGroup(story, questionIndex).index;
+  let game = store.getState().utosQuizGames[String(level)] ?? createUtosQuizGameState(level);
+  if (level === 0) {
+    while (game.matches < 5) {
+      const move = findUtosMatchMove(game.board);
+      assert(move, 'A matching board always has a playable move');
+      game = swapUtosMatchTiles(game, ...move);
+      assert(game, 'A legal match advances the game');
+      store.getState().saveUtosQuizGame(level, game);
+    }
+  } else {
+    game = level === 1 ? { kind: 'memory', matchedIds: UTOS_CHARACTERS.map(character => character.id) }
+      : { kind: 'riddles', answers: UTOS_RIDDLES.map(riddle => riddle.answer) };
+    store.getState().saveUtosQuizGame(level, game);
+  }
 }
 
 function completeCabinet(story) {
@@ -88,6 +113,7 @@ async function checkQuizGates(stories) {
     await store.persist.rehydrate();
     assert(quizOpen(story.id), "Completed Gawain unlocks persist after reload");
     const first = story.activities[0];
+    completeUtosPregame(story);
     store.getState().completeActivity({ storyId: story.id, activityId: first.id, answer: first.answer });
     assert(store.getState().activityResults[first.id], "An unlocked quiz accepts its first answer");
     const previous = JSON.stringify(store.getState().activityResults);
@@ -167,6 +193,7 @@ async function check() {
     assert(canEnterStory(open.id, store.getState().activityResults), "All story portals are temporarily accessible");
     store.getState().completeStoryReading(open.id);
     completeCabinet(open);
+    completeUtosPregame(open);
     store.getState().completeActivity({ storyId: open.id, activityId: open.activities[0].id, answer: open.activities[0].answer });
     assert(store.getState().activityResults[open.activities[0].id], "Later worlds accept tasks without completing earlier stories");
   }
@@ -182,7 +209,10 @@ async function check() {
     assert(!canOpenStoryActivities(story.id, store.getState().readingCompletedStoryIds, store.getState().activityResults), "Cabinet is locked on first portal entry");
     store.getState().setStoryScene(story.id, 1);
     assert(!canOpenStoryActivities(story.id, store.getState().readingCompletedStoryIds, store.getState().activityResults), "Opening or partially reading the book does not unlock the cabinet");
-    const complete = index => store.getState().completeActivity({ storyId: story.id, activityId: story.activities[index].id, answer: story.activities[index].answer });
+    const complete = index => {
+      completeUtosPregame(story, index);
+      store.getState().completeActivity({ storyId: story.id, activityId: story.activities[index].id, answer: story.activities[index].answer });
+    };
     assert.equal(story.activities.length, expectedQuestionCount);
     complete(0);
     assert.equal(Object.keys(store.getState().activityResults).length, initialAnswerCount, "Questions require reading first");
@@ -250,6 +280,7 @@ async function check() {
   await checkCabinet(stories);
   await checkAssessments(stories);
   await checkWardrobe(stories[0]);
+  await checkUtosQuizGames(stories[2]);
   store.getState().clearGameProgress();
   assert(!canOpenStoryActivities(stories[0].id, store.getState().readingCompletedStoryIds, store.getState().activityResults), "Clearing progress relocks the activity cabinet");
   assert(!isWorldChestUnlocked(hubNodes()), "Reset relocks the main chest");
@@ -277,6 +308,7 @@ async function checkAssessments(stories) {
       assert.equal(JSON.stringify(store.getState().activityResults), beforeInvalid, 'Invalid responses do not consume an attempt');
       let expectedXp = story.readingXp;
       for (const [index, activity] of story.activities.entries()) {
+        completeUtosPregame(story, index);
         const correct = index < correctCount;
         const answer = correct ? activity.answer : activity.choices.find(choice => choice !== activity.answer);
         store.getState().completeActivity({ storyId: story.id, activityId: activity.id, answer });
@@ -327,7 +359,7 @@ async function checkAssessments(stories) {
   assert.equal(store.getState().xp, oldSave.state.xp, 'Migration preserves accumulated XP');
   assert(store.getState().activityResults['utos-ng-hari-q15'], 'Removed questions remain saved');
   assert.equal(store.getState().activityResults[story.activities[9].id].selectedAnswer, undefined, 'Migration never invents a historical answer');
-  assert.equal(JSON.parse(savedStorage.get('wikalino-user-store')).version, 6);
+  assert.equal(JSON.parse(savedStorage.get('wikalino-user-store')).version, 7);
 
   const sequence = { type: 'plot_sequence', items: ['a', 'b'], answer: ['a', 'b'] };
   assert.equal(gradeAssessmentAnswer(sequence, ['a', 'b']), true);
@@ -335,6 +367,74 @@ async function checkAssessments(stories) {
   assert.equal(gradeAssessmentAnswer(sequence, ['a', 'a']), null);
   assert.equal(gradeAssessmentAnswer(sequence, 'a'), null);
   console.log('Scoring: all three 10-item assessments, 0/7/8/9/10 scores, XP, stars, wrong-answer progression, immutable reloads, and legacy migration passed');
+}
+async function checkUtosQuizGames(story) {
+  store.getState().clearGameProgress();
+  const initial = createUtosQuizGameState(0);
+  store.getState().saveUtosQuizGame(0, initial);
+  assert.deepEqual(store.getState().utosQuizGames, {}, 'Reading and Gawain gate quiz game saves');
+  store.getState().completeStoryReading(story.id);
+  const tasks = getCabinetActivities(story.id);
+  const lastTask = tasks.at(-1);
+  store.getState().saveCabinetResponse({ storyId: story.id, activityId: lastTask.id, responses: cabinetAnswers(lastTask), groupName: 'Test', complete: true });
+  assert.equal(store.getState().cabinetResponses[lastTask.id], undefined, 'Later crown sections cannot skip incomplete earlier activities');
+  const legacyCompletions = Object.fromEntries(tasks.map(task => [task.id, { storyId: story.id, completedAt: 'previous-completion' }]));
+  assert(!canOpenStoryQuiz(story.id, [story.id], {}, legacyCompletions), 'Outdated completion timestamps cannot bypass revised activity requirements');
+  completeCabinet(story);
+  const xp = store.getState().xp;
+  const answer = index => store.getState().completeActivity({ storyId: story.id, activityId: story.activities[index].id, answer: story.activities[index].answer });
+  answer(0);
+  assert.deepEqual(store.getState().activityResults, {}, 'An unfinished pregame cannot submit assessment answers');
+  store.getState().saveUtosQuizGame(1, createUtosQuizGameState(1));
+  assert.equal(store.getState().utosQuizGames['1'], undefined, 'Later levels cannot save before preceding questions');
+  store.getState().saveUtosQuizGame(0, { ...initial, matches: 6 });
+  assert.deepEqual(store.getState().utosQuizGames, {}, 'Invalid game progress is rejected');
+  let game = initial;
+  const before = JSON.stringify(game);
+  assert.equal(swapUtosMatchTiles(game, 0, 15), null, 'Nonadjacent swaps cannot count');
+  assert.equal(JSON.stringify(game), before, 'An invalid move does not mutate the board');
+  game = swapUtosMatchTiles(game, ...findUtosMatchMove(game.board));
+  store.getState().saveUtosQuizGame(0, game);
+  await store.persist.rehydrate();
+  assert.equal(store.getState().utosQuizGames['0'].matches, 1, 'Partial matching survives reload');
+  answer(0);
+  assert.deepEqual(store.getState().activityResults, {}, 'One match does not meet the five-match target');
+  completeUtosPregame(story, 0);
+  assert(isUtosQuizGameComplete(0, store.getState().utosQuizGames['0']));
+  assert.equal(store.getState().xp, xp, 'Game points never award assessment XP');
+  assert.equal(getAssessmentSummary(story, store.getState().activityResults).answered, 0, 'Game points never count as quiz answers');
+  for (const index of [0, 1, 2]) answer(index);
+  const memory = { kind: 'memory', matchedIds: ['jojo', 'jojo'] };
+  store.getState().saveUtosQuizGame(1, memory);
+  assert.deepEqual(store.getState().utosQuizGames['1'].matchedIds, ['jojo'], 'Repeated pairs cannot inflate memory progress');
+  answer(3);
+  assert.equal(store.getState().activityResults[story.activities[3].id], undefined, 'Partial memory progress cannot submit questions');
+  store.getState().saveUtosQuizGame(1, { kind: 'memory', matchedIds: ['unknown'] });
+  assert.deepEqual(store.getState().utosQuizGames['1'].matchedIds, ['jojo'], 'Unknown characters cannot alter progress');
+  completeUtosPregame(story, 3);
+  for (const index of [3, 4, 5]) answer(index);
+  store.getState().saveUtosQuizGame(2, { kind: 'riddles', answers: ['wrong', '', ''] });
+  assert.equal(store.getState().utosQuizGames['2'], undefined, 'Wrong riddle answers cannot be saved as solved');
+  store.getState().saveUtosQuizGame(2, { kind: 'riddles', answers: [' lapis ', '', ''] });
+  assert.deepEqual(store.getState().utosQuizGames['2'].answers, ['Lapis', '', ''], 'Riddle answers ignore case and surrounding spaces');
+  answer(6);
+  assert.equal(store.getState().activityResults[story.activities[6].id], undefined, 'All three supplied riddles are required');
+  completeUtosPregame(story, 6);
+  await store.persist.rehydrate();
+  assert(isUtosQuizGameComplete(2, store.getState().utosQuizGames['2']), 'Completed riddles survive reload');
+  for (const index of [6, 7, 8, 9]) answer(index);
+  const summary = getAssessmentSummary(story, store.getState().activityResults);
+  assert.equal(summary.total, 10);
+  assert.equal(summary.correct, 10, 'Pregames preserve the ten-question assessment score');
+  const snapshot = JSON.stringify(store.getState().activityResults);
+  const finalXp = store.getState().xp;
+  completeUtosPregame(story, 6);
+  answer(9);
+  assert.equal(store.getState().xp, finalXp, 'Reopening games does not farm XP');
+  assert.equal(JSON.stringify(store.getState().activityResults), snapshot, 'Reopening games preserves immutable quiz grades');
+  store.getState().clearGameProgress();
+  assert.deepEqual(store.getState().utosQuizGames, {}, 'Reset clears all Utos game progress');
+  console.log('Utos games: five-match gate, memory pairs, typed riddles, invalid saves, reload, separate points, immutable grades and reset passed');
 }
 async function checkWardrobe(story) {
   store.getState().clearGameProgress();

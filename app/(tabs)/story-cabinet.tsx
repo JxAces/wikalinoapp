@@ -14,9 +14,10 @@ import { UgatActivityTreeCard } from "@/components/story-cabinet/UgatActivityTre
 import { UgatExploreActivity, UgatTreeMapActivity } from "@/components/story-cabinet/UgatLearningActivities";
 import { UtosActivityMenu } from "@/components/story-cabinet/UtosActivityMenu";
 import { UtosConflictActivity } from "@/components/story-cabinet/UtosConflictActivity";
+import { UtosMeaningsActivity, UtosSequenceActivity, UtosReflectionActivity } from "@/components/story-cabinet/UtosLearningActivities";
 import { WikalinoBrand } from "@/components/ui/WikalinoBrand";
 import { canEnterStory, canOpenStoryActivities } from "@/components/story-world/quest-progression";
-import { getCabinetActivities, isCabinetResponseComplete, type CabinetActivity } from "@/data/cabinet-activities";
+import { canOpenCabinetActivity, getCabinetActivities, isCabinetResponseComplete, type CabinetActivity } from "@/data/cabinet-activities";
 import { getStoryById, type Story } from "@/data/stories";
 import { useUserStore } from "@/store/useUserStore";
 
@@ -34,14 +35,23 @@ export default function StoryCabinetScreen() {
 
 function Cabinet({ story }: { story: Story }) {
   const scroll = useRef<ScrollView>(null);
-  const [selected, setSelected] = useState<CabinetActivity | null>(null);
+  const [selection, setSelected] = useState<CabinetActivity | null>(null);
   const [cabinetWidth, setCabinetWidth] = useState(0);
   const saved = useUserStore(state => state.cabinetResponses);
   const activities = getCabinetActivities(story.id);
-  const completed = activities.filter(activity => saved[activity.id]?.completedAt).length;
   const individualCabinets = story.id === "m1-story-1";
   const ugatTree = story.id === "m1-story-2";
   const utosCrown = story.id === "m1-story-3";
+  const selected = selection && canOpenCabinetActivity(selection, saved) ? selection : null;
+  const isCompleted = (activity: CabinetActivity) => {
+    const response = saved[activity.id];
+    return Boolean(response?.completedAt) && (!utosCrown ||
+      response?.storyId === story.id && isCabinetResponseComplete(activity, response.responses));
+  };
+  const completed = activities.filter(isCompleted).length;
+  const selectActivity = (activity: CabinetActivity) => {
+    if (canOpenCabinetActivity(activity, saved)) setSelected(activity);
+  };
   const crownMenu = utosCrown && (!selected || selected.id === 'utos-conflict');
   const woodMenu = individualCabinets && !selected;
   const ugatMenu = ugatTree && !selected;
@@ -55,7 +65,7 @@ function Cabinet({ story }: { story: Story }) {
     </View>
     <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === "ios" ? "padding" : undefined}>
       <ScrollView ref={scroll} key={selected?.id ?? "cabinet"} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content}>
-        {selected ? <CabinetEditor key={selected.id} activity={selected} story={story} onBack={() => setSelected(null)} onNext={ugatTree && activities.indexOf(selected) < activities.length - 1 ? () => setSelected(activities[activities.indexOf(selected) + 1]) : undefined} onFocusActivity={y => scroll.current?.scrollTo({ y, animated: false })} /> : utosCrown ? <UtosActivityMenu activities={activities.map(activity => ({ activity, completed: Boolean(saved[activity.id]?.completedAt), hasDraft: Boolean(saved[activity.id]) }))} onSelect={setSelected} /> : <View style={styles.inner}>
+        {selected ? <CabinetEditor key={selected.id} activity={selected} story={story} onBack={() => setSelected(null)} onNext={ugatTree && activities.indexOf(selected) < activities.length - 1 ? () => selectActivity(activities[activities.indexOf(selected) + 1]) : undefined} onFocusActivity={y => scroll.current?.scrollTo({ y, animated: false })} /> : utosCrown ? <UtosActivityMenu activities={activities.map(activity => ({ activity, completed: isCompleted(activity), hasDraft: Boolean(saved[activity.id]), locked: !canOpenCabinetActivity(activity, saved) }))} onSelect={selectActivity} /> : <View style={styles.inner}>
           {individualCabinets ? <>
             <Text style={styles.pathLabel}>SANDAANG DAMIT PATH</Text>
             <Text accessibilityRole="header" style={styles.title}>Suriin ang kuwento, magbigay ng patunay, at ipaliwanag ang iyong pananaw.</Text>
@@ -91,6 +101,7 @@ function CabinetEditor({ activity, story, onBack, onNext, onFocusActivity }: { a
   const profileGroup = useUserStore(state => state.profile?.pangkat ?? "");
   const saveResponse = useUserStore(state => state.saveCabinetResponse);
   const [responses, setResponses] = useState<Record<string, string>>(() => saved?.responses ?? {});
+  const responsesRef = useRef(responses);
   const [groupName, setGroupName] = useState(() => saved?.groupName ?? profileGroup);
   const [showErrors, setShowErrors] = useState(false);
   const [showExample, setShowExample] = useState(false);
@@ -102,23 +113,35 @@ function CabinetEditor({ activity, story, onBack, onNext, onFocusActivity }: { a
   const isDetective = activity.id === "damit-detective";
 
   function changeAnswer(fieldId: string, value: string) {
-    const next = { ...responses, [fieldId]: value };
+    // Puzzle checks may save several fields during one event before React renders.
+    const next = { ...responsesRef.current, [fieldId]: value };
+    responsesRef.current = next;
     setResponses(next);
     setMessage("");
     saveResponse({ storyId: activity.storyId, activityId: activity.id, responses: next, groupName });
   }
   function complete() {
-    if (!isCabinetResponseComplete(activity, responses)) { setShowErrors(true); setMessage(activity.id === 'utos-sequence' ? 'Punan ang anim na puwesto. Gamitin ang bawat story card nang isang beses lamang.' : "Punan ang lahat ng sagot at patunay bago tapusin ang gawain."); return; }
-    saveResponse({ storyId: activity.storyId, activityId: activity.id, responses, groupName, complete: true });
+    const currentResponses = responsesRef.current;
+    if (!isCabinetResponseComplete(activity, currentResponses)) { setShowErrors(true); setMessage(activity.id === 'utos-sequence' ? 'Ayusin ang anim na pangyayari sa tamang pagkakasunod-sunod. Gamitin ang bawat story card nang isang beses lamang.' : activity.storyId === 'm1-story-3' ? 'Tapusin ang bawat bahagi at suriin ang iyong mga sagot bago ipasa.' : "Punan ang lahat ng sagot at patunay bago tapusin ang gawain."); return; }
+    saveResponse({ storyId: activity.storyId, activityId: activity.id, responses: currentResponses, groupName, complete: true });
     setShowErrors(false);
     setMessage(isUgatExplore ? 'Tapos na ang paggalugad. Maaari mong balikan ang mga pahiwatig anumang oras.' : isDetective ? "Kumpleto ang ulat. Naka-save sa device na ito; ipakita ito sa guro." : "Kumpleto at naka-save sa device na ito. Maaari nang ipakita sa guro.");
   }
 
   if (activity.id === 'utos-conflict') return <UtosConflictActivity
     activity={activity} responses={responses} onChange={changeAnswer} onComplete={complete}
-    completed={Boolean(saved?.completedAt)} hasDraft={Boolean(saved)} onBack={onBack}
+    completed={Boolean(saved?.completedAt) && isCabinetResponseComplete(activity, responses)} hasDraft={Boolean(saved)} onBack={onBack}
     onViewChange={() => onFocusActivity(0)}
   />;
+
+  const UtosActivity = activity.id === 'utos-meanings' ? UtosMeaningsActivity :
+    activity.id === 'utos-sequence' ? UtosSequenceActivity : activity.id === 'utos-stand-up' ? UtosReflectionActivity : null;
+  if (UtosActivity) return <View style={styles.inner}>
+    <UtosActivity activity={activity} responses={responses} onChange={changeAnswer} onComplete={complete}
+      completed={Boolean(saved?.completedAt) && isCabinetResponseComplete(activity, responses)} showErrors={showErrors} />
+    {message ? <Text accessibilityRole={showErrors ? "alert" : "text"} accessibilityLiveRegion="polite" style={[styles.message, showErrors && styles.error]}>{message}</Text> : null}
+    <Pressable accessibilityRole="button" onPress={onBack} style={[styles.secondary, styles.utosBack]}><Text style={styles.secondaryText}>Bumalik sa korona</Text></Pressable>
+  </View>;
 
   return <View style={styles.inner}>
     {!isDetective && <>
@@ -161,6 +184,7 @@ function CabinetEditor({ activity, story, onBack, onNext, onFocusActivity }: { a
 }
 
 const styles = StyleSheet.create({
+  utosBack: { alignSelf: 'flex-start', marginTop: 20 },
   ugatMenuScreen: { backgroundColor: AppTheme.background },
   ugatMenuHeader: { backgroundColor: AppTheme.panelStrong, borderBottomColor: AppTheme.border },
   ugatMenuBack: { backgroundColor: AppTheme.surfaceSoft, borderWidth: 1, borderColor: AppTheme.border },
