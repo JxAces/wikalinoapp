@@ -16,6 +16,7 @@ function loadLayout(name) {
 const layoutModule = {exports:loadLayout('hub-layout')};
 const constants = loadLayout('story-world.constants');
 const ugatModule = {exports:loadLayout('ugat-layout')};
+const motionModule = loadLayout('explorer-motion');
 const cameraModule = { exports: {} };
 vm.runInNewContext(ts.transpileModule(fs.readFileSync(path.join(__dirname, '../components/story-world/story-world-camera.ts'), 'utf8'), {
   compilerOptions: { module: ts.ModuleKind.CommonJS },
@@ -33,6 +34,7 @@ vm.runInNewContext(code, {
     : name === './ugat-layout' ? ugatModule.exports
     : name === './ugat-forest' ? { UGAT_STORY: constants.UGAT_STORY }
     : name === './story-world-camera' ? cameraModule.exports
+    : name === './explorer-motion' ? motionModule
     : name === './quest-progression' ? { worldNodeId: node => node.id ?? node.story.id }
     : name === './load-explorer.native' ? { loadStoryScrollModel: async () => new three.Group() }
     : name === './story-portal-visual' ? { createStoryPortal: id => { const group = new three.Group(); group.name = id; return { group }; } }
@@ -122,6 +124,10 @@ async function run(quest, stopAt, failure) {
   assert(gate.position.z > constants.QUESTION_SCROLL_POSITIONS[0].z + 1.7, 'Return portal sits behind the entry spawn');
   assert(gate.position.z <= constants.STORY_WORLD_BOUNDS.maxZ && gate.position.x >= constants.STORY_WORLD_BOUNDS.minX, 'Return portal is reachable');
   engine.input = { x: 0, y: 0 };
+  engine.locomotion = new motionModule.ExplorerLocomotion();
+  engine.movementDirection = new three.Vector3();
+  engine.movementHeading = Math.PI;
+  engine.attention = { id: '', yaw: 0, kind: 'scroll' };
   engine.character = new three.Group();
   engine.characterVisual = new three.Group();
   engine.setAnimation = () => {};

@@ -52,6 +52,9 @@ import {
 import type { PlayerCharacterId } from "@/data/player-characters";
 import { bakeExplorerWalk, type BakedExplorerWalk } from "./baked-explorer-walk";
 import { ExplorerWalk } from "./explorer-walk";
+import { ExplorerLocomotion, EXPLORER_WALK_SPEED, type ExplorerAttention } from "./explorer-motion";
+import { createExplorerExpression } from "./explorer-expression";
+import { prepareExplorerArmWeights } from "./explorer-arm-weights";
 import { disposeWorldObject } from "./dispose-world-object";
 import { prepareCompatibleSkinning, type CompatibleSkinning } from "./compatible-skinning";
 import type {
@@ -233,12 +236,14 @@ export class StoryWorldEngine {
   private nearReturnPortal = false;
   private returnGate: ReturnType<typeof createStoryPortal> | null = null;
   private chestLock: Mesh | null = null;
-  private locomotionStyle: "hop" | "walk" = "walk";
   private renderer: WebGLRenderer;
   private scene = new Scene();
   private standingPose: Object3D | null = null;
   private walkingPose: Object3D | null = null;
   private explorerWalk: ExplorerWalk | null = null;
+  private locomotion = new ExplorerLocomotion();
+  private expression: ReturnType<typeof createExplorerExpression> | null = null;
+  private attention: ExplorerAttention = { id: "", yaw: 0, kind: "scroll" };
   private bakedWalk: BakedExplorerWalk = null;
   private explorerSkinning: CompatibleSkinning = null;
   private walkPhase = 0;
@@ -292,6 +297,12 @@ export class StoryWorldEngine {
     this.input = input;
   }
 
+  /** Menus, reading and backgrounding stop immediately; joystick release eases. */
+  haltMovement() {
+    this.input = { x: 0, y: 0 };
+    this.locomotion.reset();
+  }
+
   finishWelcome() {
     if (!this.welcomeGuide) return;
     this.welcomeGuide.group.removeFromParent();
@@ -334,6 +345,7 @@ export class StoryWorldEngine {
   }
 
   stop() {
+    this.haltMovement();
     if (this.animationFrame !== null) {
       cancelAnimationFrame(this.animationFrame);
       this.animationFrame = null;
@@ -347,6 +359,7 @@ export class StoryWorldEngine {
     }
     this.disposed = true;
     this.stop();
+    this.expression?.dispose();
     this.explorerWalk?.dispose();
     this.bakedWalk?.dispose();
     this.explorerSkinning?.dispose();
@@ -453,28 +466,35 @@ export class StoryWorldEngine {
     }
     // Prepare off-scene: rendering and navigation can continue between poses,
     // and leaving during preparation must not attach a late-loaded character.
-    if (Platform.OS !== "web" && model.walkClip) {
-      try {
+    try {
+      prepareExplorerArmWeights(model.scene, this.options.characterId);
+      if (Platform.OS !== "web" && model.walkClip) {
         this.bakedWalk = await bakeExplorerWalk(model.scene, model.walkClip, () => this.disposed);
-      } catch (error) {
-        disposeWorldObject(model.scene);
-        throw error;
       }
       if (this.disposed) {
         this.bakedWalk?.dispose();
         disposeWorldObject(model.scene);
         return;
       }
+      this.standingPose = model.standingPose;
+      this.walkingPose = model.walkingPose;
+      if (!this.bakedWalk) {
+        this.explorerSkinning = prepareCompatibleSkinning(model.scene, this.renderer.capabilities.isWebGL2, Platform.OS === "web" ? this.renderer.capabilities.maxVertexUniforms : 0);
+        if (model.walkClip) this.explorerWalk = new ExplorerWalk(model.scene, model.walkClip);
+      }
+      // Capture normalized model coordinates before attaching the world transform.
+      this.expression = createExplorerExpression(model.scene, this.options.characterId);
+      this.characterVisual.add(model.scene);
+      this.setAnimation("Idle", true);
+    } catch (error) {
+      this.expression?.dispose();
+      this.explorerWalk?.dispose();
+      this.bakedWalk?.dispose();
+      this.explorerSkinning?.dispose();
+      this.expression = this.explorerWalk = this.bakedWalk = this.explorerSkinning = null;
+      disposeWorldObject(model.scene);
+      throw error;
     }
-    this.standingPose = model.standingPose;
-    this.walkingPose = model.walkingPose;
-    this.locomotionStyle = model.locomotionStyle;
-    this.characterVisual.add(model.scene);
-    if (!this.bakedWalk) {
-      this.explorerSkinning = prepareCompatibleSkinning(model.scene, this.renderer.capabilities.isWebGL2, Platform.OS === "web" ? this.renderer.capabilities.maxVertexUniforms : 0);
-      if (model.walkClip) this.explorerWalk = new ExplorerWalk(model.scene, model.walkClip);
-    }
-    this.setAnimation("Idle", true);
   }
 
   private addStoryGates() {
@@ -730,87 +750,70 @@ export class StoryWorldEngine {
   };
 
   private updateCharacter(delta: number) {
-    const strength = Math.min(1, Math.hypot(this.input.x, this.input.y));
-    this.explorerWalk?.update(delta, strength > 0.06);
-    this.bakedWalk?.update(delta, strength > 0.06);
-    if (strength > 0.06) {
-      cameraRelativeMovement(this.input.x, this.input.y, this.movementHeading, this.movementDirection);
-      const directionX = this.movementDirection.x;
-      const directionZ = this.movementDirection.z;
-      const speed = 3.15;
-      const bounds = this.options.questStoryId ? STORY_WORLD_BOUNDS : HUB_BOUNDS;
-      const nextX = MathUtils.clamp(
-        this.character.position.x + directionX * speed * delta,
-        bounds.minX,
-        bounds.maxX,
-      );
-      const nextZ = MathUtils.clamp(
-        this.character.position.z + directionZ * speed * delta,
-        bounds.minZ,
-        bounds.maxZ,
-      );
+    cameraRelativeMovement(this.input.x, this.input.y, this.movementHeading, this.movementDirection);
+    const step = this.locomotion.advance(delta, this.movementDirection.x, this.movementDirection.z);
+    const oldX = this.character.position.x, oldZ = this.character.position.z;
+    const bounds = this.options.questStoryId ? STORY_WORLD_BOUNDS : HUB_BOUNDS;
+    const nextX = MathUtils.clamp(oldX + step.x, bounds.minX, bounds.maxX);
+    const nextZ = MathUtils.clamp(oldZ + step.z, bounds.minZ, bounds.maxZ);
+    if (step.x || step.z) {
       if (!this.options.questStoryId) {
-        moveThroughHub(this.character.position, nextX-this.character.position.x, nextZ-this.character.position.z);
+        moveThroughHub(this.character.position, nextX - oldX, nextZ - oldZ);
       } else if (this.options.questStoryId === DRESS_MAZE_STORY) {
-        moveThroughDressMaze(this.character.position, nextX - this.character.position.x, nextZ - this.character.position.z);
+        moveThroughDressMaze(this.character.position, nextX - oldX, nextZ - oldZ);
       } else if (this.options.questStoryId === UGAT_STORY) {
-        moveThroughUgat(this.character.position, nextX - this.character.position.x, nextZ - this.character.position.z);
+        moveThroughUgat(this.character.position, nextX - oldX, nextZ - oldZ);
       } else if (this.options.questStoryId === VILLAGE_STORY) {
-        moveThroughVillage(this.character.position, nextX - this.character.position.x, nextZ - this.character.position.z);
+        moveThroughVillage(this.character.position, nextX - oldX, nextZ - oldZ);
       } else {
         this.character.position.x = nextX;
         this.character.position.z = nextZ;
       }
-      const targetRotation = Math.atan2(directionX, directionZ);
+    }
+    const movedX = this.character.position.x - oldX, movedZ = this.character.position.z - oldZ;
+    this.locomotion.resolve(movedX, movedZ);
+    // Animate actual travel: pushing against scenery must not walk in place.
+    const strength = delta > 0 ? Math.min(1, Math.hypot(movedX, movedZ) / (delta * EXPLORER_WALK_SPEED)) : 0;
+    this.explorerWalk?.update(delta, strength);
+    this.bakedWalk?.update(delta, strength);
+    const animatedPhase = this.bakedWalk?.phase ?? this.explorerWalk?.phase;
+    if (animatedPhase !== undefined) this.walkPhase = animatedPhase;
+    const moving = strength > 0.025;
+    const settle = 1 - Math.exp(-delta * 12);
+    if (moving) {
+      const targetRotation = Math.atan2(movedX, movedZ);
       const rotationDifference = Math.atan2(
         Math.sin(targetRotation - this.character.rotation.y),
         Math.cos(targetRotation - this.character.rotation.y),
       );
-      this.character.rotation.y += rotationDifference * Math.min(1, delta * 11);
-      const duration = this.bakedWalk?.duration ?? this.explorerWalk?.clip.duration;
-      this.walkPhase += delta * (duration ? Math.PI * 2 / duration : 7.5 + strength * 2.5);
-      if (this.locomotionStyle === "hop") {
-        this.characterVisual.position.y = Math.abs(Math.sin(this.walkPhase)) * 0.18;
-        this.characterVisual.rotation.x =
-          -0.035 + Math.cos(this.walkPhase * 2) * 0.035;
-        this.characterVisual.rotation.z = Math.sin(this.walkPhase) * 0.012;
-      } else {
-        this.characterVisual.position.y = Math.abs(Math.sin(this.walkPhase)) * (this.explorerWalk || this.bakedWalk ? 0.012 : 0.055);
-        this.characterVisual.rotation.x = 0.025;
-        this.characterVisual.rotation.z = Math.sin(this.walkPhase) * 0.025;
-      }
-      if (this.walkingPose && this.locomotionStyle === "walk" && !this.explorerWalk && !this.bakedWalk) {
-        // The Quaternius file contains a modeled walking pose rather than a
-        // skeleton clip. Mirroring that pose on alternating steps gives the
-        // character a clear left/right stride while keeping it mobile-friendly.
+      this.character.rotation.y += rotationDifference * (1 - Math.exp(-delta * 11));
+      const duration = this.bakedWalk?.duration ?? this.explorerWalk?.clip.duration ?? 0.9;
+      if (animatedPhase === undefined) this.walkPhase += delta * Math.PI * 2 / duration * (0.55 + strength * 0.45);
+      const stride = Math.min(1, strength * 2.5);
+      const height = Math.abs(Math.sin(this.walkPhase)) * (this.explorerWalk || this.bakedWalk ? 0.008 : 0.025) * stride;
+      this.characterVisual.position.y = MathUtils.lerp(this.characterVisual.position.y, height, settle);
+      this.characterVisual.rotation.x = MathUtils.lerp(this.characterVisual.rotation.x, 0.018 * strength, settle);
+      this.characterVisual.rotation.z = MathUtils.lerp(this.characterVisual.rotation.z, Math.sin(this.walkPhase) * 0.013 * stride, settle);
+      if (this.walkingPose && !this.explorerWalk && !this.bakedWalk) {
         this.walkingPose.scale.x = Math.sin(this.walkPhase) >= 0 ? 1 : -1;
       }
-      this.setAnimation("Walk");
     } else {
-      const settle = 1 - Math.exp(-delta * 12);
-      this.characterVisual.position.y = MathUtils.lerp(
-        this.characterVisual.position.y,
-        0,
-        settle,
-      );
-      this.characterVisual.rotation.x = MathUtils.lerp(
-        this.characterVisual.rotation.x,
-        0,
-        settle,
-      );
-      this.characterVisual.rotation.z = MathUtils.lerp(
-        this.characterVisual.rotation.z,
-        0,
-        settle,
-      );
-      if (this.walkingPose) {
-        this.walkingPose.scale.x = 1;
-      }
-      this.setAnimation("Idle");
+      this.characterVisual.position.y = MathUtils.lerp(this.characterVisual.position.y, 0, settle);
+      this.characterVisual.rotation.x = MathUtils.lerp(this.characterVisual.rotation.x, 0, settle);
+      this.characterVisual.rotation.z = MathUtils.lerp(this.characterVisual.rotation.z, 0, settle);
+      if (this.walkingPose) this.walkingPose.scale.x = 1;
     }
+    this.setAnimation(moving ? "Walk" : "Idle");
+    // The original student swaps a mirrored static leg pose. Compensate its
+    // local arm phase so the arms still alternate in world space.
+    const expressionPhase = !this.bakedWalk && !this.explorerWalk && moving && this.walkingPose?.scale.x === -1
+      ? -this.walkPhase : this.walkPhase;
 
     let nearestId: string | null = null;
     let nearestDistance = STORY_INTERACTION_DISTANCE;
+    let attentionPosition: { x: number; z: number } | undefined;
+    let attentionId: string | undefined;
+    let attentionKind: ExplorerAttention["kind"] = this.options.questStoryId ? "scroll" : "portal";
     for (const portal of this.options.portals) {
       const distance = Math.hypot(
         this.character.position.x - portal.position.x,
@@ -819,11 +822,27 @@ export class StoryWorldEngine {
       if (distance < nearestDistance) {
         nearestDistance = distance;
         nearestId = worldNodeId(portal);
+        attentionPosition = portal.state !== "locked" ? portal.position : undefined;
+        attentionId = portal.state !== "locked" ? nearestId : undefined;
       }
     }
     const chestPosition = worldChestPosition(Boolean(this.options.questStoryId),this.options.questStoryId);
     const nearChest = Math.hypot(this.character.position.x - chestPosition.x, this.character.position.z - chestPosition.z) < STORY_INTERACTION_DISTANCE;
     const nearReturnPortal = Boolean(this.returnGate) && Math.hypot(this.character.position.x - RETURN_PORTAL_POSITION.x, this.character.position.z - RETURN_PORTAL_POSITION.z) < STORY_INTERACTION_DISTANCE;
+    if (nearReturnPortal && Math.hypot(this.character.position.x - RETURN_PORTAL_POSITION.x, this.character.position.z - RETURN_PORTAL_POSITION.z) < nearestDistance) {
+      attentionPosition = RETURN_PORTAL_POSITION;
+      attentionId = RETURN_PORTAL_ID;
+      attentionKind = "portal";
+    }
+    if (attentionPosition && attentionId) {
+      const angle = Math.atan2(attentionPosition.x - this.character.position.x, attentionPosition.z - this.character.position.z) - this.character.rotation.y;
+      this.attention.id = attentionId;
+      this.attention.yaw = Math.atan2(Math.sin(angle), Math.cos(angle));
+      this.attention.kind = attentionKind;
+      this.expression?.update(delta, strength, this.attention, expressionPhase);
+    } else {
+      this.expression?.update(delta, strength, undefined, expressionPhase);
+    }
     const ugatMemory = this.options.questStoryId === UGAT_STORY ? ugatMemoryNear(this.character.position.x,this.character.position.z) : undefined;
     if (nearestId !== this.lastNearestStoryId || nearChest !== this.nearChest || nearReturnPortal !== this.nearReturnPortal || ugatMemory !== this.ugatMemory) {
       this.lastNearestStoryId = nearestId;

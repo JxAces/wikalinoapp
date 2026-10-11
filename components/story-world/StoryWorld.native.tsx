@@ -207,7 +207,7 @@ export default function StoryWorld({ questStoryId }: { questStoryId?: string } =
   const openMemory = () => {
     if(!nearbyMemory)return;
     inputRef.current={x:0,y:0};
-    engineRef.current?.setInput(inputRef.current);
+    engineRef.current?.haltMovement();
     setMemoryNote(nearbyMemory);
   };
   const finishWelcome = () => {
@@ -230,7 +230,7 @@ export default function StoryWorld({ questStoryId }: { questStoryId?: string } =
         return;
       }
       inputRef.current = { x: 0, y: 0 };
-      engineRef.current?.setInput(inputRef.current);
+      engineRef.current?.haltMovement();
       if (questStory && portal && portal.activityIndex !== undefined) {
         router.push({ pathname: "/activity-player", params: { storyId: questStory.id, activityIndex: String(portal.activityIndex) } });
         return;

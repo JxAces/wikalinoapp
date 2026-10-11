@@ -21,6 +21,7 @@ function compiledUrl(file) {
 // fs accepts URL objects, not file:// strings.
 function moduleUrl(name) { return compiledUrl(new URL(`../components/story-world/${name}.ts`, import.meta.url)); }
 const { bakeExplorerWalk } = await import(moduleUrl('baked-explorer-walk'));
+const { prepareExplorerArmWeights } = await import(moduleUrl('explorer-arm-weights'));
 const { mergeColoredScenery } = await import(moduleUrl('merge-colored-scenery'));
 const { createMeadowEnvironment } = await import(moduleUrl('story-world-environment'));
 const { createStoryPortal } = await import(moduleUrl('story-portal-visual'));
@@ -51,6 +52,7 @@ for (const name of ['indigenous', 'muslim', 'batang-pinoy', 'student-girl']) {
   const root = gltf.scene;
   root.scale.setScalar(1.37);
   root.position.set(-0.08, 0.015, 0.11);
+  prepareExplorerArmWeights(root, name);
   const clip = gltf.animations.find(clip => clip.name === 'Walk');
   let yields = 0;
   const baked = await bakeExplorerWalk(root, clip, () => false, async () => { yields++; });
@@ -67,7 +69,7 @@ for (const name of ['indigenous', 'muslim', 'batang-pinoy', 'student-girl']) {
   oracle.clipAction(clip).play();
   const expected = new Vector3(), actual = new Vector3();
   for (let phase = 0; phase < 12; phase++) {
-    baked.update(clip.duration / 12 * (phase === 0 ? 0.25 : 1), true);
+    baked.update(clip.duration / 12 * (phase === 0 ? 0.25 : 1), 1);
     oracle.setTime(phase * clip.duration / 12);
     root.updateMatrixWorld(true);
     for (const [index, [mesh, display]] of pairs.entries()) {
@@ -76,6 +78,8 @@ for (const name of ['indigenous', 'muslim', 'batang-pinoy', 'student-girl']) {
       assert.equal(display.material, mesh.material);
       assert.equal(display.geometry.index, idle[index].index, 'Pose indices share storage');
       assert.equal(display.geometry.attributes.color, idle[index].attributes.color, 'Attire colors share storage');
+      assert.equal(display.geometry.attributes.explorerArmWeight, idle[index].attributes.explorerArmWeight, 'Arm weights share storage');
+      assert(Object.keys(display.geometry.attributes).length <= 8, 'Native poses fit WebGL 1 attribute limit');
       snapshots.add(display.geometry);
       const position = display.geometry.attributes.position;
       for (let vertex = 0; vertex < position.count; vertex++) {
@@ -89,11 +93,11 @@ for (const name of ['indigenous', 'muslim', 'batang-pinoy', 'student-girl']) {
   assert.equal(snapshots.size, 13 * pairs.length);
   const versions = [...snapshots].map(geometry => [geometry.attributes.position.version, geometry.attributes.normal.version]);
   const start = performance.now();
-  for (let frame = 0; frame < 3000; frame++) baked.update(1 / 30, frame % 70 < 60);
+  for (let frame = 0; frame < 3000; frame++) baked.update(1 / 30, frame % 70 < 60 ? 1 : 0);
   const time = performance.now() - start;
   assert.deepEqual([...snapshots].map(geometry => [geometry.attributes.position.version, geometry.attributes.normal.version]), versions,
     'Walking never rewrites or re-uploads vertex attributes');
-  baked.update(1 / 30, false);
+  for (let frame = 0; frame < 30; frame++) baked.update(1 / 30, 0);
   pairs.forEach(([, display], index) => assert.equal(display.geometry, idle[index], 'Stopping restores original stance'));
   let disposed = 0;
   snapshots.forEach(geometry => geometry.addEventListener('dispose', () => disposed++));
