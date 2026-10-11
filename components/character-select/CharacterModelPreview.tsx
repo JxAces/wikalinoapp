@@ -2,7 +2,7 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import type { StyleProp, ViewStyle } from "react-native";
 import { StyleSheet, Text, View } from "react-native";
 
-import { Colors } from "@/constants/colors";
+import { AppTheme, Colors } from "@/constants/colors";
 import type { PlayerCharacterId } from "@/data/player-characters";
 
 export type CharacterModelPreviewProps = {
@@ -23,7 +23,7 @@ export function CharacterModelPreview({ style }: CharacterModelPreviewProps) {
 const styles = StyleSheet.create({
   root: {
     alignItems: "center",
-    backgroundColor: "#A9D8C4",
+    backgroundColor: AppTheme.background,
     justifyContent: "center",
     minHeight: 220,
   },

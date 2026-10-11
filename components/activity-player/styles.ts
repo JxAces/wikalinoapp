@@ -1,6 +1,6 @@
 import { StyleSheet } from "react-native";
 
-import { Colors } from "../../constants/colors";
+import { AppTheme, Colors } from "../../constants/colors";
 
 const styles = StyleSheet.create({
   /*
@@ -10,13 +10,13 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
 
-    backgroundColor: Colors.primaryDark,
+    backgroundColor: "transparent",
   },
 
   screen: {
     flex: 1,
 
-    backgroundColor: Colors.background,
+    backgroundColor: "transparent",
   },
 
   content: {
@@ -103,6 +103,10 @@ const styles = StyleSheet.create({
     fontSize: 15,
 
     fontWeight: "900",
+  },
+
+  ugatHeaderTitle: {
+    lineHeight: 20,
   },
 
   activityCounter: {
@@ -224,7 +228,7 @@ const styles = StyleSheet.create({
 
     borderRadius: 999,
 
-    backgroundColor: "rgba(31,29,45,0.67)",
+    backgroundColor: AppTheme.overlay,
   },
 
   challengeTypeText: {
@@ -266,7 +270,7 @@ const styles = StyleSheet.create({
 
     borderWidth: 1,
 
-    borderColor: "#F5D9CF",
+    borderColor: AppTheme.error,
   },
 
   instructionIcon: {
@@ -596,7 +600,7 @@ const styles = StyleSheet.create({
 
     borderRadius: 17,
 
-    backgroundColor: "rgba(255,255,255,0.83)",
+    backgroundColor: AppTheme.surface,
 
     borderWidth: 2,
 
@@ -620,7 +624,7 @@ const styles = StyleSheet.create({
   archeryTargetWrong: {
     borderColor: Colors.secondary,
 
-    backgroundColor: "#FFF1EC",
+    backgroundColor: AppTheme.errorSurface,
   },
 
   archeryTargetCorrect: {
@@ -652,7 +656,7 @@ const styles = StyleSheet.create({
 
     borderColor: Colors.secondary,
 
-    backgroundColor: "#FFF8E9",
+    backgroundColor: AppTheme.surface,
 
     alignItems: "center",
 
@@ -694,7 +698,7 @@ const styles = StyleSheet.create({
   },
 
   bullseyeCenterCorrect: {
-    backgroundColor: Colors.teal,
+    backgroundColor: AppTheme.primary,
   },
 
   archeryTargetNumber: {
@@ -776,7 +780,7 @@ const styles = StyleSheet.create({
 
     gap: 3,
 
-    backgroundColor: Colors.teal,
+    backgroundColor: AppTheme.primary,
   },
 
   impactBadgeText: {
@@ -800,7 +804,7 @@ const styles = StyleSheet.create({
 
     borderRadius: 3,
 
-    backgroundColor: Colors.teal,
+    backgroundColor: AppTheme.primary,
 
     zIndex: 12,
   },
@@ -906,7 +910,7 @@ const styles = StyleSheet.create({
 
     borderRadius: 32,
 
-    backgroundColor: "rgba(255,250,236,0.92)",
+    backgroundColor: AppTheme.surface,
 
     borderWidth: 3,
 
@@ -974,7 +978,7 @@ const styles = StyleSheet.create({
 
     borderRadius: 14,
 
-    backgroundColor: "rgba(255,249,235,0.95)",
+    backgroundColor: AppTheme.surface,
 
     borderWidth: 1,
 
@@ -1022,7 +1026,7 @@ const styles = StyleSheet.create({
 
     borderWidth: 1,
 
-    borderColor: "#F0C9BC",
+    borderColor: AppTheme.error,
   },
 
   archeryHintIcon: {
@@ -1064,7 +1068,7 @@ const styles = StyleSheet.create({
   archeryHintRetry: {
     marginTop: 6,
 
-    color: Colors.teal,
+    color: AppTheme.primary,
 
     fontSize: 7,
 
@@ -1194,7 +1198,7 @@ const styles = StyleSheet.create({
   },
 
   plotCheckpointFilled: {
-    backgroundColor: Colors.teal,
+    backgroundColor: AppTheme.primary,
 
     borderColor: Colors.surface,
   },
@@ -1570,7 +1574,7 @@ const styles = StyleSheet.create({
 
     justifyContent: "center",
 
-    backgroundColor: "#FFF9E9",
+    backgroundColor: AppTheme.surface,
 
     borderWidth: 7,
 
@@ -1592,7 +1596,7 @@ const styles = StyleSheet.create({
 
     borderColor: "#D6C697",
 
-    backgroundColor: "#F7EED6",
+    backgroundColor: AppTheme.surfaceSoft,
   },
 
   compassDirection: {
@@ -1777,6 +1781,1090 @@ const styles = StyleSheet.create({
 
   /*
    * =====================================================
+   * UGAT · FIRST SCROLL
+   * =====================================================
+   */
+
+  ugatRunnerGame: {
+    marginBottom: 18,
+  },
+
+  ugatRunnerHeader: {
+    marginBottom: 10,
+    padding: 13,
+    borderRadius: 20,
+    backgroundColor: Colors.primary,
+    borderWidth: 1,
+    borderColor: Colors.primaryDark,
+  },
+
+  ugatRunnerTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+
+  ugatRunnerTitleCopy: {
+    flex: 1,
+  },
+
+  ugatRunnerEyebrow: {
+    color: Colors.accent,
+    fontSize: 10,
+    fontWeight: "900",
+    letterSpacing: 1.1,
+  },
+
+  ugatRunnerSubtitle: {
+    marginTop: 3,
+    color: "rgba(255,255,255,0.76)",
+    fontSize: 8,
+    lineHeight: 11,
+    fontWeight: "700",
+  },
+
+  ugatRunnerLives: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 2,
+  },
+
+  ugatRunnerHud: {
+    marginTop: 10,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: 8,
+  },
+
+  ugatRunnerHudItem: {
+    minHeight: 30,
+    paddingHorizontal: 9,
+    borderRadius: 11,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "rgba(255,255,255,0.1)",
+    borderWidth: 1,
+    borderColor: "rgba(247,215,122,0.27)",
+  },
+
+  ugatRunnerHudText: {
+    color: Colors.surface,
+    fontSize: 6.4,
+    fontWeight: "900",
+    letterSpacing: 0.35,
+  },
+
+  ugatRunnerMap: {
+    marginBottom: 10,
+    paddingHorizontal: 12,
+    paddingTop: 10,
+    paddingBottom: 7,
+    borderRadius: 17,
+    flexDirection: "row",
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+
+  ugatRunnerMapStepWrap: {
+    position: "relative",
+    flex: 1,
+    alignItems: "center",
+  },
+
+  ugatRunnerMapLine: {
+    position: "absolute",
+    top: 13,
+    right: "50%",
+    width: "100%",
+    height: 3,
+    backgroundColor: Colors.border,
+  },
+
+  ugatRunnerMapLineComplete: {
+    backgroundColor: AppTheme.primary,
+  },
+
+  ugatRunnerMapNode: {
+    width: 29,
+    height: 29,
+    borderRadius: 15,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: Colors.background,
+    borderWidth: 2,
+    borderColor: Colors.border,
+    zIndex: 2,
+  },
+
+  ugatRunnerMapNodeComplete: {
+    backgroundColor: AppTheme.primary,
+    borderColor: Colors.teal,
+  },
+
+  ugatRunnerMapNodeCurrent: {
+    backgroundColor: Colors.accent,
+    borderColor: Colors.primary,
+  },
+
+  ugatRunnerMapText: {
+    marginTop: 3,
+    color: Colors.textMuted,
+    fontSize: 6,
+    fontWeight: "900",
+  },
+
+  ugatRunnerMapTextCurrent: {
+    color: Colors.primary,
+  },
+
+  ugatRunnerScene: {
+    position: "relative",
+    height: 390,
+    marginBottom: 10,
+    borderRadius: 22,
+    overflow: "hidden",
+    backgroundColor: "#DCE5D1",
+    borderWidth: 2,
+    borderColor: AppTheme.border,
+  },
+
+  ugatRunnerBackdrop: {
+    position: "absolute",
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    width: "100%",
+    height: "100%",
+    opacity: 0.78,
+  },
+
+  ugatRunnerBackdropShade: {
+    position: "absolute",
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    backgroundColor: "rgba(33,70,55,0.2)",
+  },
+
+  ugatRunnerTrailSvg: {
+    position: "absolute",
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+  },
+
+  ugatRunnerCoin: {
+    position: "absolute",
+    left: "56%",
+    bottom: 62,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: Colors.accent,
+    borderWidth: 3,
+    borderColor: "#FFF5C8",
+    shadowColor: Colors.primaryDark,
+    shadowOpacity: 0.2,
+    shadowRadius: 5,
+    elevation: 4,
+  },
+
+  ugatRunnerGate: {
+    position: "absolute",
+    right: 14,
+    bottom: 31,
+    width: 54,
+    alignItems: "center",
+  },
+
+  ugatRunnerGateTop: {
+    width: 45,
+    height: 36,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: Colors.primary,
+    borderWidth: 3,
+    borderColor: Colors.accent,
+  },
+
+  ugatRunnerGateText: {
+    color: Colors.accent,
+    fontSize: 15,
+    fontWeight: "900",
+  },
+
+  ugatRunnerGatePosts: {
+    width: 48,
+    height: 41,
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+
+  ugatRunnerGatePost: {
+    width: 6,
+    height: 41,
+    borderBottomLeftRadius: 3,
+    borderBottomRightRadius: 3,
+    backgroundColor: Colors.primaryDark,
+    borderWidth: 1,
+    borderColor: Colors.accent,
+  },
+
+  ugatRunnerChild: {
+    position: "absolute",
+    left: "50%",
+    bottom: 14,
+    marginLeft: -31,
+    width: 62,
+    height: 78,
+    zIndex: 9,
+  },
+
+  ugatRunnerSceneLabel: {
+    position: "absolute",
+    top: 10,
+    left: 10,
+    right: 10,
+    minHeight: 31,
+    paddingHorizontal: 10,
+    borderRadius: 11,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    backgroundColor: AppTheme.overlay,
+    borderWidth: 1,
+    borderColor: "rgba(247,215,122,0.55)",
+    zIndex: 10,
+  },
+
+  ugatRunnerSceneLabelText: {
+    color: Colors.surface,
+    fontSize: 7.2,
+    fontWeight: "900",
+    letterSpacing: 0.7,
+  },
+
+  ugatRunnerInstruction: {
+    minHeight: 42,
+    marginBottom: 9,
+    paddingHorizontal: 11,
+    borderRadius: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: Colors.secondarySoft,
+    borderWidth: 1,
+    borderColor: AppTheme.error,
+  },
+
+  ugatRunnerInstructionText: {
+    flex: 1,
+    color: Colors.text,
+    fontSize: 8.2,
+    lineHeight: 12,
+    fontWeight: "800",
+  },
+
+  ugatRootChoiceWrap: {
+    position: "absolute",
+    width: "44%",
+    height: 84,
+    zIndex: 8,
+  },
+
+  ugatRootChoiceTopLeft: {
+    top: 55,
+    left: 10,
+  },
+
+  ugatRootChoiceTopRight: {
+    top: 55,
+    right: 10,
+  },
+
+  ugatRootChoiceBottomLeft: {
+    top: 151,
+    left: 10,
+  },
+
+  ugatRootChoiceBottomRight: {
+    top: 151,
+    right: 10,
+  },
+
+  ugatRootChoice: {
+    flex: 1,
+    padding: 8,
+    borderRadius: 13,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+    backgroundColor: AppTheme.surface,
+    borderWidth: 2,
+    borderColor: AppTheme.border,
+    shadowColor: Colors.primaryDark,
+    shadowOpacity: 0.18,
+    shadowRadius: 5,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 4,
+  },
+
+  ugatRootChoiceSelected: {
+    backgroundColor: AppTheme.selected,
+    borderColor: Colors.primary,
+  },
+
+  ugatRootChoiceWrong: {
+    backgroundColor: AppTheme.errorSurface,
+    borderColor: Colors.error,
+  },
+
+  ugatRootChoiceSign: {
+    width: 31,
+    height: 31,
+    borderRadius: 7,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: Colors.primarySoft,
+    borderWidth: 2,
+    borderColor: AppTheme.border,
+    transform: [{ rotate: "-2deg" }],
+  },
+
+  ugatRootChoiceSignSelected: {
+    backgroundColor: Colors.primary,
+    borderColor: Colors.accent,
+  },
+
+  ugatRootChoiceSignWrong: {
+    backgroundColor: Colors.error,
+    borderColor: Colors.surface,
+  },
+
+  ugatRootChoiceLetter: {
+    color: Colors.primary,
+    fontSize: 10,
+    fontWeight: "900",
+  },
+
+  ugatRootChoiceLetterSelected: {
+    color: Colors.accent,
+  },
+
+  ugatRootChoiceText: {
+    flex: 1,
+    color: Colors.text,
+    fontSize: 9.5,
+    lineHeight: 13,
+    fontWeight: "800",
+  },
+
+  ugatRootChoiceTextSelected: {
+    color: Colors.primary,
+    fontWeight: "900",
+  },
+
+  ugatRunnerChoices: {
+    gap: 8,
+  },
+
+  ugatRunnerChoice: {
+    minHeight: 61,
+    padding: 9,
+    borderRadius: 17,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderLeftWidth: 5,
+    borderLeftColor: AppTheme.border,
+  },
+
+  ugatRunnerChoiceSelected: {
+    backgroundColor: Colors.accentSoft,
+    borderColor: Colors.primary,
+    borderLeftColor: Colors.secondary,
+  },
+
+  ugatRunnerChoiceSign: {
+    width: 39,
+    height: 39,
+    borderRadius: 7,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: Colors.primarySoft,
+    borderWidth: 2,
+    borderColor: AppTheme.border,
+    transform: [{ rotate: "-2deg" }],
+  },
+
+  ugatRunnerChoiceSignSelected: {
+    backgroundColor: Colors.primary,
+    borderColor: Colors.accent,
+  },
+
+  ugatRunnerChoiceLetter: {
+    color: Colors.primary,
+    fontSize: 12,
+    fontWeight: "900",
+  },
+
+  ugatRunnerChoiceLetterSelected: {
+    color: Colors.accent,
+  },
+
+  ugatRunnerChoiceText: {
+    flex: 1,
+    color: Colors.text,
+    fontSize: 9.5,
+    lineHeight: 14,
+    fontWeight: "700",
+  },
+
+  ugatRunnerChoiceTextSelected: {
+    color: Colors.primary,
+    fontWeight: "900",
+  },
+
+  ugatFirstScrollGame: {
+    marginBottom: 18,
+  },
+
+  ugatDropTarget: {
+    position: "relative",
+    minHeight: 106,
+    marginBottom: 9,
+    padding: 12,
+    paddingRight: 74,
+    borderRadius: 20,
+    borderWidth: 2,
+    borderStyle: "dashed",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 11,
+    overflow: "hidden",
+  },
+
+  ugatDropTargetIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+  },
+
+  ugatDropTargetCopy: {
+    flex: 1,
+  },
+
+  ugatDropTargetEyebrow: {
+    marginBottom: 2,
+    fontSize: 7,
+    fontWeight: "900",
+    letterSpacing: 1,
+  },
+
+  ugatDropTargetLabel: {
+    color: Colors.primary,
+    fontSize: 11,
+    lineHeight: 15,
+    fontWeight: "900",
+  },
+
+  ugatDropTargetLabelDark: {
+    color: Colors.surface,
+  },
+
+  ugatDropTargetInstruction: {
+    marginTop: 3,
+    color: Colors.textMuted,
+    fontSize: 8.5,
+    lineHeight: 12,
+    fontWeight: "700",
+  },
+
+  ugatDropTargetInstructionDark: {
+    color: "rgba(255,255,255,0.72)",
+  },
+
+  ugatDropArrow: {
+    position: "absolute",
+    top: 0,
+    right: 0,
+    bottom: 0,
+    width: 67,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 1,
+    backgroundColor: "rgba(255,255,255,0.12)",
+    borderLeftWidth: 1,
+    borderLeftColor: "rgba(255,255,255,0.28)",
+  },
+
+  ugatDropArrowText: {
+    maxWidth: 48,
+    fontSize: 6.5,
+    lineHeight: 9,
+    fontWeight: "900",
+    letterSpacing: 0.7,
+    textAlign: "center",
+  },
+
+  ugatDragInstructionRow: {
+    minHeight: 36,
+    marginBottom: 9,
+    paddingHorizontal: 10,
+    borderRadius: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+
+  ugatDragInstructionText: {
+    flex: 1,
+    color: Colors.textMuted,
+    fontSize: 8,
+    lineHeight: 11,
+    fontWeight: "800",
+  },
+
+  ugatDragChoiceActive: {
+    shadowColor: Colors.primary,
+    shadowOpacity: 0.15,
+    shadowRadius: 7,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 4,
+  },
+
+  ugatDragHandle: {
+    width: 48,
+    minHeight: 40,
+    marginLeft: 2,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: Colors.primarySoft,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+
+  ugatDragHandleText: {
+    marginTop: 1,
+    color: Colors.textMuted,
+    fontSize: 5.8,
+    fontWeight: "900",
+    letterSpacing: 0.5,
+  },
+
+  ugatDragHandleTextActive: {
+    color: Colors.primary,
+  },
+
+  ugatGameHeader: {
+    marginBottom: 12,
+    padding: 13,
+    borderRadius: 18,
+    borderWidth: 1,
+  },
+
+  ugatGameHeading: {
+    flex: 1,
+  },
+
+  memoryCoinHeader: {
+    backgroundColor: Colors.accentSoft,
+    borderColor: Colors.accent,
+  },
+
+  routeHeader: {
+    backgroundColor: AppTheme.surfaceSoft,
+    borderColor: AppTheme.border,
+  },
+
+  familyTreeHeader: {
+    backgroundColor: Colors.tealSoft,
+    borderColor: Colors.teal,
+  },
+
+  checkpointHeader: {
+    backgroundColor: Colors.primary,
+    borderColor: Colors.primaryDark,
+  },
+
+  checkpointTitleText: {
+    color: Colors.accent,
+  },
+
+  checkpointSubtitleText: {
+    color: "rgba(255,255,255,0.72)",
+  },
+
+  memoryCoinTrack: {
+    flexDirection: "row",
+    gap: 8,
+  },
+
+  memoryCoinSlot: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+
+  memoryCoinSlotCollected: {
+    backgroundColor: Colors.accent,
+    borderColor: Colors.primary,
+  },
+
+  memoryChoice: {
+    minHeight: 58,
+    padding: 10,
+    borderRadius: 17,
+    marginBottom: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+
+  memoryChoiceSelected: {
+    borderColor: Colors.secondary,
+    backgroundColor: Colors.tealSoft,
+  },
+
+  memoryChoiceLetter: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: Colors.primarySoft,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+
+  memoryChoiceLetterSelected: {
+    backgroundColor: Colors.secondary,
+    borderColor: Colors.secondary,
+  },
+
+  memoryChoiceLetterText: {
+    color: Colors.primary,
+    fontSize: 11,
+    fontWeight: "900",
+  },
+
+  memoryChoiceLetterTextSelected: {
+    color: Colors.surface,
+  },
+
+  memoryChoiceText: {
+    flex: 1,
+    color: Colors.text,
+    fontSize: 10,
+    lineHeight: 14,
+    fontWeight: "700",
+  },
+
+  memoryChoiceTextSelected: {
+    color: Colors.primary,
+    fontWeight: "900",
+  },
+
+  ugatChoiceContent: {
+    flex: 1,
+  },
+
+  ugatChoiceLabel: {
+    marginBottom: 3,
+    color: Colors.textMuted,
+    fontSize: 7,
+    fontWeight: "900",
+    letterSpacing: 0.8,
+  },
+
+  routeProgress: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+
+  routeProgressLine: {
+    flex: 1,
+    height: 2,
+    marginHorizontal: 7,
+    backgroundColor: AppTheme.border,
+  },
+
+  routeStamp: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: Colors.secondary,
+    borderWidth: 2,
+    borderColor: Colors.surface,
+  },
+
+  routeChoice: {
+    minHeight: 62,
+    marginBottom: 8,
+    padding: 10,
+    borderRadius: 17,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 11,
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: AppTheme.border,
+  },
+
+  routeChoiceSelected: {
+    backgroundColor: AppTheme.surfaceSoft,
+    borderColor: Colors.secondary,
+  },
+
+  routePin: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: AppTheme.surfaceSoft,
+  },
+
+  routePinSelected: {
+    backgroundColor: Colors.secondary,
+  },
+
+  familyTreeProgress: {
+    position: "relative",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingHorizontal: 3,
+  },
+
+  familyTreeTrunk: {
+    position: "absolute",
+    left: 16,
+    right: 16,
+    top: 16,
+    height: 3,
+    backgroundColor: AppTheme.primary,
+  },
+
+  familyTreeNode: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: Colors.surface,
+    borderWidth: 2,
+    borderColor: Colors.teal,
+  },
+
+  familyTreeNodeComplete: {
+    backgroundColor: AppTheme.primary,
+  },
+
+  familyChoice: {
+    minHeight: 76,
+    marginBottom: 8,
+    padding: 10,
+    borderRadius: 18,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+
+  familyChoiceSelected: {
+    backgroundColor: Colors.tealSoft,
+    borderColor: Colors.teal,
+  },
+
+  familyPortrait: {
+    width: 48,
+    height: 54,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: Colors.primarySoft,
+    borderWidth: 2,
+    borderColor: Colors.surface,
+  },
+
+  familyPortraitSelected: {
+    backgroundColor: AppTheme.primary,
+  },
+
+  familyChoiceText: {
+    flex: 1,
+    color: Colors.text,
+    fontSize: 11,
+    fontWeight: "900",
+  },
+
+  checkpointBanner: {
+    minHeight: 35,
+    paddingHorizontal: 10,
+    borderRadius: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: "rgba(255,255,255,0.09)",
+    borderWidth: 1,
+    borderColor: "rgba(247,215,122,0.35)",
+  },
+
+  checkpointBannerText: {
+    flex: 1,
+    color: Colors.accent,
+    fontSize: 7.5,
+    fontWeight: "900",
+    letterSpacing: 0.8,
+  },
+
+  checkpointChoice: {
+    minHeight: 70,
+    marginBottom: 8,
+    padding: 10,
+    borderRadius: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 11,
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderLeftWidth: 5,
+    borderLeftColor: Colors.primary,
+  },
+
+  checkpointChoiceSelected: {
+    backgroundColor: Colors.accentSoft,
+    borderColor: Colors.secondary,
+    borderLeftColor: Colors.secondary,
+  },
+
+  checkpointSign: {
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: Colors.primarySoft,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+
+  checkpointSignSelected: {
+    backgroundColor: Colors.secondary,
+    borderColor: Colors.secondary,
+  },
+
+  ugatSharedScrollGame: {
+    marginBottom: 18,
+  },
+
+  ugatSharedHeader: {
+    marginBottom: 12,
+    padding: 14,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+
+  ugatPathHeader: {
+    backgroundColor: AppTheme.surfaceSoft,
+    borderColor: AppTheme.border,
+  },
+
+  treeFinaleHeader: {
+    backgroundColor: Colors.primary,
+    borderColor: Colors.primaryDark,
+  },
+
+  treeFinaleTitle: {
+    color: Colors.accent,
+  },
+
+  treeFinaleSubtitle: {
+    color: "rgba(255,255,255,0.72)",
+  },
+
+  ugatPathProgress: {
+    flexDirection: "row",
+    marginTop: 2,
+  },
+
+  treeFinaleProgress: {
+    flexDirection: "row",
+    marginTop: 2,
+    paddingVertical: 3,
+  },
+
+  ugatProgressStepWrap: {
+    position: "relative",
+    flex: 1,
+    alignItems: "center",
+  },
+
+  ugatProgressConnector: {
+    position: "absolute",
+    top: 17,
+    left: "-50%",
+    width: "100%",
+    height: 3,
+    backgroundColor: Colors.border,
+  },
+
+  ugatProgressConnectorComplete: {
+    backgroundColor: AppTheme.primary,
+  },
+
+  ugatProgressStep: {
+    zIndex: 1,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 2,
+  },
+
+  ugatPathStep: {
+    backgroundColor: Colors.surface,
+    borderColor: AppTheme.border,
+  },
+
+  treeFinaleStep: {
+    backgroundColor: "rgba(255,255,255,0.08)",
+    borderColor: "rgba(247,215,122,0.55)",
+  },
+
+  ugatProgressStepComplete: {
+    backgroundColor: AppTheme.primary,
+    borderColor: Colors.teal,
+  },
+
+  ugatProgressStepCurrent: {
+    borderColor: Colors.accent,
+    borderWidth: 3,
+  },
+
+  ugatProgressStepText: {
+    marginTop: 5,
+    color: Colors.textMuted,
+    fontSize: 6.5,
+    fontWeight: "900",
+    textAlign: "center",
+  },
+
+  treeFinaleStepText: {
+    color: "rgba(255,255,255,0.68)",
+  },
+
+  ugatPathChoice: {
+    minHeight: 70,
+    marginBottom: 8,
+    padding: 10,
+    borderRadius: 17,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 11,
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: AppTheme.border,
+    borderLeftWidth: 5,
+    borderLeftColor: Colors.secondary,
+  },
+
+  ugatPathChoiceSelected: {
+    backgroundColor: AppTheme.surfaceSoft,
+    borderColor: Colors.secondary,
+  },
+
+  ugatPathSign: {
+    width: 38,
+    height: 34,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: Colors.primarySoft,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+
+  ugatPathSignSelected: {
+    backgroundColor: Colors.secondary,
+    borderColor: Colors.secondary,
+  },
+
+  treeFinaleChoice: {
+    minHeight: 72,
+    marginBottom: 8,
+    padding: 10,
+    borderRadius: 22,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 11,
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+
+  treeFinaleChoiceSelected: {
+    backgroundColor: Colors.tealSoft,
+    borderColor: Colors.teal,
+  },
+
+  treeFinaleLeaf: {
+    width: 42,
+    height: 42,
+    borderTopLeftRadius: 22,
+    borderBottomRightRadius: 22,
+    borderTopRightRadius: 8,
+    borderBottomLeftRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: Colors.primarySoft,
+    borderWidth: 1,
+    borderColor: Colors.teal,
+  },
+
+  treeFinaleLeafSelected: {
+    backgroundColor: AppTheme.primary,
+  },
+
+  treeFinaleChoiceLabel: {
+    color: Colors.secondary,
+  },
+
+  /*
+   * =====================================================
    * STANDARD
    * =====================================================
    */
@@ -1878,13 +2966,13 @@ const styles = StyleSheet.create({
   feedbackCorrect: {
     backgroundColor: Colors.tealSoft,
 
-    borderColor: "#B7E0D8",
+    borderColor: AppTheme.success,
   },
 
   feedbackWrong: {
     backgroundColor: Colors.secondarySoft,
 
-    borderColor: "#F3CFC4",
+    borderColor: AppTheme.error,
   },
 
   feedbackHeader: {
@@ -1954,7 +3042,7 @@ const styles = StyleSheet.create({
 
     gap: 8,
 
-    backgroundColor: Colors.teal,
+    backgroundColor: AppTheme.primary,
   },
 
   continueButtonText: {
@@ -1986,7 +3074,7 @@ const styles = StyleSheet.create({
 
     borderWidth: 1,
 
-    borderColor: "#E8BEB2",
+    borderColor: AppTheme.error,
   },
 
   retryButtonText: {

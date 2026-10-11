@@ -25,7 +25,15 @@ function load(relative) {
   const exports = {};
   const source = fs.readFileSync(path.join(root, relative), "utf8");
   const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } }).outputText;
-  new Function("exports", "require", code)(exports, require);
+  const localRequire = request => {
+    if (request.startsWith('.') || request.startsWith('@/')) {
+      const base = request.startsWith('@/') ? path.join(root, request.slice(2)) : path.resolve(root, path.dirname(relative), request);
+      const file = fs.existsSync(`${base}.ts`) ? `${base}.ts` : `${base}.tsx`;
+      return load(path.relative(root, file));
+    }
+    return require(request);
+  };
+  new Function("exports", "require", code)(exports, localRequire);
   return exports;
 }
 
@@ -42,7 +50,36 @@ try {
     const svgTags = html.match(/<svg\b[^>]*>/g) ?? [];
     assert.equal(svgTags.length, count);
     assert(svgTags.every(tag => tag.includes('aria-hidden="true"') && !/\saccessible=/.test(tag)), `${name}: decorative SVGs must use valid web attributes`);
+    if (id === 'ugat-check') {
+      assert.equal((html.match(/role="radio"/g) ?? []).length, 6, 'Both the three roots and their labels are selectable');
+      assert(/aria-disabled="true"[^>]*aria-label="Magbigay ng patunay"|aria-label="Magbigay ng patunay"[^>]*aria-disabled="true"/.test(html), 'Evidence is unavailable until a root is selected');
+      const savedAnswers = { interpretation: 'personal', 'evidence-1': 'Unang patunay.', 'evidence-2': 'Ikalawang patunay.', reflection: 'Paliwanag ng pangkat.' };
+      const review = renderToStaticMarkup(React.createElement(Component, { activity, responses: savedAnswers, onChange() {}, onComplete() {}, showErrors: false, completed: true }));
+      for (const text of ['Mga sagot ng pangkat', 'Unang patunay.', 'Ikalawang patunay.', 'Paliwanag ng pangkat.', 'Ipasa']) assert(review.includes(text), 'Completed answers reopen in review');
+    }
   }
+  const { UtosConflictActivity } = load('components/story-cabinet/UtosConflictActivity.tsx');
+  const conflict = cabinetActivities.find(item => item.id === 'utos-conflict');
+  const renderConflict = (responses = {}, completed = false) => renderToStaticMarkup(React.createElement(UtosConflictActivity, {
+    activity: conflict, responses, completed, hasDraft: Object.keys(responses).length > 0, onChange() {}, onComplete() {}, onBack() {},
+  }));
+  const firstRound = renderConflict();
+  assert.equal((firstRound.match(/role="radio"/g) ?? []).length, 4, 'Round 1 begins with character choices only');
+  assert(firstRound.includes('aria-label="Susunod na round →"') && firstRound.includes('aria-disabled="true"'), 'An unanswered round cannot advance');
+  const scaleTags = firstRound.match(/<svg\b[^>]*>/g) ?? [];
+  assert.equal(scaleTags.length, 1, 'Round displays one balance scale');
+  assert(scaleTags.every(tag => tag.includes('aria-hidden="true"') && !/\saccessible=/.test(tag)), 'Scale uses valid decorative SVG attributes');
+  const reasonRound = renderConflict({ 'round-1-character': 'A' });
+  assert.equal((reasonRound.match(/role="radio"/g) ?? []).length, 8, 'Choosing a character reveals the four reasons');
+  assert(reasonRound.includes('Piliin din ang dahilan bago magpatuloy.'));
+  const secondRound = renderConflict({ 'round-1-character': 'A', 'round-1-reason': 'B' });
+  assert(secondRound.includes('Pag-unawa sa kalagayan'), 'Draft resumes at the first unfinished round');
+  assert.equal((secondRound.match(/role="radio"/g) ?? []).length, 4);
+  const completeResponses = { 'round-1-character': 'A', 'round-1-reason': 'B', 'round-2': 'B', 'round-3': 'C' };
+  const conflictReview = renderConflict(completeResponses, true);
+  for (const value of ['Ang iyong mga sagot', 'Baguhin ang Round 1', 'Baguhin ang Round 2', 'Baguhin ang Round 3', 'Naka-save na ang iyong mga sagot']) assert(conflictReview.includes(value));
+  for (const field of conflict.fields) assert(conflictReview.includes(field.options.find(option => option.value === completeResponses[field.id]).label), 'Review preserves every saved answer');
+  assert(renderConflict(completeResponses).includes('Balikan bago tapusin'), 'A fully answered draft opens review without marking completion');
   const { ActivityCabinetCard } = load("components/story-cabinet/ActivityCabinetCard.tsx");
   for (const completed of [false, true]) {
     const html = renderToStaticMarkup(React.createElement(ActivityCabinetCard, { activity: cabinetActivities[0], index: 0, completed, hasDraft: false, compact: true, onPress() {} }));
@@ -50,7 +87,9 @@ try {
     assert.equal(svgTags.length, 1);
     assert(svgTags.every(tag => tag.includes('aria-hidden="true"') && !/\saccessible=/.test(tag)), "Activity cabinets must hide decorative SVGs using valid web attributes");
   }
-  assert.deepEqual(errors, [], "Cabinet artwork must render without React DOM errors");
+  const { UgatTreeArt } = load('components/activity-player/ugat-tree-art.tsx');
+  renderToStaticMarkup(React.createElement(UgatTreeArt, { grown: [true, true, true], current: 2, growth: new nativeWeb.Animated.Value(1) }));
+  assert.deepEqual(errors, [], "Cabinet and tree artwork must render without React DOM errors");
 
   const { Svg } = require("react-native-svg");
   renderToStaticMarkup(React.createElement(Svg, { accessible: false }));
@@ -59,4 +98,4 @@ try {
   Module._load = originalLoad;
   console.error = originalError;
 }
-console.log("PASS: Activity cabinets, Suri-Lalim, and Ugat artwork render without invalid accessible attributes; decorative SVGs stay hidden from assistive technology; original warning reproduced by the negative control.");
+console.log("PASS: Cabinet SVG accessibility, Ugat tree rotations, Utos round reveal/resume/review, and the original warning negative control.");

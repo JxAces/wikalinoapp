@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { Platform, StyleSheet, Text, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
+import { AppTheme } from "@/constants/colors";
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -72,8 +73,8 @@ export function VirtualJoystick({
 const styles = StyleSheet.create({
   base: {
     alignItems: "center",
-    backgroundColor: "rgba(13, 13, 48, 0.72)",
-    borderColor: "rgba(255, 220, 127, 0.38)",
+    backgroundColor: AppTheme.surface,
+    borderColor: AppTheme.border,
     borderRadius: 62,
     borderWidth: 1,
     height: 124,
@@ -81,13 +82,13 @@ const styles = StyleSheet.create({
     width: 124,
   },
   crossHorizontal: {
-    backgroundColor: "rgba(255,255,255,0.08)",
+    backgroundColor: AppTheme.border,
     height: 1,
     position: "absolute",
     width: 82,
   },
   crossVertical: {
-    backgroundColor: "rgba(255,255,255,0.08)",
+    backgroundColor: AppTheme.border,
     height: 82,
     position: "absolute",
     width: 1,
@@ -97,13 +98,13 @@ const styles = StyleSheet.create({
   },
   knob: {
     alignItems: "center",
-    backgroundColor: "#F6CD62",
-    borderColor: "#FFF2BF",
+    backgroundColor: AppTheme.primary,
+    borderColor: AppTheme.selected,
     borderRadius: 25,
     borderWidth: 2,
     height: 50,
     justifyContent: "center",
-    shadowColor: "#F6CD62",
+    shadowColor: AppTheme.primary,
     shadowOpacity: 0.5,
     shadowRadius: 10,
     width: 50,
@@ -118,7 +119,11 @@ const styles = StyleSheet.create({
     width: 10,
   },
   label: {
-    color: "rgba(255, 233, 172, 0.74)",
+    color: AppTheme.text,
+    backgroundColor: AppTheme.surface,
+    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
     fontSize: 8,
     fontWeight: "900",
     letterSpacing: 1.4,

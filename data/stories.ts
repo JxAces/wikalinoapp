@@ -1,5 +1,5 @@
 import { sandaangDamit } from "./story-content/sandaang-damit";
-import { simulaNgIsangKahulugan } from "./story-content/simula-ng-isang-kahulugan";
+import { utosNgHari } from "./story-content/utos-ng-hari";
 import { ugat } from "./story-content/ugat";
 import type { StoryUnit } from "./story-types";
 
@@ -22,7 +22,7 @@ export const storyUnits: StoryUnit[] = [
     markahan: 1,
     title: "Unang Markahan",
     subtitle: "Pagbasa at Masusing Pagsusuri ng Maikling Kuwento",
-    stories: [sandaangDamit, ugat, simulaNgIsangKahulugan],
+    stories: [sandaangDamit, ugat, utosNgHari],
   },
   {
     id: "story-unit-2",

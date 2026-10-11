@@ -1,3 +1,4 @@
+import { AppTheme } from "@/constants/colors";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useState } from "react";
 import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
@@ -31,7 +32,7 @@ export function ActivityCabinetCard({ activity, index, completed, hasDraft, comp
   >
     <View pointerEvents="none" style={[styles.artwork, compact && styles.artworkCompact]}>
       <Svg width="100%" height="100%" viewBox="0 0 280 260" aria-hidden={true} accessible={Platform.OS === "web" ? undefined : false}>
-        <Ellipse cx="140" cy="248" rx="116" ry="8" fill="#0E2D27" opacity="0.65" />
+        <Ellipse cx="140" cy="248" rx="116" ry="8" fill="#241910" opacity="0.65" />
         {/* Feet, solid case, and stepped cornice make each activity its own cabinet. */}
         <Path d="M33 225 H52 L49 247 H36 Z M228 225 H247 L244 247 H231 Z" fill="#825737" stroke="#C09A61" strokeWidth="2" />
         <Rect x="25" y="28" width="230" height="204" rx="4" fill="#543B2B" stroke="#BC935A" strokeWidth="3" />
@@ -75,14 +76,14 @@ export function ActivityCabinetCard({ activity, index, completed, hasDraft, comp
     <View style={[styles.copy, compact && styles.copyCompact]}>
       <View style={styles.meta}>
         <Text style={styles.number}>GAWAIN {String(index + 1).padStart(2, "0")}</Text>
-        {completed && <MaterialCommunityIcons name="check-circle" color="#BFE0A3" size={16} />}
+        {completed && <MaterialCommunityIcons name="check-circle" color={AppTheme.primary} size={16} />}
       </View>
       <Text style={styles.title}>{activity.title}</Text>
       <Text style={styles.mode}>{activity.mode === "group" ? "Pangkatang gawain" : "Indibidwal na gawain"}</Text>
       <Text style={[styles.status, completed && styles.statusDone]}>{completed ? "Kumpleto · Bukas na" : hasDraft ? "May draft · Hindi pa tapos" : "Handa nang simulan"}</Text>
       <View style={[styles.action, completed && styles.actionDone]}>
         <Text style={[styles.actionText, completed && styles.actionTextDone]}>{action}</Text>
-        <MaterialCommunityIcons name="arrow-right" size={16} color={completed ? "#CAE3B2" : "#EDD19A"} />
+        <MaterialCommunityIcons name="arrow-right" size={16} color={completed ? AppTheme.primary : AppTheme.primary} />
       </View>
     </View>
   </Pressable>;
@@ -92,20 +93,20 @@ const styles = StyleSheet.create({
   card: { minWidth: 0, padding: 8, borderRadius: 14, borderWidth: 2, borderColor: "transparent" },
   cardWide: { flex: 1 },
   cardCompact: { width: "100%", flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 12 },
-  focused: { borderColor: "#E5C583", backgroundColor: "#24473A" },
-  pressed: { backgroundColor: "#24473A", transform: [{ scale: 0.98 }] },
+  focused: { borderColor: AppTheme.primary, backgroundColor: AppTheme.selected },
+  pressed: { backgroundColor: AppTheme.selected, transform: [{ scale: 0.98 }] },
   artwork: { width: "100%", aspectRatio: 280 / 260 },
   artworkCompact: { width: "39%", maxWidth: 170 },
   copy: { paddingHorizontal: 4, paddingTop: 12 },
   copyCompact: { flex: 1, paddingTop: 0, paddingHorizontal: 0 },
   meta: { minHeight: 18, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 6 },
-  number: { fontSize: 10, fontWeight: "800", letterSpacing: 1.5, color: "#D7B97F" },
-  title: { color: "#FFF0C6", fontSize: 19, lineHeight: 26, fontWeight: "800", marginTop: 8 },
-  mode: { color: "#C8D1B1", fontSize: 11, lineHeight: 17, marginTop: 6 },
-  status: { color: "#DAC598", fontSize: 11, lineHeight: 18, marginTop: 14 },
-  statusDone: { color: "#BFE0A3" },
-  action: { minHeight: 44, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8, borderTopWidth: 1, borderTopColor: "#65714F", marginTop: 8, paddingVertical: 10 },
-  actionDone: { borderTopColor: "#55774D" },
-  actionText: { flex: 1, color: "#EDD19A", fontWeight: "700", fontSize: 12, lineHeight: 18 },
-  actionTextDone: { color: "#CAE3B2" },
+  number: { fontSize: 10, fontWeight: "800", letterSpacing: 1.5, color: AppTheme.muted },
+  title: { color: AppTheme.text, fontSize: 19, lineHeight: 26, fontWeight: "800", marginTop: 8 },
+  mode: { color: AppTheme.muted, fontSize: 11, lineHeight: 17, marginTop: 6 },
+  status: { color: AppTheme.muted, fontSize: 11, lineHeight: 18, marginTop: 14 },
+  statusDone: { color: AppTheme.success },
+  action: { minHeight: 44, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8, borderTopWidth: 1, borderTopColor: AppTheme.border, marginTop: 8, paddingVertical: 10 },
+  actionDone: { borderTopColor: AppTheme.border },
+  actionText: { flex: 1, color: AppTheme.text, fontWeight: "700", fontSize: 12, lineHeight: 18 },
+  actionTextDone: { color: AppTheme.success },
 });

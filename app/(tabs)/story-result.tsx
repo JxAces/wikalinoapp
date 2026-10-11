@@ -25,6 +25,7 @@ import {
 } from "react-native-safe-area-context";
 
 import {
+  AppTheme,
   Colors,
 } from "../../constants/colors";
 
@@ -37,11 +38,10 @@ import {
   useUserStore,
 } from "../../store/useUserStore";
 
-import {
-  StoryRewardVisual,
-} from "../../components/three/integrations/StoryRewardVisual";
 import { canEnterStory } from "../../components/story-world/quest-progression";
+import { WikalinoBrand } from "@/components/ui/WikalinoBrand";
 import { hubReturnRoute } from "../../components/story-world/hub-navigation";
+import { getAssessmentSummary } from "../../utils/assessment";
 
 export default function StoryResultScreen() {
   const { storyId } =
@@ -113,6 +113,7 @@ export default function StoryResultScreen() {
 
   const stars =
     getStoryStars(story.id);
+  const assessment = getAssessmentSummary(story, activityResults);
 
   const activityXp =
     story.activities.reduce(
@@ -136,6 +137,7 @@ export default function StoryResultScreen() {
     <SafeAreaView
       style={styles.safeArea}
     >
+      <WikalinoBrand style={{ alignSelf: "center", marginTop: 12 }} />
       <ScrollView
         showsVerticalScrollIndicator={
           false
@@ -144,23 +146,21 @@ export default function StoryResultScreen() {
           styles.container
         }
       >
-        <StoryRewardVisual />
-
-        <Text
-          style={styles.eyebrow}
-        >
-          KWENTO COMPLETE
-        </Text>
-
         <Text style={styles.title}>
-          Mahusay!
+          Natapos ang pagsusulit!
         </Text>
 
         <Text
           style={styles.storyTitle}
         >
-          {story.title}
+          {story.title} ni {story.author}
         </Text>
+
+        <View style={styles.scoreCard} accessibilityLabel={`Iskor: ${assessment.correct} sa ${assessment.total}, ${assessment.percentage} porsiyento`}>
+          <Text style={styles.scoreLabel}>ISKOR SA PAGSUSULIT</Text>
+          <Text style={styles.scoreValue}>{assessment.correct}/{assessment.total}</Text>
+          <Text style={styles.scoreDetail}>{assessment.percentage}% · {assessment.correct} tama · {assessment.incorrect} mali</Text>
+        </View>
 
         <View style={styles.stars}>
           {[0, 1, 2].map(
@@ -229,7 +229,7 @@ export default function StoryResultScreen() {
                 styles.unlockedLabel
               }
             >
-              BAGONG KAALAMAN
+              PAGPAPAHALAGA
             </Text>
 
             <Text
@@ -302,8 +302,7 @@ export default function StoryResultScreen() {
                 styles.secondaryButtonText
               }
             >
-              Tingnan ang Susunod na
-              Kwento
+              Tingnan ang susunod na Kuwento
             </Text>
 
             <MaterialCommunityIcons
@@ -322,6 +321,19 @@ export default function StoryResultScreen() {
 
 const styles =
   StyleSheet.create({
+    scoreCard: {
+      width: "100%",
+      marginTop: 22,
+      padding: 20,
+      borderRadius: 19,
+      backgroundColor: Colors.surface,
+      borderWidth: 1,
+      borderColor: Colors.border,
+      alignItems: "center",
+    },
+    scoreLabel: { color: Colors.textMuted, fontSize: 11, fontWeight: "800", letterSpacing: 1 },
+    scoreValue: { color: Colors.primary, fontSize: 42, fontWeight: "900", marginTop: 6 },
+    scoreDetail: { color: Colors.text, fontSize: 15, fontWeight: "600", marginTop: 4 },
     safeArea: {
       flex: 1,
       backgroundColor:
@@ -335,21 +347,9 @@ const styles =
 
       paddingHorizontal: 22,
 
-      paddingTop: 50,
+      paddingTop: 24,
 
       paddingBottom: 30,
-    },
-
-    eyebrow: {
-      marginTop: 24,
-
-      color: Colors.secondary,
-
-      fontSize: 9,
-
-      fontWeight: "900",
-
-      letterSpacing: 1.5,
     },
 
     title: {
@@ -360,6 +360,8 @@ const styles =
       fontSize: 32,
 
       fontWeight: "900",
+
+      textAlign: "center",
     },
 
     storyTitle: {
@@ -370,6 +372,10 @@ const styles =
       fontSize: 14,
 
       fontWeight: "700",
+
+      lineHeight: 20,
+
+      textAlign: "center",
     },
 
     stars: {
@@ -397,7 +403,7 @@ const styles =
 
     xpLabel: {
       color:
-        "rgba(255,255,255,0.65)",
+        AppTheme.buttonText,
 
       fontSize: 8,
 

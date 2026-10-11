@@ -10,7 +10,8 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Colors } from "../../constants/colors";
+import { WikalinoBrand } from "@/components/ui/WikalinoBrand";
+import { AppTheme, Colors } from "../../constants/colors";
 import {
   getChallengesByMarkahan,
   getMarkahanByNumber,
@@ -191,9 +192,9 @@ export default function ChallengesScreen() {
       const icons = ["⚑", "⚔", "🧩", "📖", "🎯", "✏"];
       const colors = [
         Colors.teal,
-        "#78A85A",
+        Colors.secondary,
         Colors.accent,
-        "#5C91B8",
+        Colors.primary,
         Colors.secondary,
       ];
 
@@ -224,6 +225,7 @@ export default function ChallengesScreen() {
             >
               <Text style={styles.backText}>←</Text>
             </Pressable>
+            <WikalinoBrand />
           </View>
 
           <View style={styles.screenCard}>
@@ -299,6 +301,9 @@ const styles = StyleSheet.create({
   },
 
   topBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
     marginBottom: 12,
   },
 
@@ -439,7 +444,7 @@ const styles = StyleSheet.create({
   },
 
   lessonCardCompleted: {
-    backgroundColor: Colors.tealSoft,
+    backgroundColor: AppTheme.successSurface,
     borderColor: Colors.success,
   },
 

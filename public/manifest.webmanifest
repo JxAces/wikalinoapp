@@ -7,8 +7,8 @@
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
-  "background_color": "#A9D8C4",
-  "theme_color": "#203F36",
+  "background_color": "#E8D8B5",
+  "theme_color": "#E2CFA8",
   "icons": [
     {
       "src": "/icons/wikalinggo-buddy-v2-192.png",

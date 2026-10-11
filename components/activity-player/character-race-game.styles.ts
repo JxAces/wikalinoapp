@@ -1,6 +1,6 @@
 import { StyleSheet } from "react-native";
 
-import { Colors } from "../../constants/colors";
+import { AppTheme, Colors } from "../../constants/colors";
 
 const styles = StyleSheet.create({
   game: {
@@ -17,9 +17,9 @@ const styles = StyleSheet.create({
     borderRadius: 21,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#FFF2C6",
+    backgroundColor: AppTheme.panel,
     borderWidth: 1,
-    borderColor: "#EACB76",
+    borderColor: AppTheme.border,
   },
   headingCopy: {
     flex: 1,
@@ -54,12 +54,12 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    backgroundColor: "#FFFDF7",
+    backgroundColor: AppTheme.surface,
     borderWidth: 1.5,
-    borderColor: "#DED8CA",
+    borderColor: AppTheme.border,
   },
   racerChoiceSelected: {
-    backgroundColor: "#F2EEFF",
+    backgroundColor: AppTheme.selected,
     borderColor: Colors.primary,
   },
   racerChoiceDisabled: {
@@ -91,9 +91,9 @@ const styles = StyleSheet.create({
     gap: 8,
     borderRadius: 20,
     overflow: "hidden",
-    backgroundColor: "#E8F2DF",
+    backgroundColor: AppTheme.successSurface,
     borderWidth: 1,
-    borderColor: "#B7CDA7",
+    borderColor: AppTheme.success,
   },
   boardHeader: {
     flexDirection: "row",
@@ -101,7 +101,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   boardTitle: {
-    color: "#49643C",
+    color: AppTheme.success,
     fontSize: 10,
     fontWeight: "900",
     letterSpacing: 0.8,
@@ -116,9 +116,9 @@ const styles = StyleSheet.create({
     height: 57,
     borderRadius: 14,
     overflow: "hidden",
-    backgroundColor: "rgba(255,255,255,0.78)",
+    backgroundColor: AppTheme.surface,
     borderWidth: 1,
-    borderColor: "rgba(92,117,77,0.20)",
+    borderColor: AppTheme.border,
   },
   laneStripe: {
     position: "absolute",
@@ -161,7 +161,7 @@ const styles = StyleSheet.create({
   runnerName: {
     marginTop: 1,
     maxWidth: 58,
-    color: "#405036",
+    color: AppTheme.text,
     fontSize: 7,
     fontWeight: "900",
     textAlign: "center",
@@ -176,12 +176,12 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 3,
-    backgroundColor: "#FFF0A9",
+    backgroundColor: AppTheme.selected,
     borderWidth: 1,
-    borderColor: "#DCB84C",
+    borderColor: AppTheme.border,
   },
   winnerText: {
-    color: "#7C5A11",
+    color: AppTheme.primary,
     fontSize: 8,
     fontWeight: "900",
   },
@@ -212,9 +212,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: 7,
-    backgroundColor: "#F2EEFF",
+    backgroundColor: AppTheme.selected,
     borderWidth: 1,
-    borderColor: "#D8CFF6",
+    borderColor: AppTheme.border,
   },
   runningStatusText: {
     flex: 1,

@@ -11,6 +11,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
 } from "react-native";
 import Animated, {
@@ -21,11 +22,15 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { WikalinoBrand } from "@/components/ui/WikalinoBrand";
+import { AppTheme } from "@/constants/colors";
+import { LinearGradient } from "expo-linear-gradient";
 
 import { getStoryById, getStoryUnitByNumber, storyUnits } from "@/data/stories";
 import { DEFAULT_PLAYER_CHARACTER } from "@/data/player-characters";
 import { useUserStore } from "@/store/useUserStore";
 import { getLevelInfo } from "@/utils/progression";
+import { getAssessmentSummary } from "@/utils/assessment";
 
 import { StoryWorldEngine } from "./StoryWorldEngine.native";
 import { RETURN_PORTAL_ID, STORY_WORLD_POSITIONS, UGAT_STORY } from "./story-world.constants";
@@ -42,7 +47,7 @@ import { UGAT_MEMORIES, type UgatMemory } from "./ugat-layout";
 import { useWorldKeyboard } from "@/hooks/useWorldKeyboard";
 import { hubReturnRoute, hubSpawn } from "./hub-navigation";
 
-import { canEnterStory, isStoryAnswered, isWorldChestUnlocked, questionScrolls, scrollTitle, worldNodeId } from "./quest-progression";
+import { assessmentLevelTitle, canEnterStory, isStoryAnswered, isWorldChestUnlocked, questionScrolls, scrollTitle, worldNodeId } from "./quest-progression";
 
 const EMPTY_STATUS: StoryWorldStatus = {
   animation: "Idle",
@@ -52,6 +57,7 @@ const EMPTY_STATUS: StoryWorldStatus = {
 export default function StoryWorld({ questStoryId }: { questStoryId?: string } = {}) {
   const focused = useIsFocused();
   const insets = useSafeAreaInsets();
+  const compactPortal = useWindowDimensions().width < 480;
   const params = useLocalSearchParams<{ markahan?: string; node?: string; returnPortal?: string | string[] }>();
   const questStory = questStoryId ? getStoryById(questStoryId) : undefined;
   const daylightWorld = questStoryId === UGAT_STORY;
@@ -93,7 +99,8 @@ export default function StoryWorld({ questStoryId }: { questStoryId?: string } =
     ? spawnNode && !questEntrance ? { x: spawnNode.position.x, z: spawnNode.position.z + 1.7 } : undefined
     : hubArrival.position, [questStory, spawnNode, questEntrance, hubArrival]);
   const spawnHeading = questStory ? undefined : hubArrival.heading;
-  const answered = questStory?.activities.filter(activity => activityResults[activity.id]).length ?? 0;
+  const assessment = questStory ? getAssessmentSummary(questStory, activityResults) : null;
+  const answered = assessment?.answered ?? 0;
   const chestUnlocked = isWorldChestUnlocked(portals);
   const chestProgress = questStory ? `${answered}/${questStory.activities.length} gawain` : `${portals.filter(node => node.state === "completed").length}/${portals.length} portal`;
   const claimChest = () => {
@@ -283,6 +290,7 @@ export default function StoryWorld({ questStoryId }: { questStoryId?: string } =
         onEnterStory={enterStory}
         portals={portals}
         questStoryId={questStoryId}
+        assessment={assessment}
         chestUnlocked={chestUnlocked}
         chestProgress={chestProgress}
         onClaimChest={claimChest}
@@ -292,7 +300,7 @@ export default function StoryWorld({ questStoryId }: { questStoryId?: string } =
 
   return (
     <View style={styles.root}>
-      <StatusBar style={questStory ? "dark" : "light"} />
+      <StatusBar style="dark" />
       {focused && <RenderSurface
         key={`${characterId}:${questStoryId ?? "hub"}`}
         msaaSamples={0}
@@ -301,9 +309,10 @@ export default function StoryWorld({ questStoryId }: { questStoryId?: string } =
       />}
 
       <View pointerEvents="box-none" style={[StyleSheet.absoluteFill, styles.hudLayer]}>
-        <View pointerEvents={needsWelcome?"none":"auto"} accessibilityElementsHidden={needsWelcome} importantForAccessibility={needsWelcome?"no-hide-descendants":"auto"} style={[styles.topHud, { paddingTop: insets.top + 8, opacity: needsWelcome?0:1 }]}>
+        <View pointerEvents="none" style={[styles.brandHeader, { top: insets.top + 8 }]}><View style={styles.brandBadge}><WikalinoBrand color={AppTheme.primary} /></View></View>
+        <View pointerEvents={needsWelcome?"none":"auto"} accessibilityElementsHidden={needsWelcome} importantForAccessibility={needsWelcome?"no-hide-descendants":"auto"} style={[styles.topHud, { paddingTop: insets.top + 40, opacity: needsWelcome?0:1 }]}>
           <View style={styles.identityCard}>
-            <View style={questStory && styles.daylightIdentity}>
+            <View style={styles.daylightIdentity}>
               <Text numberOfLines={1} style={[styles.playerName, questStory && styles.daylightPlayerName]}>{firstName}</Text>
               <Text style={[styles.levelText, questStory && styles.daylightLevelText]}>LV {level.level}</Text>
             </View>
@@ -315,16 +324,15 @@ export default function StoryWorld({ questStoryId }: { questStoryId?: string } =
           </View>
         </View>
 
-        {ready && questStory && <View pointerEvents="none" style={[styles.navigationCard, { top: insets.top + 58 }]}>
-          <MaterialCommunityIcons color="#F7D77A" name="script-text-outline" size={20} />
-          <Text style={styles.navigationTitle}>{portals.filter(node => node.state === "completed").length}/{portals.length} balumbon</Text>
+        {assessment && <View pointerEvents="none" style={[styles.assessmentPosition, { top: insets.top + 90 }]}>
+          <AssessmentScoreCard assessment={assessment} />
         </View>}
 
-        {ready && !questStory && !needsWelcome && status.minimap && <HubMinimap portals={portals} player={status.minimap} top={insets.top+62} />}
+        {ready && !questStory && !needsWelcome && status.minimap && <HubMinimap portals={portals} player={status.minimap} top={insets.top+94} />}
 
         {!ready ? (
           <View style={styles.loadingCard}>
-            <MaterialCommunityIcons color="#F7D77A" name="creation" size={22} />
+            <MaterialCommunityIcons color={AppTheme.primary} name="creation" size={22} />
             <Text style={styles.loadingTitle}>Binubuo ang mahiwagang mundo...</Text>
             <Text style={styles.loadingHint}>Inihahanda ang iyong manlalakbay</Text>
           </View>
@@ -336,7 +344,7 @@ export default function StoryWorld({ questStoryId }: { questStoryId?: string } =
           </View>
         ) : ready && questStory && status.nearReturnPortal ? (
           <View style={[styles.storyPrompt, { bottom: insets.bottom + 164 }]}>
-            <MaterialCommunityIcons name="exit-run" color="#F7D77A" size={24} />
+            <MaterialCommunityIcons name="exit-run" color={AppTheme.primary} size={24} />
             <View style={styles.storyPromptCopy}>
               <Text style={styles.storyPromptEyebrow}>PORTAL PABALIK</Text>
               <Text style={styles.storyPromptTitle}>Bumalik sa mga portal ng kuwento</Text>
@@ -346,7 +354,7 @@ export default function StoryWorld({ questStoryId }: { questStoryId?: string } =
             </Pressable>
           </View>
         ) : nearbyPortal ? (
-          <View style={[styles.storyPrompt, { bottom: insets.bottom + 164 }]}>
+          <View style={[styles.storyPrompt, { bottom: insets.bottom + 164 }, !questStory && compactPortal && styles.storyPromptCompact]}>
             <View
               style={[
                 styles.storyNumber,
@@ -354,7 +362,7 @@ export default function StoryWorld({ questStoryId }: { questStoryId?: string } =
               ]}
             >
               <MaterialCommunityIcons
-                color={nearbyPortal.state === "locked" ? "#B5B6C2" : "#F7D77A"}
+                color={AppTheme.buttonText}
                 name={
                   nearbyPortal.state === "locked"
                     ? "lock"
@@ -368,24 +376,25 @@ export default function StoryWorld({ questStoryId }: { questStoryId?: string } =
             <View style={styles.storyPromptCopy}>
               <Text style={styles.storyPromptEyebrow}>
                 {nearbyPortal.state === "locked"
-                  ? (questStory ? "TAPUSIN MUNA ANG NAUNANG BALUMBON" : "TAPUSIN ANG LAHAT NG GAWAIN SA NAUNANG KUWENTO")
+                  ? (questStory ? "TAPUSIN MUNA ANG NAUNANG LEVEL" : "TAPUSIN ANG LAHAT NG GAWAIN SA NAUNANG KUWENTO")
                   : nearbyPortal.state === "completed"
-                    ? (questStory ? "TAMA NA · BALIKAN" : "BALIKAN ANG KUWENTO")
+                    ? (questStory ? "NASAGUTAN NA · BALIKAN" : "BALIKAN ANG KUWENTO")
                     : questStory ? `TANONG ${(nearbyPortal.questionGroup?.start ?? 0) + 1}–${nearbyPortal.questionGroup?.end ?? 5}` : `KUWENTO ${nearbyPortal.story.order}`}
               </Text>
-              <Text numberOfLines={1} style={styles.storyPromptTitle}>
-                {nodeTitle(nearbyPortal)}
+              <Text style={styles.storyPromptTitle}>
+                {nearbyPortal.questionGroup ? assessmentLevelTitle(nearbyPortal.questionGroup.index) : `${nearbyPortal.story.title} ni ${nearbyPortal.story.author}`}
               </Text>
+              {nearbyPortal.questionGroup && <Text style={styles.storyPromptProgress}>{nearbyPortal.questionGroup.answeredCount}/{nearbyPortal.questionGroup.end - nearbyPortal.questionGroup.start} nasagutan</Text>}
             </View>
             {nearbyPortal.state !== "locked" ? (
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel={`Buksan ang ${nodeTitle(nearbyPortal)}`}
+                accessibilityLabel={questStory ? `Buksan ang ${nodeTitle(nearbyPortal)}` : `Basahin natin: ${nearbyPortal.story.title} ni ${nearbyPortal.story.author}`}
                 onPress={() => enterStory(worldNodeId(nearbyPortal))}
-                style={({ pressed }) => [styles.enterButton, pressed && styles.pressed]}
+                style={({ pressed }) => [styles.enterButton, !questStory && compactPortal && styles.portalActionCompact, pressed && styles.pressed]}
               >
-                <Text style={styles.enterButtonText}>{questStory ? "SAGUTIN" : "PASOK"}</Text>
-                <MaterialCommunityIcons color="#18283B" name="arrow-right" size={17} />
+                <Text style={styles.enterButtonText}>{questStory ? "SAGUTIN" : "Basahin natin"}</Text>
+                <MaterialCommunityIcons color={AppTheme.buttonText} name="arrow-right" size={17} />
               </Pressable>
             ) : null}
           </View>
@@ -406,6 +415,8 @@ export default function StoryWorld({ questStoryId }: { questStoryId?: string } =
           pointerEvents="none"
           style={[styles.transitionBackdrop, transitionBackdropStyle]}
         >
+          <LinearGradient colors={AppTheme.backgroundGradient} style={StyleSheet.absoluteFill} />
+          <View style={[styles.brandHeader, { top: insets.top + 8 }]}><WikalinoBrand color={AppTheme.primary} /></View>
           <Animated.View style={[styles.transitionRing, transitionRingStyle]}>
             <MaterialCommunityIcons color="#FFF2B8" name="creation" size={43} />
           </Animated.View>
@@ -419,8 +430,8 @@ export default function StoryWorld({ questStoryId }: { questStoryId?: string } =
 
 function HudButton({ icon, onPress }: { icon: keyof typeof MaterialCommunityIcons.glyphMap; onPress: () => void }) {
   return (
-    <Pressable accessibilityRole="button" accessibilityLabel={icon === "bookshelf" ? "Bumalik sa aklat, kabinet, at balumbon" : icon === "map-outline" ? "Bumalik sa mga portal" : icon === "cards-outline" ? "Aklatan" : icon === "chart-timeline-variant" ? "Progreso" : "Tungkol sa Wikalino"} onPress={onPress} style={({ pressed }) => [styles.hudButton, pressed && styles.pressed]}>
-      <MaterialCommunityIcons color="#FFF1BD" name={icon} size={20} />
+    <Pressable accessibilityRole="button" accessibilityLabel={icon === "bookshelf" ? "Bumalik sa aklat, kabinet, at pagsusulit" : icon === "map-outline" ? "Bumalik sa mga portal" : icon === "cards-outline" ? "Aklatan" : icon === "chart-timeline-variant" ? "Progreso" : "Tungkol sa Wikalino"} onPress={onPress} style={({ pressed }) => [styles.hudButton, pressed && styles.pressed]}>
+      <MaterialCommunityIcons color={AppTheme.primary} name={icon} size={20} />
     </Pressable>
   );
 }
@@ -429,7 +440,7 @@ function ChestRewardPrompt({ unlocked, progress, quest, nearby, onClaim }: {
   unlocked: boolean; progress: string; quest: boolean; nearby: boolean; onClaim: () => void;
 }) {
   return <>
-    <MaterialCommunityIcons name={unlocked ? "treasure-chest" : "lock"} color={unlocked ? "#F7D77A" : "#B5B6C2"} size={24} />
+    <MaterialCommunityIcons name={unlocked ? "treasure-chest" : "lock"} color={AppTheme.primary} size={24} />
     <View style={styles.storyPromptCopy}>
       <Text style={styles.storyPromptEyebrow}>{unlocked ? "BUKAS NA ANG KABAN" : `NAKAKANDADO · ${progress}`}</Text>
       <Text style={styles.storyPromptTitle}>{unlocked ? (nearby ? "Handa na ang gantimpala!" : "Lumapit sa kaban para sa gantimpala.") : quest ? "Tapusin muna ang lahat ng gawain." : "Tapusin muna ang lahat ng portal at mga gawain nito."}</Text>
@@ -438,11 +449,33 @@ function ChestRewardPrompt({ unlocked, progress, quest, nearby, onClaim }: {
   </>;
 }
 
+function AssessmentScoreCard({ assessment }: {
+  assessment: ReturnType<typeof getAssessmentSummary>;
+}) {
+  return (
+    <View
+      accessible
+      accessibilityLabel={`Pagsusulit: ${assessment.correct} sa ${assessment.total} tama. ${assessment.answered} sa ${assessment.total} nasagutan.`}
+      style={styles.assessmentCard}
+    >
+      <View style={styles.assessmentScoreRow}>
+        <MaterialCommunityIcons color={AppTheme.primary} name="check-circle-outline" size={25} />
+        <View>
+          <Text style={styles.assessmentLabel}>PAGSUSULIT</Text>
+          <Text style={styles.assessmentValue}>{assessment.correct}/{assessment.total} <Text style={styles.assessmentUnit}>tama</Text></Text>
+        </View>
+      </View>
+      <Text style={styles.assessmentProgress}>{assessment.answered}/{assessment.total} nasagutan</Text>
+    </View>
+  );
+}
+
 function FallbackWorld({
   error,
   onEnterStory,
   portals,
   questStoryId,
+  assessment,
   chestUnlocked,
   chestProgress,
   onClaimChest,
@@ -451,20 +484,23 @@ function FallbackWorld({
   onEnterStory: (storyId: string) => void;
   portals: StoryWorldPortal[];
   questStoryId?: string;
+  assessment: ReturnType<typeof getAssessmentSummary> | null;
   chestUnlocked: boolean;
   chestProgress: string;
   onClaimChest: () => void;
 }) {
   const insets = useSafeAreaInsets();
   return (
-    <View style={styles.fallbackRoot}>
-      <StatusBar style="light" />
+    <LinearGradient colors={AppTheme.backgroundGradient} style={styles.fallbackRoot}>
+      <StatusBar style="dark" />
       <ScrollView
         contentContainerStyle={[styles.fallbackContent, { paddingTop: insets.top + 24 }]}
       >
-        <MaterialCommunityIcons color="#F7D77A" name="map-outline" size={38} />
+        <WikalinoBrand color={AppTheme.primary} style={{ alignSelf: "center", marginBottom: 20 }} />
+        <MaterialCommunityIcons color={AppTheme.primary} name="map-outline" size={38} />
         <Text style={styles.fallbackTitle}>{questStoryId ? "Landas ng mga Tanong" : "Mapa ng mga Kuwento"}</Text>
-        <Pressable accessibilityRole="button" onPress={() => questStoryId ? router.replace({ pathname: "/story-room", params: { storyId: questStoryId } }) : router.replace("/landing")}><Text style={styles.fallbackText}>{questStoryId ? "Bumalik sa aklat, kabinet, at balumbon" : "Bumalik sa mga portal"}</Text></Pressable>
+        {assessment && <View style={styles.fallbackAssessment}><AssessmentScoreCard assessment={assessment} /></View>}
+        <Pressable accessibilityRole="button" onPress={() => questStoryId ? router.replace({ pathname: "/story-room", params: { storyId: questStoryId } }) : router.replace("/landing")}><Text style={styles.fallbackText}>{questStoryId ? "Bumalik sa aklat, kabinet, at pagsusulit" : "Bumalik sa mga portal"}</Text></Pressable>
         <Text style={styles.fallbackText}>
           Hindi maipakita ang 3D mundo ngayon. Maaari mo pa ring buksan ang mga kuwento.
         </Text>
@@ -476,7 +512,7 @@ function FallbackWorld({
             style={[styles.fallbackStory, portal.state === "locked" && styles.fallbackStoryLocked]}
           >
             <MaterialCommunityIcons
-              color={portal.state === "locked" ? "#858596" : "#F7D77A"}
+              color={AppTheme.primary}
               name={
                 portal.state === "locked"
                   ? "lock"
@@ -487,9 +523,9 @@ function FallbackWorld({
               size={22}
             />
             <View style={styles.fallbackStoryCopy}>
-              <Text style={styles.fallbackStoryTitle}>{scrollTitle(portal)}</Text>
+              <Text style={styles.fallbackStoryTitle}>{questStoryId ? scrollTitle(portal) : `${portal.story.title} ni ${portal.story.author}`}</Text>
               <Text style={styles.fallbackStoryMeta}>
-                {portal.state === "locked" ? (questStoryId ? "Tapusin muna ang naunang balumbon" : "Tapusin ang lahat ng gawain sa naunang kuwento") : portal.state === "completed" ? "Tapos na" : portal.story.subtitle}
+                {portal.state === "locked" ? (questStoryId ? "Tapusin muna ang naunang level" : "Tapusin ang lahat ng gawain sa naunang kuwento") : questStoryId ? (portal.state === "completed" ? "Tapos na" : portal.story.subtitle) : "Basahin natin →"}
               </Text>
             </View>
           </Pressable>
@@ -497,12 +533,22 @@ function FallbackWorld({
         <View style={styles.fallbackStory}><ChestRewardPrompt unlocked={chestUnlocked} progress={chestProgress} quest={Boolean(questStoryId)} nearby onClaim={onClaimChest} /></View>
         <Text style={styles.fallbackError} numberOfLines={2}>{error}</Text>
       </ScrollView>
-    </View>
+    </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
+  brandHeader: { position: "absolute", left: 0, right: 0, alignItems: "center" },
+  brandBadge: { paddingHorizontal: 12, borderRadius: 8, backgroundColor: AppTheme.surface },
   hudLayer: { zIndex: 1 },
+  assessmentPosition: { position: "absolute", left: 18, maxWidth: "90%" },
+  assessmentCard: { paddingHorizontal: 13, paddingVertical: 10, gap: 6, borderRadius: 16, backgroundColor: AppTheme.surface, borderWidth: 1, borderColor: AppTheme.border },
+  assessmentScoreRow: { flexDirection: "row", alignItems: "center", gap: 9 },
+  assessmentLabel: { color: AppTheme.primary, fontSize: 8, fontWeight: "900", letterSpacing: 0.8 },
+  assessmentValue: { color: AppTheme.text, fontSize: 23, fontWeight: "900", marginTop: 2 },
+  assessmentUnit: { fontSize: 12, fontWeight: "700" },
+  assessmentProgress: { color: AppTheme.muted, fontSize: 10, fontWeight: "600" },
+  fallbackAssessment: { alignSelf: "flex-start", marginTop: 14, marginBottom: 4 },
   navigationCard: { position: "absolute", left: 18, maxWidth: "65%", paddingHorizontal: 10, paddingVertical: 7, gap: 7, borderRadius: 20, backgroundColor: "rgba(24,63,52,0.82)", flexDirection: "row", alignItems: "center" },
   navigationTitle: { color: "#FFF9E9", fontWeight: "800", fontSize: 11, flexShrink: 1 },
   avatar: {
@@ -524,21 +570,21 @@ const styles = StyleSheet.create({
   },
   enterButton: {
     alignItems: "center",
-    backgroundColor: "#F7D77A",
+    backgroundColor: AppTheme.primary,
     borderRadius: 14,
     flexDirection: "row",
     gap: 4,
     paddingHorizontal: 13,
     paddingVertical: 11,
   },
-  enterButtonText: { color: "#18283B", fontSize: 9, fontWeight: "900", letterSpacing: 0.7 },
+  enterButtonText: { color: AppTheme.buttonText, fontSize: 11, fontWeight: "900" },
   fallbackContent: { paddingBottom: 50, paddingHorizontal: 22 },
-  fallbackError: { color: "rgba(255,255,255,0.25)", fontSize: 8, marginTop: 18 },
-  fallbackRoot: { backgroundColor: "#18283B", flex: 1 },
+  fallbackError: { color: AppTheme.muted, fontSize: 8, marginTop: 18 },
+  fallbackRoot: { backgroundColor: AppTheme.background, flex: 1 },
   fallbackStory: {
     alignItems: "center",
-    backgroundColor: "rgba(255,255,255,0.08)",
-    borderColor: "rgba(247,215,122,0.24)",
+    backgroundColor: AppTheme.surface,
+    borderColor: AppTheme.border,
     borderRadius: 17,
     borderWidth: 1,
     flexDirection: "row",
@@ -547,14 +593,14 @@ const styles = StyleSheet.create({
   },
   fallbackStoryCopy: { flex: 1, marginLeft: 12 },
   fallbackStoryLocked: { opacity: 0.52 },
-  fallbackStoryMeta: { color: "rgba(255,255,255,0.5)", fontSize: 10, marginTop: 3 },
-  fallbackStoryTitle: { color: "#FFFFFF", fontSize: 14, fontWeight: "800" },
-  fallbackText: { color: "rgba(255,255,255,0.58)", fontSize: 12, lineHeight: 18, marginBottom: 13, marginTop: 7 },
-  fallbackTitle: { color: "#FFFFFF", fontSize: 25, fontWeight: "900", marginTop: 11 },
+  fallbackStoryMeta: { color: AppTheme.muted, fontSize: 10, marginTop: 3 },
+  fallbackStoryTitle: { color: AppTheme.text, fontSize: 14, fontWeight: "800" },
+  fallbackText: { color: AppTheme.muted, fontSize: 12, lineHeight: 18, marginBottom: 13, marginTop: 7 },
+  fallbackTitle: { color: AppTheme.text, fontSize: 25, fontWeight: "900", marginTop: 11 },
   hudButton: {
     alignItems: "center",
-    backgroundColor: "rgba(10,10,39,0.62)",
-    borderColor: "rgba(255,235,177,0.18)",
+    backgroundColor: AppTheme.surface,
+    borderColor: AppTheme.border,
     borderRadius: 13,
     borderWidth: 1,
     height: 39,
@@ -562,16 +608,16 @@ const styles = StyleSheet.create({
     width: 39,
   },
   identityCard: { alignItems: "center", flex: 1, flexDirection: "row" },
-  daylightIdentity: { alignSelf: "flex-start", backgroundColor: "#F4F0D5", borderRadius: 10, paddingHorizontal: 10, paddingVertical: 5 },
-  daylightPlayerName: { color: "#203F36" },
-  daylightLevelText: { color: "#485D35" },
+  daylightIdentity: { alignSelf: "flex-start", backgroundColor: AppTheme.surface, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 5 },
+  daylightPlayerName: { color: AppTheme.text },
+  daylightLevelText: { color: AppTheme.primary },
   levelBadge: { alignItems: "flex-end", marginLeft: 8 },
-  levelText: { color: "#F7D77A", fontSize: 9, fontWeight: "900" },
+  levelText: { color: AppTheme.primary, fontSize: 9, fontWeight: "900" },
   loadingCard: {
     alignItems: "center",
     alignSelf: "center",
-    backgroundColor: "rgba(10,10,40,0.84)",
-    borderColor: "rgba(247,215,122,0.3)",
+    backgroundColor: AppTheme.surface,
+    borderColor: AppTheme.border,
     borderRadius: 20,
     borderWidth: 1,
     left: 32,
@@ -580,8 +626,8 @@ const styles = StyleSheet.create({
     right: 32,
     top: "43%",
   },
-  loadingHint: { color: "rgba(255,255,255,0.48)", fontSize: 10, marginTop: 4 },
-  loadingTitle: { color: "#FFFFFF", fontSize: 14, fontWeight: "800", marginTop: 9 },
+  loadingHint: { color: AppTheme.muted, fontSize: 10, marginTop: 4 },
+  loadingTitle: { color: AppTheme.text, fontSize: 14, fontWeight: "800", marginTop: 9 },
   missionCard: {
     alignItems: "center",
     alignSelf: "center",
@@ -599,22 +645,22 @@ const styles = StyleSheet.create({
   missionCopy: { flex: 1, marginLeft: 9 },
   missionEyebrow: { color: "#F7D77A", fontSize: 7, fontWeight: "900", letterSpacing: 1.1 },
   missionText: { color: "rgba(255,255,255,0.76)", fontSize: 10, fontWeight: "700", marginTop: 2 },
-  playerName: { color: "#FFFFFF", fontSize: 15, fontWeight: "900", maxWidth: 110 },
+  playerName: { color: AppTheme.text, fontSize: 15, fontWeight: "900", maxWidth: 110 },
   pressed: { opacity: 0.72, transform: [{ scale: 0.96 }] },
-  root: { backgroundColor: "#18283B", flex: 1, overflow: "hidden" },
+  root: { backgroundColor: AppTheme.background, flex: 1, overflow: "hidden" },
   storyNumber: {
     alignItems: "center",
-    backgroundColor: "rgba(78,159,109,0.88)",
+    backgroundColor: AppTheme.primary,
     borderRadius: 14,
     height: 45,
     justifyContent: "center",
     width: 45,
   },
-  storyNumberLocked: { backgroundColor: "rgba(60,60,78,0.8)" },
+  storyNumberLocked: { backgroundColor: AppTheme.muted },
   storyPrompt: {
     alignItems: "center",
-    backgroundColor: "rgba(9, 9, 35, 0.92)",
-    borderColor: "rgba(247,215,122,0.32)",
+    backgroundColor: AppTheme.surface,
+    borderColor: AppTheme.border,
     borderRadius: 19,
     borderWidth: 1,
     flexDirection: "row",
@@ -624,8 +670,11 @@ const styles = StyleSheet.create({
     right: 18,
   },
   storyPromptCopy: { flex: 1, marginHorizontal: 10 },
-  storyPromptEyebrow: { color: "#F7D77A", fontSize: 7, fontWeight: "900", letterSpacing: 1 },
-  storyPromptTitle: { color: "#FFFFFF", fontSize: 14, fontWeight: "900", marginTop: 3 },
+  storyPromptCompact: { flexWrap: "wrap", rowGap: 10 },
+  portalActionCompact: { width: "100%", justifyContent: "center" },
+  storyPromptEyebrow: { color: AppTheme.primary, fontSize: 7, fontWeight: "900", letterSpacing: 1 },
+  storyPromptTitle: { color: AppTheme.text, fontSize: 14, lineHeight: 19, fontWeight: "900", marginTop: 3 },
+  storyPromptProgress: { color: AppTheme.muted, fontSize: 10, marginTop: 3 },
   topActions: { flexDirection: "row", gap: 7 },
   topHud: {
     alignItems: "center",
@@ -637,7 +686,7 @@ const styles = StyleSheet.create({
   transitionBackdrop: {
     zIndex: 2,
     alignItems: "center",
-    backgroundColor: "#18283B",
+    backgroundColor: AppTheme.background,
     bottom: 0,
     justifyContent: "center",
     left: 0,
@@ -645,10 +694,10 @@ const styles = StyleSheet.create({
     right: 0,
     top: 0,
   },
-  transitionEyebrow: { color: "#F7D77A", fontSize: 9, fontWeight: "900", letterSpacing: 1.6, marginTop: 138 },
+  transitionEyebrow: { color: AppTheme.primary, fontSize: 9, fontWeight: "900", letterSpacing: 1.6, marginTop: 138 },
   transitionRing: {
     alignItems: "center",
-    backgroundColor: "#4E9F6D",
+    backgroundColor: AppTheme.primary,
     borderColor: "#F7D77A",
     borderRadius: 80,
     borderWidth: 5,
@@ -657,7 +706,7 @@ const styles = StyleSheet.create({
     position: "absolute",
     width: 160,
   },
-  transitionTitle: { color: "#FFFFFF", fontSize: 22, fontWeight: "900", marginTop: 8, textAlign: "center" },
+  transitionTitle: { color: AppTheme.text, fontSize: 22, fontWeight: "900", marginTop: 8, textAlign: "center" },
   welcome: { color: "rgba(255,255,255,0.48)", fontSize: 6.5, fontWeight: "900", letterSpacing: 0.9 },
   xpText: { color: "rgba(255,255,255,0.5)", fontSize: 7, fontWeight: "800", marginTop: 1 },
 });

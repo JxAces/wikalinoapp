@@ -7,6 +7,7 @@ import {
     View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { WikalinoBrand } from "@/components/ui/WikalinoBrand";
 import { Colors } from "../../constants/colors";
 import { getChallengesByMarkahan } from "../../data/markahan";
 import { useUserStore } from "../../store/useUserStore";
@@ -29,6 +30,7 @@ export default function ResultScreen() {
       resizeMode="cover"
     >
       <SafeAreaView style={styles.safeArea}>
+        <WikalinoBrand style={{ alignSelf: "center", marginTop: 12 }} />
         <View style={styles.container}>
           <View style={styles.card}>
             <Text style={styles.title}>Magaling!</Text>
@@ -97,7 +99,7 @@ const styles = StyleSheet.create({
     width: "100%",
     minHeight: 52,
     borderRadius: 14,
-    backgroundColor: Colors.teal,
+    backgroundColor: Colors.primary,
     alignItems: "center",
     justifyContent: "center",
     marginTop: 10,

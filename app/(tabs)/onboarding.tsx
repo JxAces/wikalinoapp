@@ -7,13 +7,27 @@ import {
   ScrollView, StyleSheet, Text, TextInput, View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { WikalinoBrand } from "@/components/ui/WikalinoBrand";
+import { AppTheme, Colors } from "@/constants/colors";
 
 import { CharacterLineup } from "../../components/character-select/CharacterLineup";
-import { Colors } from "../../constants/colors";
 import { PANGKAT_OPTIONS, type PangkatOption } from "../../data/pangkat";
 import { DEFAULT_PLAYER_CHARACTER, type PlayerCharacterId } from "../../data/player-characters";
 import { useUserStore } from "../../store/useUserStore";
 import { hubStartRoute } from "../../components/story-world/hub-navigation";
+
+// Share the onboarding parchment palette with the rest of the app.
+const OnboardingColors = {
+  background: AppTheme.backgroundGradient,
+  brown: AppTheme.primary,
+  text: AppTheme.text,
+  cream: AppTheme.surface,
+  label: Colors.secondary,
+  textMuted: AppTheme.muted,
+  border: AppTheme.border,
+  selected: AppTheme.selected,
+  buttonText: AppTheme.buttonText,
+};
 
 export default function OnboardingScreen() {
   const setProfile = useUserStore(state => state.setProfile);
@@ -62,21 +76,13 @@ export default function OnboardingScreen() {
   }
 
   return (
-    <LinearGradient colors={["#A9D8C4", "#DDEBD2", "#EAF4EC"]} style={styles.screen}>
+    <LinearGradient colors={OnboardingColors.background} style={styles.screen}>
       <SafeAreaView style={styles.screen}>
         <KeyboardAvoidingView style={styles.screen} behavior={Platform.OS === "ios" ? "padding" : undefined}>
           <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content}>
             <View style={styles.brandRow}>
-              <MaterialCommunityIcons name="book-open-page-variant" color={Colors.secondary} size={23} />
-              <Text style={styles.brand}>WIKALINO</Text>
-            </View>
-            <View style={styles.hero}>
-              <View style={styles.emblem}>
-                <MaterialCommunityIcons name="compass-outline" size={52} color={Colors.accent} />
-              </View>
-              <Text style={styles.eyebrow}>BAGONG PAGLALAKBAY</Text>
-              <Text style={styles.title}>Ano ang pangalan{`\n`}ng ating bida?</Text>
-              <Text style={styles.subtitle}>Ihanda ang iyong pangalan at piliin ang baitang.</Text>
+              <MaterialCommunityIcons name="book-open-page-variant" color={OnboardingColors.brown} size={36} />
+              <WikalinoBrand style={styles.brand} />
             </View>
             <View style={styles.form}>
               <Text style={styles.label}>PANGALAN</Text>
@@ -84,7 +90,8 @@ export default function OnboardingScreen() {
                 accessibilityLabel="Pangalan ng manlalaro"
                 value={fullName} onChangeText={setFullName}
                 placeholder="Ilagay ang iyong pangalan"
-                placeholderTextColor={Colors.textMuted}
+                placeholderTextColor={OnboardingColors.textMuted}
+                selectionColor={OnboardingColors.brown}
                 autoCapitalize="words" autoCorrect={false} maxLength={60}
                 returnKeyType="done" onSubmitEditing={chooseCharacter}
                 style={styles.input}
@@ -100,15 +107,15 @@ export default function OnboardingScreen() {
                     accessibilityLabel={`Baitang ${number}`}
                     style={({ pressed }) => [styles.grade, selected && styles.gradeSelected, pressed && styles.pressed]}>
                     <Text style={[styles.gradeNumber, selected && styles.gradeNumberSelected]}>{number}</Text>
-                    {selected && <MaterialCommunityIcons name="check-circle" size={15} color={Colors.accent} />}
+                    {selected && <MaterialCommunityIcons name="check-circle" size={15} color={OnboardingColors.text} />}
                   </Pressable>;
                 })}
               </View>
               <Pressable onPress={chooseCharacter} disabled={!canContinue}
                 accessibilityRole="button" accessibilityState={{ disabled: !canContinue }}
                 style={({ pressed }) => [styles.continue, !canContinue && styles.disabled, pressed && styles.pressed]}>
-                <Text style={styles.continueText}>Piliin ang iyong tauhan</Text>
-                <MaterialCommunityIcons name="arrow-right" size={22} color={Colors.accentSoft} />
+                <Text style={styles.continueText}>Piliin ang iyong karakter</Text>
+                <MaterialCommunityIcons name="arrow-right" size={22} color={OnboardingColors.buttonText} />
               </Pressable>
             </View>
           </ScrollView>
@@ -121,24 +128,19 @@ export default function OnboardingScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1 },
   content: { flexGrow: 1, justifyContent: "center", padding: 26, paddingBottom: 36, maxWidth: 540, width: "100%", alignSelf: "center" },
-  brandRow: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, marginBottom: 30 },
-  brand: { fontSize: 16, fontWeight: "900", letterSpacing: 5, color: Colors.secondary },
-  hero: { alignItems: "center", marginBottom: 28 },
-  emblem: { backgroundColor: Colors.secondary, padding: 18, borderRadius: 30, marginBottom: 24, borderWidth: 2, borderColor: "#93B693" },
-  eyebrow: { color: Colors.secondary, fontSize: 11, letterSpacing: 2, fontWeight: "900", marginBottom: 12 },
-  title: { fontSize: 32, lineHeight: 39, fontWeight: "900", textAlign: "center", color: Colors.primaryDark },
-  subtitle: { marginTop: 12, color: Colors.secondary, textAlign: "center", fontSize: 14, lineHeight: 21 },
+  brandRow: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 12, marginBottom: 36 },
+  brand: { fontSize: 32, lineHeight: 40, fontWeight: "900", letterSpacing: 4, color: OnboardingColors.brown },
   form: { gap: 10 },
-  label: { color: Colors.primary, fontWeight: "900", letterSpacing: 1.8, fontSize: 12 },
-  input: { borderWidth: 1.5, borderColor: "#9BBBA7", backgroundColor: Colors.surface, borderRadius: 16, padding: 18, fontSize: 17, color: Colors.text, minHeight: 58 },
+  label: { color: OnboardingColors.label, fontWeight: "900", letterSpacing: 1.8, fontSize: 12 },
+  input: { borderWidth: 1.5, borderColor: OnboardingColors.border, backgroundColor: OnboardingColors.cream, borderRadius: 16, padding: 18, fontSize: 17, color: OnboardingColors.text, minHeight: 58 },
   gradeLabel: { marginTop: 14 },
   grades: { flexDirection: "row", gap: 10 },
-  grade: { flex: 1, minHeight: 65, borderWidth: 1.5, borderColor: "#9BBBA7", borderRadius: 16, backgroundColor: "#F2F6E9", justifyContent: "center", alignItems: "center", flexDirection: "row", gap: 6 },
-  gradeSelected: { borderColor: Colors.secondary, backgroundColor: Colors.secondary },
-  gradeNumber: { fontWeight: "900", fontSize: 23, color: Colors.secondary },
-  gradeNumberSelected: { color: Colors.surface },
-  continue: { minHeight: 60, borderRadius: 18, backgroundColor: Colors.secondary, marginTop: 24, flexDirection: "row", justifyContent: "center", alignItems: "center", gap: 12, padding: 14 },
-  continueText: { color: Colors.accentSoft, fontWeight: "900", fontSize: 16 },
-  disabled: { opacity: 0.4 },
+  grade: { flex: 1, minHeight: 65, borderWidth: 1.5, borderColor: OnboardingColors.border, borderRadius: 16, backgroundColor: OnboardingColors.cream, justifyContent: "center", alignItems: "center", flexDirection: "row", gap: 6 },
+  gradeSelected: { borderColor: OnboardingColors.brown, backgroundColor: OnboardingColors.selected },
+  gradeNumber: { fontWeight: "900", fontSize: 23, color: OnboardingColors.brown },
+  gradeNumberSelected: { color: OnboardingColors.text },
+  continue: { minHeight: 60, borderRadius: 18, backgroundColor: OnboardingColors.brown, marginTop: 24, flexDirection: "row", justifyContent: "center", alignItems: "center", gap: 12, padding: 14 },
+  continueText: { color: OnboardingColors.buttonText, fontWeight: "900", fontSize: 16 },
+  disabled: { opacity: 0.48 },
   pressed: { opacity: 0.75 },
 });

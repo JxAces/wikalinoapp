@@ -1,5 +1,7 @@
-import { canAnswerQuestion, canEnterStory, canOpenStoryActivities, isStoryAnswered } from "../components/story-world/quest-progression";
+import { canAnswerQuestion, canEnterStory, canOpenStoryActivities, canOpenStoryQuiz, isStoryAnswered, questionGroup } from "../components/story-world/quest-progression";
+import { isWardrobeDressed } from "../data/sandaang-wardrobe";
 import { getCabinetActivity, isCabinetResponseComplete } from "../data/cabinet-activities";
+import { getAssessmentSummary, gradeAssessmentAnswer, type AssessmentAnswer } from "../utils/assessment";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { create } from "zustand";
 import {
@@ -77,6 +79,14 @@ export type UserProfile = {
 export type ActivityResult = {
   storyId: string;
   activityId: string;
+
+  correct: boolean;
+  // Older saves retain their first-try grade but did not store the chosen answer.
+  selectedAnswer?: AssessmentAnswer;
+  // Dressing a Level 3 mannequin never changes the grade or awards more XP.
+  wardrobeDressed?: boolean;
+  // Retained for compatibility with earlier four-piece outfit saves.
+  wardrobePieces?: number[];
 
   attempts: number;
   firstTryCorrect: boolean;
@@ -158,10 +168,10 @@ type UserStore = {
   completeActivity: (payload: {
     storyId: string;
     activityId: string;
-    attempts: number;
-    firstTryCorrect: boolean;
-    xpReward: number;
+    answer: AssessmentAnswer;
   }) => void;
+
+  dressWardrobeOutfit: (activityId: string) => void;
 
   completeStory: (
     storyId: string,
@@ -337,14 +347,12 @@ export const useUserStore =
         completeActivity: ({
           storyId,
           activityId,
-          attempts,
-          firstTryCorrect,
-          xpReward,
+          answer,
         }) =>
           set((state) => {
             const story = getStoryById(storyId);
             const index = story?.activities.findIndex(activity => activity.id === activityId) ?? -1;
-            if (!story || !canOpenStoryActivities(storyId, state.readingCompletedStoryIds, state.activityResults) || !canAnswerQuestion(story, index, state.activityResults)) return state;
+            if (!story || !canOpenStoryQuiz(storyId, state.readingCompletedStoryIds, state.activityResults, state.cabinetResponses) || !canAnswerQuestion(story, index, state.activityResults)) return state;
             /*
              * Prevent XP farming by repeatedly
              * completing the same activity.
@@ -358,11 +366,10 @@ export const useUserStore =
               return state;
             }
 
-            const firstTryBonus =
-              firstTryCorrect ? 5 : 0;
-
-            const xpEarned =
-              xpReward + firstTryBonus;
+            const activity = story.activities[index];
+            const correct = gradeAssessmentAnswer(activity, answer);
+            if (correct === null) return state;
+            const xpEarned = correct ? activity.xp + 5 : 0;
 
             return {
               activityResults: {
@@ -371,8 +378,11 @@ export const useUserStore =
                 [activityId]: {
                   storyId,
                   activityId,
-                  attempts,
-                  firstTryCorrect,
+                  selectedAnswer: Array.isArray(answer) ? [...answer] : answer,
+                  ...(storyId === "m1-story-1" && questionGroup(story, index).index === 2 ? { wardrobeDressed: false } : {}),
+                  correct,
+                  attempts: 1,
+                  firstTryCorrect: correct,
                   xpEarned,
                   completedAt:
                     new Date().toISOString(),
@@ -384,6 +394,16 @@ export const useUserStore =
 
               lastStoryId: storyId,
             };
+          }),
+
+        dressWardrobeOutfit: (activityId) =>
+          set(state => {
+            const result = state.activityResults[activityId];
+            const story = getStoryById("m1-story-1");
+            const index = story?.activities.findIndex(activity => activity.id === activityId) ?? -1;
+            if (!story || index < 0 || questionGroup(story, index).index !== 2 ||
+              result?.storyId !== story.id || !result.correct || isWardrobeDressed(result)) return state;
+            return { activityResults: { ...state.activityResults, [activityId]: { ...result, wardrobeDressed: true } } };
           }),
 
         completeStory: (storyId) =>
@@ -447,42 +467,7 @@ export const useUserStore =
             return 0;
           }
 
-          const results =
-            story.activities
-              .map(
-                (activity) =>
-                  get().activityResults[
-                    activity.id
-                  ],
-              )
-              .filter(Boolean);
-
-          if (
-            results.length <
-            story.activities.length
-          ) {
-            return 0;
-          }
-
-          const firstTryCount =
-            results.filter(
-              (result) =>
-                result.firstTryCorrect,
-            ).length;
-
-          const rate =
-            firstTryCount /
-            story.activities.length;
-
-          if (rate >= 0.9) {
-            return 3;
-          }
-
-          if (rate >= 0.75) {
-            return 2;
-          }
-
-          return 1;
+          return getAssessmentSummary(story, get().activityResults).stars;
         },
 
         getCompletedStoryCountByMarkahan:
@@ -650,7 +635,7 @@ export const useUserStore =
       {
         name: USER_STORE_STORAGE_KEY,
 
-        version: 5,
+        version: 6,
 
         storage: createJSONStorage(
           () => AsyncStorage,
@@ -658,9 +643,17 @@ export const useUserStore =
 
         migrate: (
           persistedState: any,
+          version: number,
         ) => {
           const state =
             persistedState ?? {};
+
+          // Slot 3 now contains Utos ng Hari. Keep earned XP and old answer
+          // records, but do not apply the previous book's reading/completion.
+          const storySceneIndexes = { ...(state.storySceneIndexes ?? {}) };
+          if (version < 5) delete storySceneIndexes["m1-story-3"];
+          const currentStoryIds = (ids: string[] = []) =>
+            version < 5 ? ids.filter(id => id !== "m1-story-3") : ids;
 
           /*
            * Removes the old avatar requirement
@@ -701,20 +694,19 @@ export const useUserStore =
             xp: state.xp ?? 0,
 
             completedStoryIds:
-              state.completedStoryIds ??
-              [],
+              currentStoryIds(state.completedStoryIds),
 
             readingCompletedStoryIds:
-              state.readingCompletedStoryIds ??
-              [],
+              currentStoryIds(state.readingCompletedStoryIds),
 
             storySceneIndexes:
-              state.storySceneIndexes ??
-              {},
+              storySceneIndexes,
 
             activityResults:
-              state.activityResults ??
-              {},
+              Object.fromEntries(Object.entries(state.activityResults ?? {}).map(([id, saved]) => {
+                const result = saved as ActivityResult;
+                return [id, { ...result, correct: result.correct ?? result.firstTryCorrect === true }];
+              })),
 
             cabinetResponses: state.cabinetResponses ?? {},
 

@@ -22,7 +22,7 @@ export default function TabsLayout() {
           Colors.primary,
 
         tabBarInactiveTintColor:
-          "#9795A1",
+          Colors.textMuted,
 
         tabBarStyle: {
           position: "absolute",

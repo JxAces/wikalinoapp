@@ -2,6 +2,7 @@ import type { ExpoWebGLRenderingContext } from "expo-gl";
 import { useEffect, useRef, useState } from "react";
 import { StyleSheet, Text, View, type StyleProp, type ViewStyle } from "react-native";
 import { renderBudget } from "./render-budget";
+import { AppTheme } from "@/constants/colors";
 
 type Props = {
   style?: StyleProp<ViewStyle>;
@@ -60,6 +61,6 @@ export function RenderSurface({ style, onContextCreate }: Props) {
 }
 const styles = StyleSheet.create({
   root: { overflow: "hidden" },
-  error: { ...StyleSheet.absoluteFill, alignItems: "center", justifyContent: "center", padding: 24, backgroundColor: "#A9D8C4" },
-  text: { color: "#203F36", textAlign: "center" },
+  error: { ...StyleSheet.absoluteFill, alignItems: "center", justifyContent: "center", padding: 24, backgroundColor: AppTheme.background },
+  text: { color: AppTheme.text, textAlign: "center" },
 });

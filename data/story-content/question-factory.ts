@@ -37,22 +37,27 @@ const levelMeta: Record<
 export function createQuestionActivities(
   storyPrefix: string,
   groups: Record<QuestionLevel, StoryQuestion[]>,
+  limits?: Record<QuestionLevel, number>,
 ): ChoiceActivity[] {
   const orderedGroups: QuestionLevel[] = ["pamilyar", "suri", "dalubhasa"];
-  const total = orderedGroups.reduce((sum, level) => sum + groups[level].length, 0);
   let questionNumber = 0;
+  let displayedNumber = 0;
 
   return orderedGroups.flatMap(level => {
     const meta = levelMeta[level];
 
-    return groups[level].map(question => {
+    return groups[level].flatMap((question, index) => {
       questionNumber += 1;
+      // Keep original IDs so reducing the assessment does not attach old saves
+      // to different questions.
+      if (limits && index >= limits[level]) return [];
+      displayedNumber += 1;
       const answer = question.choices[question.answer];
 
       return {
         id: `${storyPrefix}-q${questionNumber}`,
         type: meta.type,
-        title: `${meta.title} ${questionNumber}`,
+        title: `${meta.title} ${displayedNumber}`,
         instruction: meta.instruction,
         question: question.question,
         choices: [...question.choices],
@@ -60,8 +65,7 @@ export function createQuestionActivities(
         hint: question.hint ?? "Hanapin ang pahiwatig sa binasang kuwento.",
         explanation: question.explanation,
         xp: meta.xp,
-        isFinal: questionNumber === total,
       } satisfies ChoiceActivity;
     });
-  });
+  }).map((activity, index, activities) => ({ ...activity, isFinal: index === activities.length - 1 }));
 }

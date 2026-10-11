@@ -1,3 +1,4 @@
+import { AppTheme } from "@/constants/colors";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useState } from "react";
 import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
@@ -9,7 +10,7 @@ type TreeActivity = { activity: CabinetActivity; completed: boolean; hasDraft: b
 
 type Props = { activities: TreeActivity[]; onPress: (activity: CabinetActivity) => void };
 
-const symbols = ["magnify", "notebook-outline", "cards-outline"] as const;
+const symbols = ["leaf", "magnify", "source-branch"] as const;
 
 /** A full lesson tree: its roots frame the work and each branch holds one activity. */
 export function UgatActivityTreeCard({ activities, onPress }: Props) {
@@ -41,10 +42,10 @@ export function UgatActivityTreeCard({ activities, onPress }: Props) {
           </Svg>
         </View>
         <Pressable accessibilityRole="button" accessibilityLabel={`${item.activity.title}. ${status}.`} onFocus={() => setFocused(item.activity.id)} onBlur={() => setFocused(null)} onPress={() => onPress(item.activity)} style={({ pressed }) => [styles.sign, right ? styles.right : styles.left, item.completed && styles.signDone, focused === item.activity.id && styles.focused, pressed && styles.pressed]}>
-        <View style={styles.signTop}><Text style={styles.number}>GAWAIN {String(index + 1).padStart(2, "0")}</Text><MaterialCommunityIcons name={item.completed ? "check-circle" : symbols[index] ?? "leaf"} size={18} color={item.completed ? "#DDE7A6" : "#E9C789"} /></View>
+        <View style={styles.signTop}><Text style={styles.number}>GAWAIN {String(index + 1).padStart(2, "0")}</Text><MaterialCommunityIcons name={item.completed ? "check-circle" : symbols[index] ?? "leaf"} size={18} color={item.completed ? AppTheme.primary : AppTheme.primary} /></View>
         <Text style={styles.title}>{item.activity.title}</Text>
         <Text style={styles.mode}>{item.activity.mode === "group" ? "Pangkatang gawain" : "Indibidwal na gawain"}</Text>
-        <View style={styles.footer}><Text style={[styles.status, item.completed && styles.statusDone]}>{status}</Text><MaterialCommunityIcons name="arrow-right" size={18} color={item.completed ? "#C9E5A8" : "#F0D089"} /></View>
+        <View style={styles.footer}><Text style={[styles.status, item.completed && styles.statusDone]}>{status}</Text><MaterialCommunityIcons name="arrow-right" size={18} color={AppTheme.primary} /></View>
       </Pressable></View>;
     })}
     <View pointerEvents="none" style={styles.roots}>
@@ -67,15 +68,15 @@ const styles = StyleSheet.create({
   branchArt: { position: "absolute", top: 0, left: 0, right: 0, height: 80 },
   mirrored: { transform: [{ scaleX: -1 }] },
   roots: { height: 115, marginTop: -2 },
-  sign: { width: "68%", maxWidth: 320, paddingHorizontal: 14, paddingVertical: 12, borderRadius: 6, backgroundColor: "#735034", borderWidth: 2, borderBottomWidth: 5, borderColor: "#B78953", borderBottomColor: "#503A29" },
+  sign: { width: "68%", maxWidth: 320, paddingHorizontal: 14, paddingVertical: 12, borderRadius: 6, backgroundColor: AppTheme.surface, borderWidth: 2, borderBottomWidth: 5, borderColor: AppTheme.border, borderBottomColor: AppTheme.border },
   left: { alignSelf: "flex-start" }, right: { alignSelf: "flex-end" },
-  signDone: { backgroundColor: "#31523A", borderColor: "#9BBA78" },
-  focused: { borderColor: "#FFE4A1" },
+  signDone: { backgroundColor: AppTheme.successSurface, borderColor: AppTheme.border, borderBottomColor: AppTheme.border },
+  focused: { borderColor: AppTheme.primary, borderBottomColor: AppTheme.primary, borderWidth: 3 },
   pressed: { opacity: 0.82, transform: [{ scale: 0.985 }] },
   signTop: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 },
-  number: { color: "#E5C887", fontSize: 10, fontWeight: "900", letterSpacing: 1.4 },
-  title: { color: "#FFF0C8", fontSize: 17, lineHeight: 23, fontWeight: "800", marginTop: 6 },
-  mode: { color: "#E7DAB6", fontSize: 11, marginTop: 4 },
+  number: { color: AppTheme.muted, fontSize: 10, fontWeight: "900", letterSpacing: 1.4 },
+  title: { color: AppTheme.text, fontSize: 17, lineHeight: 23, fontWeight: "800", marginTop: 6 },
+  mode: { color: AppTheme.muted, fontSize: 11, marginTop: 4 },
   footer: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8, marginTop: 8 },
-  status: { color: "#F2DCAB", fontSize: 12, fontWeight: "800" }, statusDone: { color: "#C9E5A8" },
+  status: { color: AppTheme.muted, fontSize: 12, fontWeight: "800" }, statusDone: { color: AppTheme.success },
 });

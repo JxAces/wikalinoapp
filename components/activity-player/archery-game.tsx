@@ -19,7 +19,7 @@ import Reanimated, {
 } from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
 
-import { Colors } from "../../constants/colors";
+import { AppTheme, Colors } from "../../constants/colors";
 import { StoryActivity } from "../../data/stories";
 import styles from "./styles";
 
@@ -76,7 +76,6 @@ export function DragArcheryGame({
   correct,
   selectedChoice,
   wrongChoice,
-  hint,
   targetShake,
   onTargetHit,
   onGestureActiveChange,
@@ -90,8 +89,6 @@ export function DragArcheryGame({
   selectedChoice: string | null;
 
   wrongChoice: string | null;
-
-  hint: string | null;
 
   targetShake: Animated.Value;
 
@@ -333,12 +330,7 @@ export function DragArcheryGame({
     const choice = activity.choices[hitIndex];
 
     await onTargetHit(choice);
-
-    if (choice !== activity.answer) {
-      setTimeout(() => {
-        resetBow();
-      }, 700);
-    }
+    setIsFlying(false);
   }
 
   /*
@@ -611,7 +603,7 @@ export function DragArcheryGame({
       ===================================== */}
 
       <LinearGradient
-        colors={["#F8EED2", "#EEDDB2", "#E6D19D"]}
+        colors={AppTheme.backgroundGradient}
         style={[
           styles.archeryField,
 
@@ -894,11 +886,11 @@ export function DragArcheryGame({
               ? aimY < MIN_PULL_Y
                 ? "Hilahin pa pababa..."
                 : "Bitawan para lumipad!"
-              : isFlying
+              : submitted
+                ? correct ? "Tamang sagot!" : "Naitala na ang sagot."
+                : isFlying
                 ? "Lumilipad ang pana..."
-                : submitted
-                  ? "Bullseye!"
-                  : "Hawakan at hilahin pababa"}
+                : "Hawakan at hilahin pababa"}
           </Text>
         </View>
 
@@ -917,33 +909,6 @@ export function DragArcheryGame({
         )}
       </LinearGradient>
 
-      {/* WRONG ANSWER HINT */}
-
-      {hint && !submitted && (
-        <View style={styles.archeryHint}>
-          <View style={styles.archeryHintIcon}>
-            <MaterialCommunityIcons
-              name="lightbulb-on-outline"
-              size={19}
-              color={Colors.secondary}
-            />
-          </View>
-
-          <View
-            style={{
-              flex: 1,
-            }}
-          >
-            <Text style={styles.archeryHintLabel}>PAHIWATIG</Text>
-
-            <Text style={styles.archeryHintText}>{hint}</Text>
-
-            <Text style={styles.archeryHintRetry}>
-              Handa na ang bagong pana. Hilahin muli upang sumubok.
-            </Text>
-          </View>
-        </View>
-      )}
     </View>
   );
 }

@@ -5,8 +5,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Text, View } from "react-native";
 import Animated, { FadeIn } from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { WikalinoBrand } from "@/components/ui/WikalinoBrand";
 
 import styles from "@/components/screens/loading.styles";
+import { AppTheme } from "@/constants/colors";
 import { StorybookIntroVisual } from "@/components/three/integrations/StorybookIntroVisual";
 import { useThreePerformance } from "@/hooks/useThreePerformance";
 import { useUserStore } from "@/store/useUserStore";
@@ -101,8 +103,8 @@ export default function LoadingScreen() {
 
   return (
     <LinearGradient
-      colors={["#A9D8C4", "#8EC58A", "#559647", "#18283B"]}
-      locations={[0, 0.35, 0.7, 1]}
+      colors={AppTheme.backgroundGradient}
+      locations={[0, 0.5, 1]}
       style={styles.root}
     >
       <View pointerEvents="none" style={styles.moonGlow} />
@@ -115,12 +117,12 @@ export default function LoadingScreen() {
         <View style={styles.header}>
           <View style={styles.brandMark}>
             <MaterialCommunityIcons
-              color="#F7D77A"
+              color={AppTheme.primary}
               name="book-open-page-variant"
               size={19}
             />
           </View>
-          <Text style={styles.brand}>WIKALINGGO</Text>
+          <WikalinoBrand color={AppTheme.text} />
         </View>
 
         <View style={[styles.scene, phase === "entering" && { zIndex: 10 }]}>
@@ -139,7 +141,7 @@ export default function LoadingScreen() {
         >
           <View style={styles.loadingHeading}>
             <MaterialCommunityIcons
-              color="#F7D77A"
+              color={AppTheme.primary}
               name={
                 visiblePhase === "entering"
                   ? "creation"

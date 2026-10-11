@@ -5,6 +5,7 @@ import { HUB_BRIDGES, HUB_HOUSES, HUB_RIVER_X, HUB_TRAILS } from "./hub-layout";
 import { minimapHeading, minimapPoint, minimapRoute } from "./hub-minimap";
 import { worldChestPosition } from "./story-world.constants";
 import type { StoryWorldPortal, StoryWorldStatus } from "./story-world.types";
+import { AppTheme } from "@/constants/colors";
 
 type Props = { portals: readonly StoryWorldPortal[]; player: NonNullable<StoryWorldStatus["minimap"]>; top: number };
 const points = (route: readonly {x:number;z:number}[]) => route.map(p=>{const at=minimapPoint(p);return `${at.x},${at.y}`;}).join(" ");
@@ -60,10 +61,10 @@ export function HubMinimap({portals,player,top}:Props) {
   </View>;
 }
 const styles=StyleSheet.create({
-  wrap:{position:"absolute",right:12,borderRadius:18,padding:7,backgroundColor:"rgba(19,48,42,0.94)",borderWidth:1,borderColor:"#789779"},
+  wrap:{position:"absolute",right:12,borderRadius:18,padding:7,backgroundColor:AppTheme.surface,borderWidth:1,borderColor:AppTheme.border},
   heading:{flexDirection:"row",justifyContent:"space-between",alignItems:"center",paddingHorizontal:5,height:19},
-  title:{fontSize:9,fontWeight:"800",letterSpacing:1.7,color:"#E6E9CA"},
-  expand:{fontSize:17,lineHeight:19,color:"#F7D77A",fontWeight:"700"},
-  destination:{fontSize:10,fontWeight:"800",color:"#F7E6B0",textAlign:"center",paddingTop:3,paddingBottom:2},
-  legend:{padding:5,gap:3},legendText:{color:"#E8EFDB",fontSize:11},
+  title:{fontSize:9,fontWeight:"800",letterSpacing:1.7,color:AppTheme.primary},
+  expand:{fontSize:17,lineHeight:19,color:AppTheme.primary,fontWeight:"700"},
+  destination:{fontSize:10,fontWeight:"800",color:AppTheme.text,textAlign:"center",paddingTop:3,paddingBottom:2},
+  legend:{padding:5,gap:3},legendText:{color:AppTheme.muted,fontSize:11},
 });

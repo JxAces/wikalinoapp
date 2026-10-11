@@ -34,7 +34,7 @@ import {
   WebGLRenderer,
 } from "three";
 
-import { Colors } from "@/constants/colors";
+import { AppTheme, Colors } from "@/constants/colors";
 import { loadExplorerModel } from "@/components/story-world/load-explorer.native";
 import { prepareCompatibleSkinning, type CompatibleSkinning } from "@/components/story-world/compatible-skinning";
 
@@ -263,7 +263,7 @@ export function CharacterModelPreview({ characterId, style, interactive = false 
       renderer.toneMapping = ACESFilmicToneMapping;
       renderer.toneMappingExposure = 1.08;
       const scene = new Scene();
-      scene.background = new Color(0xa9d8c4);
+      scene.background = new Color(AppTheme.background);
       scene.add(new HemisphereLight(0xf1fff9, 0x426d32, 2.05));
       scene.add(new AmbientLight(0xfff8e7, 0.65));
       const sunlight = new DirectionalLight(0xfff0c9, 2.3);
@@ -343,7 +343,7 @@ export function CharacterModelPreview({ characterId, style, interactive = false 
 const styles = StyleSheet.create({
   canvas: { flex: 1 },
   errorText: { color: Colors.primaryDark, fontSize: 12, fontWeight: "700", marginTop: 8 },
-  overlay: { ...StyleSheet.absoluteFill, alignItems: "center", backgroundColor: "#A9D8C4", justifyContent: "center" },
-  root: { backgroundColor: "#A9D8C4", minHeight: 240, overflow: "hidden" },
+  overlay: { ...StyleSheet.absoluteFill, alignItems: "center", backgroundColor: AppTheme.background, justifyContent: "center" },
+  root: { backgroundColor: AppTheme.background, minHeight: 240, overflow: "hidden" },
   retry: { padding: 14, borderRadius: 12, backgroundColor: Colors.primarySoft, marginTop: 12 },
 });

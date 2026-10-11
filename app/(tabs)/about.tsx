@@ -7,6 +7,7 @@ import {
     View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { WikalinoBrand } from "@/components/ui/WikalinoBrand";
 
 import { Colors } from "../../constants/colors";
 
@@ -28,6 +29,7 @@ export default function AboutScreen() {
           >
             <Text style={styles.backText}>←</Text>
           </Pressable>
+          <WikalinoBrand />
         </View>
 
         <View style={styles.container}>
@@ -35,9 +37,8 @@ export default function AboutScreen() {
             <Text style={styles.title}>Tungkol sa WIKALINO</Text>
 
             <Text style={styles.text}>
-              Ang WIKALINO ay isang offline learning app para sa Baitang 9 na
-              may mga hamon sa bawat markahan upang maging masaya at mas malinaw
-              ang pagkatuto sa Filipino.
+              Ang Wikalino ay isang edukasyonal na laro na binuo ng mga mananaliksik na sina Dela Cruz, Sarah Jane, Florida, Danica Thessa at Rosal, Abigail . Isang aplikasyong pangmobile na idinisenyo para sa pag-aaral ng Panitikan sa Baitang 9. Maaari itong gamitin online at offline ito ay naglalaman ng iba’t ibang kuwento, paksa, gawain, at hamon na matatagpuan sa bawat termino. Layunin nitong gawing higit na interaktibo, makabuluhan, at kawili-wili ang pagkatuto sa asignaturang Filipino sa pamamagitan ng pagsasanib ng mga elementong pang-edukasyon at paglalaro. Binubuo ang Wikalino ng tatlong kuwentong pampanitikan, ang mga kuwentong ito ay nakaayos sa magkakasunod na antas ng pagkatuto na makikita sa Ikalawang Termino. Hindi maaaring magpatuloy ang mag-aaral sa ikalawang kuwento hangga’t hindi niya natatapos ang unang kuwento na “Sandaang Damit.” Unti-unting nabubuksan ang mga susunod na kuwento at gawain habang natatapos ng mag-aaral ang mga kinakailangang aktibidad at hamon sa naunang antas. Sa pamamagitan ng Wikalino, maaaring matuto ang mga mag-aaral kahit may koneksiyon sa internet o wala, na nagbibigay ng mas nababagay at madaling mapapasukan paraan ng pag-aaral.
+
             </Text>
 
             <Text style={styles.footer}>© 2026 WIKALINO</Text>
@@ -60,6 +61,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   topBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
     paddingHorizontal: 20,
     marginBottom: 10,
   },

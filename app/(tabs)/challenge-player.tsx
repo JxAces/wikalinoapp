@@ -1,7 +1,7 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
+import { LinearGradient } from "expo-linear-gradient";
 import { useEffect, useMemo, useState } from "react";
 import {
-  ImageBackground,
   Pressable,
   StyleSheet,
   Text,
@@ -9,7 +9,8 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Colors } from "../../constants/colors";
+import { WikalinoBrand } from "@/components/ui/WikalinoBrand";
+import { AppTheme, Colors } from "../../constants/colors";
 import {
   Challenge,
   formatChallengeType,
@@ -110,6 +111,7 @@ export default function ChallengePlayerScreen() {
   if (!challenge) {
     return (
       <View style={styles.centered}>
+        <WikalinoBrand />
         <Text style={styles.notFoundText}>Challenge not found.</Text>
       </View>
     );
@@ -222,11 +224,9 @@ export default function ChallengePlayerScreen() {
   })();
 
   return (
-    <ImageBackground
-      source={require("../../assets/images/pageBackground/ThirdPage.png")}
+    <LinearGradient
+      colors={AppTheme.backgroundGradient}
       style={styles.background}
-      imageStyle={styles.backgroundImage}
-      resizeMode="cover"
     >
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.container}>
@@ -242,6 +242,8 @@ export default function ChallengePlayerScreen() {
             >
               <Text style={styles.backText}>←</Text>
             </Pressable>
+
+            <WikalinoBrand />
 
             <Text style={styles.progressText}>
               {challengeIndexNumber + 1}/{allChallenges.length}
@@ -287,7 +289,7 @@ export default function ChallengePlayerScreen() {
                 onChangeText={setInputValue}
                 editable={!submitted}
                 placeholder="Ilagay ang sagot dito..."
-                placeholderTextColor="#9a855e"
+                placeholderTextColor={AppTheme.muted}
               />
             )}
 
@@ -393,7 +395,7 @@ export default function ChallengePlayerScreen() {
           </View>
         </View>
       </SafeAreaView>
-    </ImageBackground>
+    </LinearGradient>
   );
 }
 
@@ -412,9 +414,6 @@ const styles = StyleSheet.create({
   background: {
     backgroundColor: Colors.background,
     flex: 1,
-  },
-  backgroundImage: {
-    opacity: 0.1,
   },
   safeArea: {
     flex: 1,
@@ -481,7 +480,7 @@ const styles = StyleSheet.create({
   difficultyText: {
     fontSize: 15,
     fontWeight: "900",
-    color: Colors.accent,
+    color: AppTheme.primary,
     letterSpacing: 1,
   },
   instruction: {
@@ -513,8 +512,8 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   choiceButtonSelected: {
-    backgroundColor: Colors.tealSoft,
-    borderColor: Colors.teal,
+    backgroundColor: AppTheme.selected,
+    borderColor: AppTheme.primary,
   },
   choiceText: {
     fontSize: 16,
@@ -592,7 +591,7 @@ const styles = StyleSheet.create({
     opacity: 0.55,
   },
   submitButtonText: {
-    color: Colors.surface,
+    color: AppTheme.buttonText,
     fontSize: 16,
     fontWeight: "900",
   },
@@ -612,7 +611,7 @@ const styles = StyleSheet.create({
     color: Colors.error,
   },
   nextButton: {
-    backgroundColor: Colors.success,
+    backgroundColor: AppTheme.primary,
   },
   retryButton: {
     backgroundColor: Colors.secondary,

@@ -1,19 +1,25 @@
+import { AppTheme } from "@/constants/colors";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
-import { AccessibilityInfo, Animated, AppState, Easing, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { AccessibilityInfo, Animated, AppState, Easing, Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { WikalinoBrand } from "@/components/ui/WikalinoBrand";
 import Svg, { Circle, Ellipse, G, Path, Rect } from "react-native-svg";
 
 import type { Story } from "@/data/stories";
 import { getCabinetActivities } from "@/data/cabinet-activities";
 import { useUserStore } from "@/store/useUserStore";
-import { canEnterStory, canOpenStoryActivities } from "./quest-progression";
+import { Alert } from "@/utils/app-alert";
+import { canEnterStory, canOpenStoryActivities, canOpenStoryQuiz } from "./quest-progression";
 import { hubReturnRoute } from "./hub-navigation";
 
+const QUIZ_LOCK_MESSAGE = "Tapusin muna ang mga gawain upang mabuksan ang pagsusulit";
+const STORY_ORDER_LABELS = ["UNANG KUWENTO", "IKALAWANG KUWENTO", "IKATLONG KUWENTO"];
+
 /** Lightweight vector objects float without retaining another GL context. */
-function FloatingObject({ cabinet = false, scroll = false, tree = false, locked = false, completed = 0 }: { cabinet?: boolean; scroll?: boolean; tree?: boolean; locked?: boolean; completed?: number }) {
+function FloatingObject({ cabinet = false, scroll = false, tree = false, crown = false, locked = false, completed = 0 }: { cabinet?: boolean; scroll?: boolean; tree?: boolean; crown?: boolean; locked?: boolean; completed?: number }) {
   const [float] = useState(() => new Animated.Value(0));
   useEffect(() => {
     let mounted = true;
@@ -44,7 +50,12 @@ function FloatingObject({ cabinet = false, scroll = false, tree = false, locked 
     </Svg>
     <Animated.View style={[StyleSheet.absoluteFill, { transform: [{ translateY: float.interpolate({ inputRange: [0, 1], outputRange: [0, -12] }) }] }]}>
       <Svg width="100%" height="100%" viewBox="0 0 220 230">
-        {tree ? <G>
+        {crown ? <G>
+          <Path d="M43 86 L77 111 L110 56 L143 111 L177 86 L163 166 H57 Z" fill={locked ? '#737B70' : '#D3A74F'} stroke={edge} strokeWidth="5" strokeLinejoin="round" />
+          <Rect x="55" y="164" width="110" height="18" rx="5" fill={edge} />
+          <Circle cx="43" cy="80" r="8" fill={edge} /><Circle cx="110" cy="49" r="8" fill={edge} /><Circle cx="177" cy="80" r="8" fill={edge} />
+          {!locked && <Path d="M110 116 L121 134 L110 151 L99 134 Z" fill="#527965" stroke="#FFF0BF" strokeWidth="2" />}
+        </G> : tree ? <G>
           <Path d="M106 160 C96 182 85 189 66 192 M106 164 C112 184 126 190 145 193 M99 166 C90 179 78 181 66 178 M112 166 C122 178 138 180 153 176" fill="none" stroke={locked ? "#6F776A" : "#B98355"} strokeWidth="8" strokeLinecap="round" />
           <Path d="M98 85 Q102 122 99 164 H116 Q112 121 118 84 Z" fill={locked ? "#737B70" : "#8D5937"} stroke={edge} strokeWidth="3" />
           <Path d="M107 59 C90 34 62 51 68 77 C43 78 42 112 70 116 C68 142 102 147 111 123 C122 146 154 140 151 115 C181 111 175 77 150 77 C154 49 126 34 107 59 Z" fill={locked ? "#69766B" : "#4F7D54"} stroke={edge} strokeWidth="3" />
@@ -95,16 +106,20 @@ function FloatingObject({ cabinet = false, scroll = false, tree = false, locked 
 }
 
 export function StoryPortalRoom({ story }: { story: Story }) {
+  const compact = useWindowDimensions().width < 480;
   const reading = useUserStore(state => state.readingCompletedStoryIds);
   const answers = useUserStore(state => state.activityResults);
   const cabinetResponses = useUserStore(state => state.cabinetResponses);
   const page = useUserStore(state => state.storySceneIndexes[story.id]);
-  const unlocked = canOpenStoryActivities(story.id, reading, answers);
+  const activitiesUnlocked = canOpenStoryActivities(story.id, reading, answers);
+  const quizUnlocked = canOpenStoryQuiz(story.id, reading, answers, cabinetResponses);
   const answered = story.activities.filter(activity => answers[activity.id]).length;
   const cabinetTasks = getCabinetActivities(story.id);
   const cabinetCompleted = cabinetTasks.filter(activity => cabinetResponses[activity.id]?.completedAt).length;
-  const bookLabel = unlocked ? "Basahin muli" : page === undefined ? "Basahin" : "Ituloy ang pagbasa";
   const isUgat = story.id === "m1-story-2";
+  const isUtos = story.id === "m1-story-3";
+  const activityIcon = isUtos ? 'crown-outline' : isUgat ? 'tree-outline' : 'wardrobe-outline';
+  const quizLockMessage = activitiesUnlocked ? QUIZ_LOCK_MESSAGE : "Tapusin muna ang pagbasa upang mabuksan ang pagsusulit.";
 
   function openBook() {
     if (canEnterStory(story.id, useUserStore.getState().activityResults)) router.replace({ pathname: "/story", params: { storyId: story.id } });
@@ -115,47 +130,52 @@ export function StoryPortalRoom({ story }: { story: Story }) {
   }
   function openQuiz() {
     const state = useUserStore.getState();
-    if (canOpenStoryActivities(story.id, state.readingCompletedStoryIds, state.activityResults)) router.replace({ pathname: "/quest-world", params: { storyId: story.id } });
+    if (!canOpenStoryQuiz(story.id, state.readingCompletedStoryIds, state.activityResults, state.cabinetResponses)) {
+      Alert.alert("Suri-Wika", canOpenStoryActivities(story.id, state.readingCompletedStoryIds, state.activityResults)
+        ? QUIZ_LOCK_MESSAGE : "Tapusin muna ang pagbasa upang mabuksan ang pagsusulit.");
+      return;
+    }
+    router.replace({ pathname: "/quest-world", params: { storyId: story.id } });
   }
 
-  return <LinearGradient colors={["#122F31", "#254C3F", "#142E2B"]} style={styles.screen}>
+  return <LinearGradient colors={AppTheme.backgroundGradient} style={styles.screen}>
     <SafeAreaView style={styles.screen}>
       <View style={styles.header}>
         <Pressable accessibilityRole="button" accessibilityLabel="Bumalik sa mga portal" onPress={() => router.replace(hubReturnRoute(story))} style={styles.back}>
-          <MaterialCommunityIcons name="arrow-left" size={22} color="#F5E4B7" />
+          <MaterialCommunityIcons name="arrow-left" size={22} color={AppTheme.primary} />
         </Pressable>
-        <Text style={styles.headerLabel}>MUNDO NG KUWENTO</Text>
-        <MaterialCommunityIcons name="star-four-points" size={19} color="#DCC18A" />
+        <WikalinoBrand color={AppTheme.primary} />
+        <View style={styles.headerSpacer} />
       </View>
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.heading}>
-          <Text style={styles.eyebrow}>KUWENTO {story.order} · MARKAHAN {story.markahan}</Text>
+          <Text style={styles.eyebrow}>{STORY_ORDER_LABELS[story.order - 1] ?? `KUWENTO ${story.order}`}</Text>
           <Text accessibilityRole="header" style={styles.title}>{story.title}</Text>
-          <Text style={styles.subtitle}>{isUgat ? "Aklat para sa kuwento. Puno para sa mga gawain. Balumbon para sa pagsusulit." : "Aklat para sa kuwento. Kabinet para sa gawain. Balumbon para sa pagsusulit."}</Text>
+          <Text style={styles.author}>ni {story.author}</Text>
         </View>
         <View style={styles.choices}>
-          <Pressable accessibilityRole="button" accessibilityLabel={bookLabel} onPress={openBook} style={({ pressed }) => [styles.choice, pressed && styles.pressed]}>
+          <Pressable accessibilityRole="button" accessibilityLabel="Tuklas-Wika" onPress={openBook} style={({ pressed }) => [styles.choice, pressed && styles.pressed]}>
             <FloatingObject />
-            <View style={styles.choiceLabel}><MaterialCommunityIcons name="book-open-page-variant-outline" color="#F3D592" size={18} /><Text style={styles.choiceTitle}>Basahin</Text></View>
-            <Text style={styles.choiceCopy}>{unlocked ? "Balikan ang kuwento anumang oras." : "Buksan ang aklat at tuklasin ang kuwento."}</Text>
-            <View style={styles.badge}><MaterialCommunityIcons name={unlocked ? "check-circle-outline" : "bookmark-outline"} color="#C6E3B5" size={15} /><Text style={styles.badgeText}>{unlocked ? "Tapos nang basahin" : page === undefined ? "Magsimula rito" : `Bahagi ${page + 1} sa ${story.scenes.length}`}</Text></View>
+            <View style={[styles.choiceLabel, compact && styles.compactChoiceLabel]}><MaterialCommunityIcons name="book-open-page-variant-outline" color={AppTheme.primary} size={18} /><Text style={styles.choiceTitle}>Tuklas-Wika</Text></View>
+            <Text style={styles.choiceCopy}>{activitiesUnlocked ? "Balikan ang kuwento anumang oras." : "Buksan ang aklat at tuklasin ang kuwento."}</Text>
+            <View style={styles.badge}><MaterialCommunityIcons name={activitiesUnlocked ? "check-circle-outline" : "bookmark-outline"} color={AppTheme.primary} size={15} /><Text style={styles.badgeText}>{activitiesUnlocked ? "Tapos nang basahin" : page === undefined ? "Magsimula rito" : `Bahagi ${page + 1} sa ${story.scenes.length}`}</Text></View>
           </Pressable>
-          <Pressable accessibilityRole="button" accessibilityLabel={unlocked ? isUgat ? "Buksan ang puno ng mga gawain" : "Buksan ang kabinet ng mga gawain" : "Mga gawain, nakandado. Tapusin muna ang pagbasa."} accessibilityState={{ disabled: !unlocked }} disabled={!unlocked} onPress={openCabinet} style={({ pressed }) => [styles.choice, pressed && styles.pressed]}>
-            <FloatingObject cabinet={!isUgat} tree={isUgat} locked={!unlocked} completed={cabinetCompleted} />
-            <View style={styles.choiceLabel}><MaterialCommunityIcons name={unlocked ? isUgat ? "tree-outline" : "wardrobe-outline" : "lock-outline"} color={unlocked ? "#F3D592" : "#B7C3AF"} size={18} /><Text style={[styles.choiceTitle, !unlocked && styles.lockedTitle]}>Mga Gawain</Text></View>
-            <Text style={styles.choiceCopy}>{unlocked ? "Pagsusuri, patunay, at pagninilay sa kuwento." : "Tapusin muna ang pagbasa upang mabuksan."}</Text>
-            <View style={[styles.badge, !unlocked && styles.lockedBadge]}><MaterialCommunityIcons name={unlocked ? isUgat ? "tree-outline" : "wardrobe-outline" : "lock"} color={unlocked ? "#C6E3B5" : "#B7C3AF"} size={15} /><Text style={[styles.badgeText, !unlocked && styles.lockedTitle]}>{unlocked ? cabinetTasks.length ? `${cabinetCompleted}/${cabinetTasks.length} gawain` : "Wala pang gawain" : "Nakakandado"}</Text></View>
+          <Pressable accessibilityRole="button" accessibilityLabel={activitiesUnlocked ? "Hasa-Wika" : "Hasa-Wika, nakakandado. Tapusin muna ang pagbasa."} accessibilityState={{ disabled: !activitiesUnlocked }} disabled={!activitiesUnlocked} onPress={openCabinet} style={({ pressed }) => [styles.choice, pressed && styles.pressed]}>
+            <FloatingObject cabinet={!isUgat && !isUtos} tree={isUgat} crown={isUtos} locked={!activitiesUnlocked} completed={cabinetCompleted} />
+            <View style={[styles.choiceLabel, compact && styles.compactChoiceLabel]}><MaterialCommunityIcons name={activitiesUnlocked ? activityIcon : "lock-outline"} color={activitiesUnlocked ? AppTheme.primary : AppTheme.primary} size={18} /><Text style={[styles.choiceTitle, !activitiesUnlocked && styles.lockedTitle]}>Hasa-Wika</Text></View>
+            <Text style={styles.choiceCopy}>{activitiesUnlocked ? "Pagsusuri, patunay, at pagninilay sa kuwento." : "Tapusin muna ang pagbasa upang mabuksan."}</Text>
+            <View style={[styles.badge, !activitiesUnlocked && styles.lockedBadge]}><MaterialCommunityIcons name={activitiesUnlocked ? activityIcon : "lock"} color={activitiesUnlocked ? AppTheme.primary : AppTheme.primary} size={15} /><Text style={[styles.badgeText, !activitiesUnlocked && styles.lockedTitle]}>{activitiesUnlocked ? cabinetTasks.length ? `${cabinetCompleted}/${cabinetTasks.length} gawain` : "Wala pang gawain" : "Nakakandado"}</Text></View>
           </Pressable>
-          <Pressable accessibilityRole="button" accessibilityLabel={unlocked ? "Buksan ang balumbon ng pagsusulit" : "Pagsusulit, nakandado. Tapusin muna ang pagbasa."} accessibilityState={{ disabled: !unlocked }} disabled={!unlocked} onPress={openQuiz} style={({ pressed }) => [styles.choice, pressed && styles.pressed]}>
-            <FloatingObject scroll locked={!unlocked} />
-            <View style={styles.choiceLabel}><MaterialCommunityIcons name={unlocked ? "script-text-outline" : "lock-outline"} color={unlocked ? "#F3D592" : "#B7C3AF"} size={18} /><Text style={[styles.choiceTitle, !unlocked && styles.lockedTitle]}>Pagsusulit</Text></View>
-            <Text style={styles.choiceCopy}>{unlocked ? "Sundan ang landas at sagutin ang mga tanong." : "Tapusin muna ang pagbasa upang mabuksan."}</Text>
-            <View style={[styles.badge, !unlocked && styles.lockedBadge]}><MaterialCommunityIcons name={unlocked ? "check-circle-outline" : "lock"} color={unlocked ? "#C6E3B5" : "#B7C3AF"} size={15} /><Text style={[styles.badgeText, !unlocked && styles.lockedTitle]}>{unlocked ? `${answered}/${story.activities.length} tanong` : "Nakakandado"}</Text></View>
+          <Pressable accessibilityRole="button" accessibilityLabel={quizUnlocked ? "Suri-Wika" : "Suri-Wika, nakakandado"} accessibilityHint={quizUnlocked ? "Buksan ang pagsusulit." : quizLockMessage} onPress={openQuiz} style={({ pressed }) => [styles.choice, pressed && styles.pressed]}>
+            <FloatingObject scroll locked={!quizUnlocked} />
+            <View style={[styles.choiceLabel, compact && styles.compactChoiceLabel]}><MaterialCommunityIcons name={quizUnlocked ? "script-text-outline" : "lock-outline"} color={quizUnlocked ? AppTheme.primary : AppTheme.primary} size={18} /><Text style={[styles.choiceTitle, !quizUnlocked && styles.lockedTitle]}>Suri-Wika</Text></View>
+            <Text style={styles.choiceCopy}>{quizUnlocked ? "Sundan ang landas at sagutin ang mga tanong." : activitiesUnlocked ? "Tapusin muna ang mga gawain upang mabuksan." : "Tapusin muna ang pagbasa upang mabuksan."}</Text>
+            <View style={[styles.badge, !quizUnlocked && styles.lockedBadge]}><MaterialCommunityIcons name={quizUnlocked ? "check-circle-outline" : "lock"} color={quizUnlocked ? AppTheme.primary : AppTheme.primary} size={15} /><Text style={[styles.badgeText, !quizUnlocked && styles.lockedTitle]}>{quizUnlocked ? `${answered}/${story.activities.length} tanong` : "Nakakandado"}</Text></View>
           </Pressable>
         </View>
         <View style={styles.hint} accessibilityLiveRegion="polite">
-          <MaterialCommunityIcons name={unlocked ? "lock-open-variant-outline" : "book-open-outline"} color="#EACD8B" size={21} />
-          <Text style={styles.hintText}>{unlocked ? isUgat ? "Bukas na ang puno ng gawain at balumbon! Pumili ng gawain, pagsusulit, o magbasa muli." : "Bukas na ang kabinet at balumbon! Pumili ng gawain, pagsusulit, o magbasa muli." : isUgat ? "Unahin ang aklat. Pagkatapos ng huling pahina, magbubukas ang puno ng gawain at balumbon." : "Unahin ang aklat. Pagkatapos ng huling pahina, magbubukas ang kabinet at balumbon."}</Text>
+          <MaterialCommunityIcons name={quizUnlocked ? "check-circle-outline" : "lock-outline"} color={AppTheme.primary} size={21} />
+          <Text style={styles.hintText}>{quizUnlocked ? "Bukas na ang pagsusulit. Maaari ka nang magsimula sa Suri-Wika." : activitiesUnlocked ? QUIZ_LOCK_MESSAGE : "Tapusin muna ang kuwento upang mabuksan ang Hasa-Wika."}</Text>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -165,24 +185,25 @@ export function StoryPortalRoom({ story }: { story: Story }) {
 const styles = StyleSheet.create({
   screen: { flex: 1 },
   header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 20, paddingTop: 10, gap: 10 },
-  back: { width: 44, height: 44, borderRadius: 15, backgroundColor: "#2E4C43", alignItems: "center", justifyContent: "center" },
-  headerLabel: { color: "#C2CFB3", fontSize: 10, letterSpacing: 1.7, fontWeight: "800" },
+  back: { width: 44, height: 44, borderRadius: 15, backgroundColor: AppTheme.surfaceSoft, alignItems: "center", justifyContent: "center" },
+  headerSpacer: { width: 44 },
   content: { flexGrow: 1, justifyContent: "center", alignItems: "center", paddingHorizontal: 16, paddingTop: 30, paddingBottom: 32 },
   heading: { maxWidth: 640, alignItems: "center", marginBottom: 12 },
-  eyebrow: { color: "#D5BA7C", fontSize: 10, letterSpacing: 1.4, fontWeight: "800", textAlign: "center" },
-  title: { color: "#FFF0C8", fontSize: 32, lineHeight: 40, fontWeight: "900", textAlign: "center", marginTop: 12 },
-  subtitle: { color: "#C3D2BB", fontSize: 13, lineHeight: 21, textAlign: "center", marginTop: 9 },
+  eyebrow: { color: AppTheme.muted, fontSize: 10, letterSpacing: 1.4, fontWeight: "800", textAlign: "center" },
+  title: { color: AppTheme.text, fontSize: 32, lineHeight: 40, fontWeight: "900", textAlign: "center", marginTop: 12 },
+  author: { color: AppTheme.muted, fontSize: 14, lineHeight: 22, textAlign: "center", marginTop: 9 },
   choices: { flexDirection: "row", width: "100%", maxWidth: 840, gap: 8, marginVertical: 16 },
   choice: { flex: 1, alignItems: "center", borderRadius: 18, paddingVertical: 12 },
   objectStage: { width: "100%", maxWidth: 235, aspectRatio: 220 / 230, marginBottom: 9 },
   choiceLabel: { minHeight: 46, flexDirection: "row", flexWrap: "wrap", alignItems: "center", justifyContent: "center", gap: 6 },
-  choiceTitle: { fontSize: 15, fontWeight: "800", color: "#FFE6A9", textAlign: "center" },
-  choiceCopy: { fontSize: 12, lineHeight: 19, color: "#C4D0B9", textAlign: "center", maxWidth: 220, marginTop: 9, paddingHorizontal: 3 },
-  badge: { flexDirection: "row", flexWrap: "wrap", justifyContent: "center", alignItems: "center", gap: 5, paddingHorizontal: 10, paddingVertical: 8, backgroundColor: "#31543E", borderRadius: 20, marginTop: 14 },
-  badgeText: { color: "#C6E3B5", fontSize: 10, fontWeight: "700", textAlign: "center" },
-  lockedBadge: { backgroundColor: "#34453D" },
-  lockedTitle: { color: "#B7C3AF" },
-  hint: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: "#2D483C", borderWidth: 1, borderColor: "#466047", padding: 16, borderRadius: 16, maxWidth: 540, width: "100%", marginTop: 12 },
-  hintText: { flex: 1, color: "#E1E4CD", fontSize: 12, lineHeight: 20 },
+  compactChoiceLabel: { flexDirection: "column", flexWrap: "nowrap", gap: 4 },
+  choiceTitle: { fontSize: 15, fontWeight: "800", color: AppTheme.text, textAlign: "center" },
+  choiceCopy: { fontSize: 12, lineHeight: 19, color: AppTheme.muted, textAlign: "center", maxWidth: 220, marginTop: 9, paddingHorizontal: 3 },
+  badge: { flexDirection: "row", flexWrap: "wrap", justifyContent: "center", alignItems: "center", gap: 5, paddingHorizontal: 10, paddingVertical: 8, backgroundColor: AppTheme.successSurface, borderRadius: 20, marginTop: 14 },
+  badgeText: { color: AppTheme.text, fontSize: 10, fontWeight: "700", textAlign: "center" },
+  lockedBadge: { backgroundColor: AppTheme.surfaceSoft },
+  lockedTitle: { color: AppTheme.text },
+  hint: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: AppTheme.surfaceSoft, borderWidth: 1, borderColor: AppTheme.border, padding: 16, borderRadius: 16, maxWidth: 540, width: "100%", marginTop: 12 },
+  hintText: { flex: 1, color: AppTheme.text, fontSize: 12, lineHeight: 20 },
   pressed: { opacity: 0.75 },
 });

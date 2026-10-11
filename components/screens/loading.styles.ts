@@ -1,12 +1,13 @@
 import { StyleSheet } from "react-native";
+import { AppTheme, Colors } from "@/constants/colors";
 
-const GOLD = "#F7D77A";
-const DEEP_GOLD = "#B77722";
+const GOLD = Colors.accent;
+const DEEP_GOLD = AppTheme.primary;
 
 export default StyleSheet.create({
   arch: {
     alignSelf: "center",
-    borderColor: "rgba(247, 215, 122, 0.25)",
+    borderColor: "rgba(128,93,41,0.25)",
     borderRadius: 210,
     borderWidth: 2,
     height: "78%",
@@ -15,7 +16,7 @@ export default StyleSheet.create({
     width: "115%",
   },
   archInset: {
-    borderColor: "rgba(247, 215, 122, 0.09)",
+    borderColor: "rgba(128,93,41,0.09)",
     borderRadius: 200,
     borderWidth: 1,
     bottom: 8,
@@ -26,7 +27,7 @@ export default StyleSheet.create({
   },
   bottomGlow: {
     alignSelf: "center",
-    backgroundColor: "rgba(24, 40, 59, 0.42)",
+    backgroundColor: "rgba(128,93,41,0.16)",
     borderRadius: 220,
     bottom: -150,
     height: 330,
@@ -41,8 +42,8 @@ export default StyleSheet.create({
   },
   brandMark: {
     alignItems: "center",
-    backgroundColor: "rgba(247, 215, 122, 0.08)",
-    borderColor: "rgba(247, 215, 122, 0.38)",
+    backgroundColor: AppTheme.surfaceSoft,
+    borderColor: AppTheme.border,
     borderRadius: 18,
     borderWidth: 1,
     height: 36,
@@ -67,8 +68,8 @@ export default StyleSheet.create({
   },
   loadingCard: {
     alignSelf: "center",
-    backgroundColor: "rgba(7, 11, 36, 0.76)",
-    borderColor: "rgba(247, 215, 122, 0.27)",
+    backgroundColor: AppTheme.surface,
+    borderColor: AppTheme.border,
     borderRadius: 20,
     borderWidth: 1,
     bottom: 24,
@@ -86,7 +87,7 @@ export default StyleSheet.create({
     marginBottom: 12,
   },
   loadingText: {
-    color: "#FFF4CF",
+    color: AppTheme.text,
     flex: 1,
     fontSize: 13,
     fontWeight: "700",
@@ -120,7 +121,7 @@ export default StyleSheet.create({
     zIndex: 3,
   },
   progressFill: {
-    backgroundColor: GOLD,
+    backgroundColor: AppTheme.primary,
     borderRadius: 999,
     height: "100%",
     shadowColor: GOLD,
@@ -128,7 +129,7 @@ export default StyleSheet.create({
     shadowRadius: 8,
   },
   progressTrack: {
-    backgroundColor: "rgba(255, 255, 255, 0.12)",
+    backgroundColor: AppTheme.panelStrong,
     borderRadius: 999,
     height: 5,
     overflow: "hidden",
@@ -148,7 +149,7 @@ export default StyleSheet.create({
     top: 0,
   },
   subtitle: {
-    color: "#6A471C",
+    color: AppTheme.muted,
     fontSize: 8,
     fontWeight: "700",
     lineHeight: 11,
@@ -157,7 +158,7 @@ export default StyleSheet.create({
     textAlign: "center",
   },
   title: {
-    color: "#27384D",
+    color: AppTheme.text,
     fontSize: 21,
     fontWeight: "900",
     letterSpacing: 0.8,

@@ -1,4 +1,4 @@
-import { canAnswerQuestion, canEnterStory, canOpenStoryActivities, questionGroup, QUESTIONS_PER_SCROLL } from "@/components/story-world/quest-progression";
+import { assessmentLevelTitle, canAnswerQuestion, canEnterStory, canOpenStoryQuiz, questionGroup } from "@/components/story-world/quest-progression";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 
 import { LinearGradient } from "expo-linear-gradient";
@@ -7,7 +7,7 @@ import * as Haptics from "expo-haptics";
 
 import { Redirect, router, useIsFocused, useLocalSearchParams } from "expo-router";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import {
   Animated,
@@ -21,8 +21,12 @@ import {
 } from "react-native";
 
 import { SafeAreaView } from "react-native-safe-area-context";
+import { WikalinoBrand } from "@/components/ui/WikalinoBrand";
 
 import styles from "@/components/activity-player/styles";
+import { SandaangSewingGame } from "@/components/activity-player/sandaang-sewing-game";
+import { SandaangWardrobeGame } from "@/components/activity-player/sandaang-wardrobe-game";
+import type { ChoiceActivity as SewingActivity } from "../../data/story-types";
 
 import {
   CharacterRaceGame,
@@ -35,13 +39,18 @@ import {
   LanternGame,
   PlotPathGame,
   StandardGame,
+  UgatFirstScrollGame,
+  UgatPathGame,
+  UgatTreeGame,
+  UgatSharedScrollGame,
 } from "@/components/activity-player/games";
 
-import { Colors } from "../../constants/colors";
+import { AppTheme, Colors } from "../../constants/colors";
 
 import { getStoryById, StoryActivity } from "../../data/stories";
 
 import { useUserStore } from "../../store/useUserStore";
+import type { AssessmentAnswer } from "../../utils/assessment";
 
 /*
  * =========================================================
@@ -59,6 +68,44 @@ type ChoiceActivity = Extract<
 function isChoiceActivity(activity: StoryActivity): activity is ChoiceActivity {
   return activity.type !== "plot_sequence";
 }
+
+const UGAT_FIRST_SCROLL_GAMES = [
+  {
+    icon: "run-fast" as const,
+    instruction: "Piliin ang karatulang tumutukoy sa pangunahing tauhan upang makatakbo sa unang landas.",
+    success: "Nalampasan ang Landas ng Pamilya!",
+  },
+  {
+    icon: "run-fast" as const,
+    instruction: "Piliin ang karatulang may tamang kahulugan ng “Ugat” upang makatakbo sa ikalawang landas.",
+    success: "Nalampasan ang Landas ng Simbolo!",
+  },
+  {
+    icon: "run-fast" as const,
+    instruction: "Piliin ang karatulang patungo sa pinagmulan upang makatakbo sa ikatlong landas.",
+    success: "Nalampasan ang Landas ng Pag-uwi!",
+  },
+  {
+    icon: "run-fast" as const,
+    instruction: "Piliin ang karatulang nagpapakita ng damdamin ng kuwento upang marating ang huling landas.",
+    success: "Natapos ang Pamilyar Level!",
+  },
+] as const;
+
+const UGAT_SHARED_SCROLL_GAMES = [
+  {
+    title: "LANDAS NG UGAT",
+    icon: "map-marker-path" as const,
+    instruction: "Hilahin ang sagot pataas sa tarangkahan upang buksan ang susunod na landas.",
+    success: "Nabuksan ang Susunod na Tarangkahan!",
+  },
+  {
+    title: "PUNO NG ALAALA",
+    icon: "tree-outline" as const,
+    instruction: "Piliin o hilahin ang binhi ng tamang sagot at itanim ito sa gintong bilog upang palaguin ang puno.",
+    success: "Lumago ang isang sanga ng Puno ng Alaala!",
+  },
+] as const;
 
 /*
  * =========================================================
@@ -85,9 +132,10 @@ export default function ActivityPlayerScreen() {
   const story = getStoryById(storyId);
   const answers = useUserStore(state => state.activityResults);
   const reading = useUserStore(state => state.readingCompletedStoryIds);
+  const cabinetResponses = useUserStore(state => state.cabinetResponses);
   if (!focused) return null;
   if (story && !canEnterStory(story.id, answers)) return <Redirect href="/landing" />;
-  if (story && !canOpenStoryActivities(story.id, reading, answers)) return <Redirect href={{ pathname: "/story-room", params: { storyId } }} />;
+  if (story && !canOpenStoryQuiz(story.id, reading, answers, cabinetResponses)) return <Redirect href={{ pathname: "/story-room", params: { storyId } }} />;
   if (story && !canAnswerQuestion(story, activityIndex, answers)) return <Redirect href={{ pathname: "/quest-world", params: { storyId } }} />;
 
   return (
@@ -118,6 +166,11 @@ function ActivityPlayerSession({
 
   const completeActivity = useUserStore((state) => state.completeActivity);
   const completeStory = useUserStore((state) => state.completeStory);
+  const activityResults = useUserStore((state) => state.activityResults);
+  const savedResult = activity ? activityResults[activity.id] : undefined;
+  const submitted = Boolean(savedResult);
+  const correct = savedResult?.correct ?? false;
+  const submissionLocked = useRef(submitted);
 
   /*
    * =======================================================
@@ -125,17 +178,15 @@ function ActivityPlayerSession({
    * =======================================================
    */
 
-  const [selectedChoice, setSelectedChoice] = useState<string | null>(null);
+  const [selectedChoice, setSelectedChoice] = useState<string | null>(
+    typeof savedResult?.selectedAnswer === "string" ? savedResult.selectedAnswer : null,
+  );
 
   const [isGameGestureActive, setIsGameGestureActive] = useState(false);
 
-  const [orderedItems, setOrderedItems] = useState<string[]>([]);
-
-  const [attempts, setAttempts] = useState(0);
-
-  const [submitted, setSubmitted] = useState(false);
-
-  const [correct, setCorrect] = useState(false);
+  const [orderedItems, setOrderedItems] = useState<string[]>(
+    Array.isArray(savedResult?.selectedAnswer) ? savedResult.selectedAnswer : [],
+  );
 
   const [isResolving, setIsResolving] = useState(false);
 
@@ -145,11 +196,7 @@ function ActivityPlayerSession({
    * =======================================================
    */
 
-  const [archeryWrongChoice, setArcheryWrongChoice] = useState<string | null>(
-    null,
-  );
-
-  const [archeryHint, setArcheryHint] = useState<string | null>(null);
+  const archeryWrongChoice = submitted && !correct ? selectedChoice : null;
 
   /*
    * =======================================================
@@ -157,7 +204,7 @@ function ActivityPlayerSession({
    * =======================================================
    */
 
-  const [lanternActivated, setLanternActivated] = useState(false);
+  const [lanternActivated, setLanternActivated] = useState(submitted);
 
   /*
    * =======================================================
@@ -166,7 +213,8 @@ function ActivityPlayerSession({
    */
 
   const [compassChoiceIndex, setCompassChoiceIndex] = useState<number | null>(
-    null,
+    activity && isChoiceActivity(activity) && typeof savedResult?.selectedAnswer === "string"
+      ? activity.choices.indexOf(savedResult.selectedAnswer) : null,
   );
 
   /*
@@ -179,7 +227,7 @@ function ActivityPlayerSession({
 
   const [introY] = useState(() => new Animated.Value(18));
 
-  const [feedbackScale] = useState(() => new Animated.Value(0.9));
+  const [feedbackScale] = useState(() => new Animated.Value(1));
 
   const [targetShake] = useState(() => new Animated.Value(0));
 
@@ -226,6 +274,7 @@ function ActivityPlayerSession({
   if (!story || !activity) {
     return (
       <SafeAreaView style={styles.errorScreen}>
+        <WikalinoBrand />
         <MaterialCommunityIcons
           name="alert-circle-outline"
           size={52}
@@ -253,304 +302,54 @@ function ActivityPlayerSession({
    * =======================================================
    */
 
-  const earnedXp = currentActivity.xp + (attempts === 1 ? 5 : 0);
+  const earnedXp = savedResult?.xpEarned ?? 0;
 
-  /*
-   * =======================================================
-   * CORRECT ANSWER
-   * =======================================================
-   */
-
-  async function handleCorrect(newAttempts: number) {
-    setCorrect(true);
-
-    setSubmitted(true);
-
+  async function submitAnswer(answer: AssessmentAnswer) {
+    if (submissionLocked.current || useUserStore.getState().activityResults[currentActivity.id]) return;
+    submissionLocked.current = true;
+    setIsResolving(true);
+    completeActivity({ storyId: currentStory.id, activityId: currentActivity.id, answer });
+    const result = useUserStore.getState().activityResults[currentActivity.id];
     setIsResolving(false);
+    if (!result) {
+      submissionLocked.current = false;
+      return;
+    }
 
-    /*
-     * Your store already prevents
-     * repeated XP farming.
-     */
-
-    completeActivity({
-      storyId: currentStory.id,
-      activityId: currentActivity.id,
-      attempts: newAttempts,
-      firstTryCorrect: newAttempts === 1,
-      xpReward: currentActivity.xp,
-    });
-
-    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-
+    // The saved answer locks the question before feedback or animation starts.
     feedbackScale.setValue(0.84);
-
-    Animated.spring(feedbackScale, {
-      toValue: 1,
-
-      friction: 5,
-
-      tension: 65,
-
-      useNativeDriver: true,
-    }).start();
+    Animated.spring(feedbackScale, { toValue: 1, friction: 5, tension: 65, useNativeDriver: true }).start();
+    if (!result.correct) {
+      Animated.sequence([-7, 7, -4, 4, 0].map(toValue =>
+        Animated.timing(targetShake, { toValue, duration: 55, useNativeDriver: true }),
+      )).start();
+    }
+    await Haptics.notificationAsync(result.correct
+      ? Haptics.NotificationFeedbackType.Success
+      : Haptics.NotificationFeedbackType.Error).catch(() => undefined);
   }
-
-  /*
-   * =======================================================
-   * NORMAL WRONG ANSWER
-   * =======================================================
-   */
-
-  async function handleWrong() {
-    setCorrect(false);
-
-    setSubmitted(true);
-
-    setIsResolving(false);
-
-    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-
-    Animated.sequence([
-      Animated.timing(targetShake, {
-        toValue: -7,
-
-        duration: 55,
-
-        useNativeDriver: true,
-      }),
-
-      Animated.timing(targetShake, {
-        toValue: 7,
-
-        duration: 55,
-
-        useNativeDriver: true,
-      }),
-
-      Animated.timing(targetShake, {
-        toValue: -4,
-
-        duration: 55,
-
-        useNativeDriver: true,
-      }),
-
-      Animated.timing(targetShake, {
-        toValue: 4,
-
-        duration: 55,
-
-        useNativeDriver: true,
-      }),
-
-      Animated.timing(targetShake, {
-        toValue: 0,
-
-        duration: 55,
-
-        useNativeDriver: true,
-      }),
-    ]).start();
-  }
-
-  /*
-   * =======================================================
-   * RETRY STANDARD ACTIVITIES
-   * =======================================================
-   */
-
-  function retryActivity() {
-    setSubmitted(false);
-
-    setCorrect(false);
-
-    setIsResolving(false);
-
-    setSelectedChoice(null);
-
-    setCompassChoiceIndex(null);
-  }
-
-  /*
-   * =======================================================
-   * STANDARD CHOICE
-   * =======================================================
-   */
 
   async function submitChoice() {
-    if (
-      !isChoiceActivity(currentActivity) ||
-      !selectedChoice ||
-      submitted ||
-      isResolving
-    ) {
-      return;
-    }
-
-    setIsResolving(true);
-
-    const newAttempts = attempts + 1;
-
-    setAttempts(newAttempts);
-
-    if (selectedChoice === currentActivity.answer) {
-      await handleCorrect(newAttempts);
-
-      return;
-    }
-
-    await handleWrong();
+    if (!isChoiceActivity(currentActivity) || !selectedChoice || submitted || isResolving) return;
+    await submitAnswer(selectedChoice);
   }
 
-  /*
-   * =======================================================
-   * CHARACTER RACE
-   * =======================================================
-   */
-
-  async function finishCharacterRace(winner: string) {
-    if (
-      currentActivity.type !== "character_race" ||
-      !selectedChoice ||
-      submitted ||
-      isResolving
-    ) {
-      return;
-    }
-
-    setIsResolving(true);
-
-    const newAttempts = attempts + 1;
-
-    setAttempts(newAttempts);
-
-    if (
-      winner === currentActivity.answer &&
-      selectedChoice === currentActivity.answer
-    ) {
-      await handleCorrect(newAttempts);
-
-      return;
-    }
-
-    await handleWrong();
+  async function handleUgatAnswer(choice: string) {
+    if (currentStory.id !== "m1-story-2" || !isChoiceActivity(currentActivity) || submitted || isResolving) return;
+    setSelectedChoice(choice);
+    await submitAnswer(choice);
   }
 
-  /*
-   * =======================================================
-   * ARCHERY HIT
-   * =======================================================
-   *
-   * There is NO answer button.
-   *
-   * Whatever target the arrow physically
-   * lands on becomes selectedChoice.
-   * =======================================================
-   */
+  async function finishCharacterRace(_winner: string) {
+    if (currentActivity.type !== "character_race" || !selectedChoice || submitted || isResolving) return;
+    await submitAnswer(selectedChoice);
+  }
 
   async function handleArrowHit(choice: string) {
-    if (currentActivity.type !== "evidence_hunt") {
-      return;
-    }
-
+    if (currentActivity.type !== "evidence_hunt" || submitted || isResolving) return;
     setSelectedChoice(choice);
-
-    const newAttempts = attempts + 1;
-
-    setAttempts(newAttempts);
-
-    /*
-     * Correct target.
-     */
-
-    if (choice === currentActivity.answer) {
-      setArcheryWrongChoice(null);
-
-      setArcheryHint(null);
-
-      await handleCorrect(newAttempts);
-
-      return;
-    }
-
-    /*
-     * Wrong TARGET.
-     *
-     * Unlike the old quiz UI:
-     * - no retry button
-     * - arrow automatically reloads
-     * - clue stays visible
-     */
-
-    setCorrect(false);
-
-    setArcheryWrongChoice(choice);
-
-    setArcheryHint(currentActivity.hint);
-
-    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-
-    Animated.sequence([
-      Animated.timing(targetShake, {
-        toValue: -7,
-
-        duration: 55,
-
-        useNativeDriver: true,
-      }),
-
-      Animated.timing(targetShake, {
-        toValue: 7,
-
-        duration: 55,
-
-        useNativeDriver: true,
-      }),
-
-      Animated.timing(targetShake, {
-        toValue: -4,
-
-        duration: 55,
-
-        useNativeDriver: true,
-      }),
-
-      Animated.timing(targetShake, {
-        toValue: 4,
-
-        duration: 55,
-
-        useNativeDriver: true,
-      }),
-
-      Animated.timing(targetShake, {
-        toValue: 0,
-
-        duration: 55,
-
-        useNativeDriver: true,
-      }),
-    ]).start();
-
-    /*
-     * Clear the actual selected answer
-     * after impact so another arrow can
-     * be fired without pressing Retry.
-     */
-
-    setTimeout(() => {
-      setSelectedChoice(null);
-
-      setArcheryWrongChoice(null);
-    }, 850);
+    await submitAnswer(choice);
   }
-
-  /*
-   * =======================================================
-   * PLOT
-   * =======================================================
-   */
 
   function addPlotItem(item: string) {
     if (submitted || orderedItems.includes(item)) {
@@ -593,23 +392,7 @@ function ActivityPlayerSession({
       return;
     }
 
-    const newAttempts = attempts + 1;
-
-    setAttempts(newAttempts);
-
-    setIsResolving(true);
-
-    const isCorrect = currentActivity.answer.every(
-      (correctItem, index) => orderedItems[index] === correctItem,
-    );
-
-    if (isCorrect) {
-      await handleCorrect(newAttempts);
-
-      return;
-    }
-
-    await handleWrong();
+    await submitAnswer(orderedItems);
   }
 
   /*
@@ -685,7 +468,7 @@ function ActivityPlayerSession({
    */
 
   function continueMission() {
-    if (!correct) return;
+    if (!submitted) return;
     const answers = useUserStore.getState().activityResults;
     if (currentStory.activities.every(item => answers[item.id])) completeStory(currentStory.id);
     if (activityIndex + 1 < group.end) {
@@ -703,6 +486,74 @@ function ActivityPlayerSession({
 
   const group = questionGroup(currentStory, activityIndex);
   const missionProgress = Math.round(((activityIndex - group.start + 1) / (group.end - group.start)) * 100);
+  const isUgatQuiz = currentStory.id === "m1-story-2";
+  const isUgatFirstScroll = isUgatQuiz && group.index === 0;
+  const ugatFirstScrollQuestionIndex = activityIndex - group.start;
+  const ugatFirstScrollGame = isUgatFirstScroll
+    ? UGAT_FIRST_SCROLL_GAMES[ugatFirstScrollQuestionIndex]
+    : undefined;
+  const ugatSharedScrollGame = isUgatQuiz && group.index > 0
+    ? UGAT_SHARED_SCROLL_GAMES[group.index - 1]
+    : undefined;
+  const activeUgatGame = ugatFirstScrollGame ?? ugatSharedScrollGame;
+  const completedGroupQuestions = currentStory.activities
+    .slice(group.start, group.end)
+    .filter((item) => Boolean(activityResults[item.id])).length;
+
+  if (isUgatQuiz && group.index === 1 && isChoiceActivity(currentActivity)) {
+    return <UgatPathGame
+      storyTitle={currentStory.title}
+      storyAuthor={currentStory.author}
+      activity={currentActivity}
+      activities={currentStory.activities.slice(group.start, group.end).filter(isChoiceActivity)}
+      questionIndex={activityIndex - group.start}
+      results={activityResults}
+      onAnswer={handleUgatAnswer}
+      onContinue={continueMission}
+      onBack={() => router.replace({ pathname: "/quest-world", params: { storyId, node: group.id } })}
+    />;
+  }
+
+  if (isUgatQuiz && group.index === 2 && isChoiceActivity(currentActivity)) {
+    return <UgatTreeGame
+      storyTitle={currentStory.title}
+      storyAuthor={currentStory.author}
+      activity={currentActivity}
+      activities={currentStory.activities.slice(group.start, group.end).filter(isChoiceActivity)}
+      questionIndex={activityIndex - group.start}
+      results={activityResults}
+      onAnswer={handleUgatAnswer}
+      onContinue={continueMission}
+      onBack={() => router.replace({ pathname: "/quest-world", params: { storyId, node: group.id } })}
+    />;
+  }
+
+  if (currentStory.id === "m1-story-1" &&
+    ((group.index === 0 && currentActivity.type === "multiple_choice") || (group.index === 1 && currentActivity.type === "evidence_hunt"))) {
+    return <SandaangSewingGame
+      level={group.index === 0 ? 1 : 2}
+      activity={currentActivity}
+      activities={currentStory.activities.slice(group.start, group.end).filter((item): item is SewingActivity => item.type !== "plot_sequence" && item.type !== "character_race")}
+      questionIndex={activityIndex - group.start}
+      results={activityResults}
+      onAnswer={submitAnswer}
+      onContinue={continueMission}
+      onCompleteLevel={continueMission}
+      onBack={() => router.replace({ pathname: "/quest-world", params: { storyId, node: group.id } })}
+    />;
+  }
+
+  if (currentStory.id === "m1-story-1" && group.index === 2 && currentActivity.type === "theme_detective") {
+    return <SandaangWardrobeGame
+      activity={currentActivity}
+      activities={currentStory.activities.slice(group.start, group.end).filter((item): item is SewingActivity => item.type !== "plot_sequence" && item.type !== "character_race")}
+      questionIndex={activityIndex - group.start}
+      results={activityResults}
+      onAnswer={submitAnswer}
+      onContinue={continueMission}
+      onBack={() => router.replace({ pathname: "/quest-world", params: { storyId, node: group.id } })}
+    />;
+  }
 
   /*
    * =======================================================
@@ -711,6 +562,7 @@ function ActivityPlayerSession({
    */
 
   return (
+    <LinearGradient colors={AppTheme.backgroundGradient} style={styles.screen}>
     <SafeAreaView edges={["top"]} style={styles.safeArea}>
       <View style={styles.screen}>
         {/* =====================================
@@ -718,7 +570,7 @@ function ActivityPlayerSession({
         ===================================== */}
 
         <LinearGradient
-          colors={["#35664A", Colors.primary, Colors.primaryDark]}
+          colors={[AppTheme.primary, AppTheme.dark]}
           start={{
             x: 0,
             y: 0,
@@ -748,12 +600,13 @@ function ActivityPlayerSession({
             </Pressable>
 
             <View style={styles.headerStory}>
+              <WikalinoBrand color={Colors.accentSoft} />
               <Text numberOfLines={1} style={styles.headerEyebrow}>
-                BALUMBON {Math.floor(group.start / QUESTIONS_PER_SCROLL) + 1} · MGA TANONG
+                {assessmentLevelTitle(group.index).toUpperCase()} · MGA TANONG
               </Text>
 
-              <Text numberOfLines={1} style={styles.headerTitle}>
-                {currentStory.title}
+              <Text testID={isUgatQuiz ? "ugat-question-story-credit" : undefined} numberOfLines={isUgatQuiz ? undefined : 1} style={[styles.headerTitle, isUgatQuiz && styles.ugatHeaderTitle]}>
+                {isUgatQuiz ? `${currentStory.title} ni ${currentStory.author}` : currentStory.title}
               </Text>
             </View>
 
@@ -816,22 +669,22 @@ function ActivityPlayerSession({
               />
 
               <LinearGradient
-                colors={["rgba(25,24,40,0.04)", "rgba(25,24,40,0.84)"]}
+                colors={["rgba(53,41,31,0.04)", "rgba(53,41,31,0.84)"]}
                 style={StyleSheet.absoluteFill}
               />
 
               <View style={styles.storyStripContent}>
-                <View style={styles.challengeTypeBadge}>
+                {!isUgatFirstScroll && <View style={styles.challengeTypeBadge}>
                   <MaterialCommunityIcons
-                    name={getActivityIcon(currentActivity.type)}
+                    name={ugatSharedScrollGame?.icon ?? getActivityIcon(currentActivity.type)}
                     size={13}
                     color={Colors.accent}
                   />
 
                   <Text style={styles.challengeTypeText}>
-                    {getGameName(currentActivity.type)}
+                    {ugatSharedScrollGame?.title ?? getGameName(currentActivity.type)}
                   </Text>
-                </View>
+                </View>}
 
                 <Text style={styles.activityTitle}>{currentActivity.title}</Text>
               </View>
@@ -856,7 +709,10 @@ function ActivityPlayerSession({
                 <Text style={styles.instructionLabel}>PAANO LARUIN</Text>
 
                 <Text style={styles.instruction}>
-                  {getGameInstruction(activity)}
+                  {activeUgatGame?.instruction ?? getGameInstruction(activity)}
+                </Text>
+                <Text style={styles.instruction}>
+                  Isang sagot lamang bawat tanong. Tama: 1 puntos. Mali: 0 puntos.
                 </Text>
               </View>
             </View>
@@ -870,6 +726,36 @@ function ActivityPlayerSession({
             </View>
 
             {/* =================================
+                UGAT · FIRST SCROLL ONLY
+            ================================= */}
+
+            {isUgatFirstScroll && isChoiceActivity(currentActivity) && (
+              <UgatFirstScrollGame
+                activity={currentActivity}
+                selectedChoice={selectedChoice}
+                onSelectChoice={setSelectedChoice}
+                onAnswer={handleUgatAnswer}
+                submitted={submitted}
+                questionIndex={ugatFirstScrollQuestionIndex}
+                totalQuestions={group.end - group.start}
+              />
+            )}
+
+            {isUgatQuiz && group.index > 0 && isChoiceActivity(currentActivity) && (
+              <UgatSharedScrollGame
+                activity={currentActivity}
+                selectedChoice={selectedChoice}
+                onSelectChoice={setSelectedChoice}
+                onAnswer={handleUgatAnswer}
+                onGestureActiveChange={setIsGameGestureActive}
+                submitted={submitted}
+                variant={group.index === 1 ? "path" : "tree"}
+                completedCount={completedGroupQuestions}
+                totalQuestions={group.end - group.start}
+              />
+            )}
+
+            {/* =================================
                 EVIDENCE ARCHERY
             ================================= */}
 
@@ -880,7 +766,6 @@ function ActivityPlayerSession({
                 correct={correct}
                 selectedChoice={selectedChoice}
                 wrongChoice={archeryWrongChoice}
-                hint={archeryHint}
                 targetShake={targetShake}
                 onTargetHit={handleArrowHit}
                 onGestureActiveChange={setIsGameGestureActive}
@@ -955,7 +840,7 @@ function ActivityPlayerSession({
                 FALLBACK
             ================================= */}
 
-            {currentActivity.type === "multiple_choice" && (
+            {currentActivity.type === "multiple_choice" && !isUgatQuiz && (
               <StandardGame
                 activity={currentActivity}
                 selectedChoice={selectedChoice}
@@ -990,7 +875,7 @@ function ActivityPlayerSession({
                     <MaterialCommunityIcons
                       name={correct ? "trophy-outline" : "lightbulb-on-outline"}
                       size={25}
-                      color={correct ? Colors.teal : Colors.secondary}
+                      color={correct ? AppTheme.success : Colors.secondary}
                     />
                   </View>
 
@@ -1004,81 +889,53 @@ function ActivityPlayerSession({
                         styles.feedbackTitle,
 
                         {
-                          color: correct ? Colors.teal : Colors.secondary,
+                          color: correct ? AppTheme.success : Colors.secondary,
                         },
                       ]}
                     >
                       {correct
-                        ? getSuccessTitle(currentActivity.type)
-                        : "Hindi pa! Subukan muli."}
+                        ? isUgatQuiz && group.index === 2 && activityIndex + 1 === group.end
+                          ? "Kumpleto ang Family Tree!"
+                          : activeUgatGame?.success ?? getSuccessTitle(currentActivity.type)
+                        : "Hindi tama ang sagot."}
                     </Text>
 
-                    {correct && (
-                      <Text style={styles.xpReward}>
-                        +{earnedXp} XP
-                        {attempts === 1 && " • First Try Bonus!"}
-                      </Text>
-                    )}
+                    <Text style={styles.xpReward}>
+                      {correct ? "1 puntos" : "0 puntos"}{correct ? ` · +${earnedXp} XP` : ""}
+                    </Text>
                   </View>
                 </View>
 
                 <Text style={styles.feedbackBody}>
-                  {correct ? currentActivity.explanation : currentActivity.hint}
+                  {currentActivity.explanation}
                 </Text>
 
-                {correct ? (
-                  <Pressable
-                    onPress={continueMission}
-                    style={({ pressed }) => [
-                      styles.continueButton,
-
-                      pressed && styles.pressed,
-                    ]}
-                  >
-                    <Text style={styles.continueButtonText}>
-                      {activityIndex + 1 < group.end ? "SUSUNOD NA TANONG" : "TAPOS ANG BALUMBON · SA LANDAS"}
-                    </Text>
-
-                    <MaterialCommunityIcons
-                      name="arrow-right"
-                      size={18}
-                      color={Colors.surface}
-                    />
-                  </Pressable>
-                ) : (
-                  /*
-                   * Evidence Hunt does NOT use
-                   * this retry button.
-                   *
-                   * Wrong arrows automatically
-                   * reload inside the archery game.
-                   */
-
-                  currentActivity.type !== "evidence_hunt" && (
-                    <Pressable
-                      onPress={retryActivity}
-                      style={({ pressed }) => [
-                        styles.retryButton,
-
-                        pressed && styles.pressed,
-                      ]}
-                    >
-                      <MaterialCommunityIcons
-                        name="reload"
-                        size={18}
-                        color={Colors.secondary}
-                      />
-
-                      <Text style={styles.retryButtonText}>SUBUKAN MULI</Text>
-                    </Pressable>
-                  )
+                {!correct && (
+                  <Text style={styles.feedbackBody}>
+                    Tamang sagot: {Array.isArray(currentActivity.answer) ? currentActivity.answer.join(" → ") : currentActivity.answer}
+                  </Text>
                 )}
+                <Text style={styles.feedbackBody}>
+                  {savedResult?.selectedAnswer === undefined
+                    ? "Naunang resulta batay sa unang pagsagot. Napanatili ang dati mong XP."
+                    : "Naitala na ang sagot. Hindi na ito maaaring baguhin."}
+                </Text>
+                <Pressable
+                  onPress={continueMission}
+                  style={({ pressed }) => [styles.continueButton, pressed && styles.pressed]}
+                >
+                  <Text style={styles.continueButtonText}>
+                    {activityIndex + 1 < group.end ? "SUSUNOD NA TANONG" : "TAPOS ANG LEVEL · SA LANDAS"}
+                  </Text>
+                  <MaterialCommunityIcons name="arrow-right" size={18} color={Colors.surface} />
+                </Pressable>
               </Animated.View>
             )}
           </Animated.View>
         </ScrollView>
       </View>
     </SafeAreaView>
+    </LinearGradient>
   );
 }
 

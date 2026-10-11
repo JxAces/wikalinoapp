@@ -169,7 +169,7 @@ const activities = createQuestionActivities("sandaang-damit", {
       explanation: "Ang kulturang may empatiya at pantay na paggalang ang pumipigil sa pang-aapi batay sa estado sa buhay.",
     },
   ],
-});
+}, { pamilyar: 3, suri: 3, dalubhasa: 4 });
 
 export const sandaangDamit: Story = {
   id: "m1-story-1",

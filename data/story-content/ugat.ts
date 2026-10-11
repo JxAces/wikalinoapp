@@ -4,35 +4,50 @@ import { createQuestionActivities } from "./question-factory";
 const activities = createQuestionActivities("ugat", {
   pamilyar: [
     {
-      question: "Ilang taon na ang pangunahing tauhan nang muli niyang pag-isipan ang kalagayan ng bayan?",
-      choices: ["Limampu", "Animnapu", "Pitumpu", "Walumpu"],
-      answer: 2,
-      explanation: "Pitumpung taong gulang na siya at mula pagkabata ay nasaksihan na niya ang pagpapalit-palit ng mga pinuno.",
+      question: "Sino ang pangunahing tauhan na binibigyang-diin sa kuwentong “Ugat”?",
+      choices: [
+        "Ang Ina / Lahi ng Pamilya",
+        "Isang Kaibigan",
+        "Isang Guro",
+        "Isang Kapitbahay",
+      ],
+      answer: 0,
+      explanation: "Binibigyang-diin ng tanong ang ina at lahi ng pamilya bilang larawan ng pinagmulan at pagkakaugnay ng mga salinlahi.",
     },
     {
-      question: "Saan nakatira si Bert, ang anak na nag-alok na kunin ang pamilya?",
-      choices: ["Hapon", "Pilipinas", "Amerika", "Australia"],
-      answer: 2,
-      explanation: "Nasa Amerika si Bert at inalok niyang mag-immigrate doon ang buong pamilya.",
-    },
-    {
-      question: "Sino ang apong nagpahayag na Pilipino ang kaniyang pipiliing mapangasawa ng kapatid at maging pagkamamamayan?",
-      choices: ["Ricky", "Tasing", "Kardo", "Bert"],
+      question: "Ano ang pangunahing simbolismo ng salitang “Ugat” sa pamagat ng maikling kuwento?",
+      choices: [
+        "Halaman sa hardin",
+        "Pinagmulan, pamilya, at kultura",
+        "Gamot sa sakit",
+        "Daanan ng tubig",
+      ],
       answer: 1,
-      explanation: "Matatag na pinili ni Tasing ang sagot na Pilipino sa dalawang tanong.",
+      explanation: "Ang ugat ay sumasagisag sa pinagmulan, pamilya, kultura, at mga pagpapahalagang nag-uugnay sa mga tauhan.",
+    },
+    {
+      question: "Saan patungo o pabalik ang daloy ng kuwento ng mga tauhan?",
+      choices: [
+        "Sa ibang bansa",
+        "Sa kanilang tahanan o pinagmulan",
+        "Sa palengke",
+        "Sa paaralan",
+      ],
+      answer: 1,
+      explanation: "Ang daloy ng kuwento ay humahantong sa muling pagharap sa tahanan, pamilya, at sariling pinagmulan.",
     },
   ],
   suri: [
     {
-      question: "Bakit sawang-sawa na ang matandang si Tasio sa kalagayan ng bayan?",
+      question: "Ano ang pangunahing damdamin na nais iparating ng kuwento tungkol sa ating pamilya at pinagmulan?",
       choices: [
-        "Ayaw na niyang magbasa ng mahahabang balita.",
-        "Paulit-ulit ang pangako ng pagbabago ngunit nananatili ang pagsasamantala, katiwalian, at kabulukan.",
-        "Hindi siya pinayagang mamuno sa pamahalaan.",
-        "Ayaw niyang sumama ang kaniyang pamilya sa Amerika.",
+        "Pagkagalit",
+        "Paglimot",
+        "Pagpapahalaga at pagmamahal",
+        "Takot",
       ],
-      answer: 1,
-      explanation: "Sa likod ng mga bagong programa at panlabas na pagbabago, nakita niyang nananatili ang dati ring mga suliranin.",
+      answer: 2,
+      explanation: "Ipinahihiwatig ng kuwento ang pagpapahalaga at pagmamahal sa pamilya, bayan, at sariling pinagmulan.",
     },
     {
       question: "Ano ang sinasagisag ng pamagat na “Ugat”?",
@@ -158,7 +173,15 @@ const activities = createQuestionActivities("ugat", {
       explanation: "Ipinahihiwatig ng wakas na ang pagputol sa malalim na ugat ng kabulukan ay kailangang magsimula sa sariling pananagutan at tuloy sa sama-samang pagkilos.",
     },
   ],
-});
+})
+  // The Ugat assessment has ten multiple-choice items divided across three
+  // themed scrolls (4-3-3). The player supplies the themed presentation.
+  .slice(0, 10)
+  .map((activity, index, selectedActivities) => ({
+    ...activity,
+    type: "multiple_choice" as const,
+    isFinal: index === selectedActivities.length - 1,
+  }));
 
 export const ugat: Story = {
   id: "m1-story-2",

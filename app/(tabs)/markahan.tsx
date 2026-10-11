@@ -9,8 +9,9 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { WikalinoBrand } from "@/components/ui/WikalinoBrand";
 
-import { Colors } from "../../constants/colors";
+import { AppTheme, Colors } from "../../constants/colors";
 import { StoryUnit, storyUnits } from "../../data/stories";
 import { useUserStore } from "../../store/useUserStore";
 
@@ -90,7 +91,7 @@ export default function MarkahanScreen() {
           </Pressable>
 
           <View style={styles.headerText}>
-            <Text style={styles.headerEyebrow}>WIKALINO</Text>
+            <WikalinoBrand />
 
             <Text style={styles.headerTitle}>Mga Markahan</Text>
           </View>
@@ -350,7 +351,7 @@ function MarkahanCard({
                     locked
                       ? Colors.textMuted
                       : completed
-                        ? Colors.teal
+                        ? AppTheme.success
                         : Colors.primary
                   }
                 />
@@ -414,7 +415,7 @@ function MarkahanCard({
                   <MaterialCommunityIcons
                     name="check-circle"
                     size={16}
-                    color={Colors.teal}
+                    color={AppTheme.success}
                   />
 
                   <Text style={styles.completeMessageText}>
@@ -610,7 +611,7 @@ const styles = StyleSheet.create({
   introText: {
     marginTop: 5,
 
-    color: "rgba(255,255,255,0.68)",
+    color: AppTheme.buttonText,
 
     fontSize: 10,
     lineHeight: 15,
@@ -648,21 +649,21 @@ const styles = StyleSheet.create({
   },
 
   unitCardCompleted: {
-    borderColor: "#C8E4DD",
+    borderColor: AppTheme.success,
 
-    backgroundColor: "#FAFFFD",
+    backgroundColor: AppTheme.successSurface,
   },
 
   unitCardLocked: {
     backgroundColor: Colors.lockedSoft,
 
-    borderColor: "#DEDBE1",
+    borderColor: AppTheme.border,
   },
 
   unitCardComingSoon: {
-    backgroundColor: "#F3F1F4",
+    backgroundColor: AppTheme.surfaceSoft,
 
-    borderColor: "#E1DFE3",
+    borderColor: AppTheme.border,
   },
 
   unitCardPressed: {
@@ -698,11 +699,11 @@ const styles = StyleSheet.create({
   },
 
   unitNumberCompleted: {
-    backgroundColor: Colors.teal,
+    backgroundColor: AppTheme.success,
   },
 
   unitNumberLocked: {
-    backgroundColor: "#DDDADF",
+    backgroundColor: Colors.lockedSoft,
   },
 
   unitNumberText: {
@@ -759,7 +760,7 @@ const styles = StyleSheet.create({
   },
 
   lockedTitle: {
-    color: "#74727A",
+    color: AppTheme.muted,
   },
 
   unitSubtitle: {
@@ -772,7 +773,7 @@ const styles = StyleSheet.create({
   },
 
   mutedText: {
-    color: "#8B8990",
+    color: Colors.locked,
   },
 
   /*
@@ -802,11 +803,11 @@ const styles = StyleSheet.create({
   },
 
   statusLocked: {
-    backgroundColor: "#DCD9DF",
+    backgroundColor: Colors.lockedSoft,
   },
 
   statusComingSoon: {
-    backgroundColor: "#E5E2E7",
+    backgroundColor: AppTheme.panel,
   },
 
   statusText: {
@@ -872,7 +873,7 @@ const styles = StyleSheet.create({
   },
 
   progressOuterLocked: {
-    backgroundColor: "#DCD9DF",
+    backgroundColor: Colors.lockedSoft,
   },
 
   progressInner: {
@@ -884,7 +885,7 @@ const styles = StyleSheet.create({
   },
 
   progressInnerCompleted: {
-    backgroundColor: Colors.teal,
+    backgroundColor: AppTheme.success,
   },
 
   /*
@@ -938,7 +939,7 @@ const styles = StyleSheet.create({
   },
 
   completeMessageText: {
-    color: Colors.teal,
+    color: AppTheme.success,
 
     fontSize: 9,
     fontWeight: "800",
@@ -961,7 +962,7 @@ const styles = StyleSheet.create({
 
     borderRadius: 13,
 
-    backgroundColor: "#E9E6EA",
+    backgroundColor: AppTheme.surfaceSoft,
   },
 
   comingSoonText: {
