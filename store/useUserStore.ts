@@ -132,6 +132,7 @@ type UserStore = {
 
   xp: number;
 
+  // Reward ledger: retain earlier completions when assessment questions change.
   completedStoryIds: string[];
 
   readingCompletedStoryIds: string[];
@@ -474,10 +475,12 @@ export const useUserStore =
 
         isStoryCompleted: (
           storyId,
-        ) =>
-          get().completedStoryIds.includes(
-            storyId,
-          ),
+        ) => {
+          const story = getStoryById(storyId);
+          const state = get();
+          return Boolean(story && state.completedStoryIds.includes(storyId) &&
+            isStoryAnswered(story, state.activityResults));
+        },
 
         getStoryStars: (
           storyId,
@@ -500,10 +503,7 @@ export const useUserStore =
               );
 
             return stories.filter(
-              (story) =>
-                get().completedStoryIds.includes(
-                  story.id,
-                ),
+              story => get().isStoryCompleted(story.id),
             ).length;
           },
 

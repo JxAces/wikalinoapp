@@ -24,6 +24,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { WikalinoBrand } from "@/components/ui/WikalinoBrand";
 
 import styles from "@/components/activity-player/styles";
+import { AssessmentInstruction, AssessmentPassage } from "@/components/activity-player/assessment-passage";
 import { SandaangSewingGame } from "@/components/activity-player/sandaang-sewing-game";
 import { SandaangWardrobeGame } from "@/components/activity-player/sandaang-wardrobe-game";
 import { UtosQuizGames } from "@/components/activity-player/utos-quiz-games";
@@ -73,22 +74,17 @@ function isChoiceActivity(activity: StoryActivity): activity is ChoiceActivity {
 const UGAT_FIRST_SCROLL_GAMES = [
   {
     icon: "run-fast" as const,
-    instruction: "Piliin ang karatulang tumutukoy sa pangunahing tauhan upang makatakbo sa unang landas.",
-    success: "Nalampasan ang Landas ng Pamilya!",
+    instruction: "Piliin ang karatulang may tamang sagot batay sa sipi upang makatakbo sa unang landas.",
+    success: "Nalampasan ang Unang Landas!",
   },
   {
     icon: "run-fast" as const,
-    instruction: "Piliin ang karatulang may tamang kahulugan ng “Ugat” upang makatakbo sa ikalawang landas.",
-    success: "Nalampasan ang Landas ng Simbolo!",
+    instruction: "Piliin ang karatulang may tamang sagot batay sa sipi upang makatakbo sa ikalawang landas.",
+    success: "Nalampasan ang Ikalawang Landas!",
   },
   {
     icon: "run-fast" as const,
-    instruction: "Piliin ang karatulang patungo sa pinagmulan upang makatakbo sa ikatlong landas.",
-    success: "Nalampasan ang Landas ng Pag-uwi!",
-  },
-  {
-    icon: "run-fast" as const,
-    instruction: "Piliin ang karatulang nagpapakita ng damdamin ng kuwento upang marating ang huling landas.",
+    instruction: "Piliin ang karatulang may tamang sagot batay sa sipi upang makumpleto ang Pamilyar Level.",
     success: "Natapos ang Pamilyar Level!",
   },
 ] as const;
@@ -739,10 +735,12 @@ function ActivityPlayerSession({
 
             {/* QUESTION */}
 
+            <AssessmentInstruction instruction={currentActivity.instruction} />
+            <AssessmentPassage passage={"passage" in currentActivity ? currentActivity.passage : undefined} />
             <View style={styles.questionCard}>
               <Text style={styles.questionLabel}>HAMON</Text>
 
-              <Text style={styles.question}>{currentActivity.question}</Text>
+              <Text testID="assessment-question" style={styles.question}>{currentActivity.question}</Text>
             </View>
 
             {/* =================================

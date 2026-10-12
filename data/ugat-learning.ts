@@ -25,10 +25,11 @@ export const ugatClues = [
 ];
 
 export const ugatZones = [
-  { id: 'root', title: 'Ugat', prompt: 'Ano ang pangunahing suliranin o pinagmumulan ng problema?', icon: 'sprout' },
-  { id: 'branch', title: 'Sanga', prompt: 'Anong mga pangyayari, kilos, o desisyon ang kaugnay ng suliranin?', icon: 'source-branch' },
-  { id: 'leaf', title: 'Dahon', prompt: 'Anong detalye o patunay mula sa teksto ang sumusuporta sa pagsusuri?', icon: 'leaf' },
-  { id: 'fruit', title: 'Bunga', prompt: 'Anong mensahe o aral ang mabubuo mula sa mga ito?', icon: 'fruit-cherries' },
+  // Keep saved category IDs stable while showing their meaning directly to pupils.
+  { id: 'root', title: 'Suliranin', helper: 'Ang pangunahing problema sa kuwento.', prompt: 'Ano ang problemang kinaharap ni Lolo Tacio?', placeholder: 'Ang pangunahing problema ay…', icon: 'help-circle-outline' },
+  { id: 'branch', title: 'Pangyayari', helper: 'Mga ginawa o naranasan ng tauhan.', prompt: 'Ano ang ginawa o naranasan ni Lolo Tacio?', placeholder: 'Si Lolo Tacio ay…', icon: 'format-list-numbered' },
+  { id: 'leaf', title: 'Patunay', helper: 'Detalye sa kuwento na sumusuporta sa sagot.', prompt: 'Aling detalye sa kuwento ang sumusuporta sa inyong sagot?', placeholder: 'Makikita sa kuwento na…', icon: 'book-open-page-variant-outline' },
+  { id: 'fruit', title: 'Aral', helper: 'Mahalagang natutuhan mula sa kuwento.', prompt: 'Ano ang aral na makukuha sa kuwento?', placeholder: 'Natutuhan namin na…', icon: 'lightbulb-outline' },
 ] as const;
 export type UgatZoneId = typeof ugatZones[number]['id'];
 

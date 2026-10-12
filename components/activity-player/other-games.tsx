@@ -882,24 +882,19 @@ function UgatDraggableChoice({
 
 const ugatFirstScrollGames = [
   {
-    checkpoint: "TANONG 1 · PAMILYA",
-    sceneLabel: "ALBUM NG PINAGMULAN",
-    icon: "account-group-outline" as const,
-  },
-  {
-    checkpoint: "TANONG 2 · SIMBOLO",
-    sceneLabel: "MALALALIM NA UGAT",
+    checkpoint: "TANONG 1 · PAMILYAR",
+    sceneLabel: "UNANG LANDAS",
     icon: "tree-outline" as const,
   },
   {
-    checkpoint: "TANONG 3 · PAG-UWI",
-    sceneLabel: "LANDAS PABALIK",
-    icon: "home-map-marker" as const,
+    checkpoint: "TANONG 2 · PAMILYAR",
+    sceneLabel: "IKALAWANG LANDAS",
+    icon: "account-group-outline" as const,
   },
   {
-    checkpoint: "TANONG 4 · PUSO",
-    sceneLabel: "PUNO NG PAGMAMAHAL",
-    icon: "heart-outline" as const,
+    checkpoint: "TANONG 3 · PAMILYAR",
+    sceneLabel: "HULING LANDAS",
+    icon: "account-outline" as const,
   },
 ] as const;
 
@@ -1357,6 +1352,7 @@ export function UgatFirstScrollGame({
               ]}
             >
               <Pressable
+                testID={`ugat-runner-route-${choiceLetter}`}
                 accessibilityLabel={`Landas ${choiceLetter}: ${choice}`}
                 accessibilityRole="button"
                 accessibilityState={{ selected, disabled: submitted || isRunning }}
@@ -1386,13 +1382,12 @@ export function UgatFirstScrollGame({
                   </Text>
                 </View>
                 <Text
-                  numberOfLines={3}
                   style={[
                     styles.ugatRootChoiceText,
                     selected && styles.ugatRootChoiceTextSelected,
                   ]}
                 >
-                  {choice}
+                  Landas {choiceLetter}
                 </Text>
               </Pressable>
             </Animated.View>
@@ -1409,6 +1404,29 @@ export function UgatFirstScrollGame({
             {isRunning ? "TUMATAKBO SA TAMANG LANDAS..." : game.sceneLabel}
           </Text>
         </View>
+      </View>
+
+      <View style={styles.ugatRunnerChoices}>
+        <Text style={styles.gameSectionEyebrow}>MGA SAGOT</Text>
+        {activity.choices.map((choice, index) => {
+          const letter = String.fromCharCode(65 + index);
+          const selected = selectedChoice === choice;
+          const wrong = selected && submitted && choice !== activity.answer;
+          return <Pressable
+            key={choice} testID={`ugat-runner-choice-${letter}`}
+            accessibilityRole="button" accessibilityLabel={`Sagot ${letter}: ${choice}`}
+            accessibilityHint="Pindutin upang piliin ang landas at isumite ang sagot."
+            accessibilityState={{ selected, disabled: submitted || isRunning }}
+            disabled={submitted || isRunning} onPress={() => chooseRoad(choice)}
+            style={({ pressed }) => [styles.ugatRunnerChoice, selected && styles.ugatRunnerChoiceSelected,
+              wrong && styles.ugatRootChoiceWrong, pressed && styles.pressed]}
+          >
+            <View style={[styles.ugatRunnerChoiceSign, selected && styles.ugatRunnerChoiceSignSelected]}>
+              <Text style={[styles.ugatRunnerChoiceLetter, selected && styles.ugatRunnerChoiceLetterSelected]}>{letter}</Text>
+            </View>
+            <Text testID={`ugat-runner-choice-text-${letter}`} style={[styles.ugatRunnerChoiceText, selected && styles.ugatRunnerChoiceTextSelected]}>{choice}</Text>
+          </Pressable>;
+        })}
       </View>
 
       <View style={styles.ugatRunnerInstruction}>

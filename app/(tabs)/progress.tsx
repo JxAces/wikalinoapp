@@ -6,6 +6,7 @@ import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-nati
 import { Alert } from "../../utils/app-alert";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { WikalinoBrand } from "@/components/ui/WikalinoBrand";
+import { isStoryAnswered } from "@/components/story-world/quest-progression";
 
 import { CharacterLineup } from "../../components/character-select/CharacterLineup";
 import { CharacterModelPreview } from "../../components/character-select/CharacterModelPreview";
@@ -27,7 +28,6 @@ const progressUnits = storyUnits.filter(unit => PROGRESS_TERM_TITLES[unit.markah
 export default function ProgressScreen() {
   const profile = useUserStore(state => state.profile);
   const xp = useUserStore(state => state.xp);
-  const completedStoryIds = useUserStore(state => state.completedStoryIds);
   const activityResults = useUserStore(state => state.activityResults);
   const getStoryStars = useUserStore(state => state.getStoryStars);
   const clearGameProgress = useUserStore(state => state.clearGameProgress);
@@ -42,8 +42,8 @@ export default function ProgressScreen() {
   const characterTitle = PLAYER_CHARACTER_OPTIONS.find(item => item.id === selectedCharacter)?.title ?? "1";
   const level = getLevelInfo(xp);
   const totalStars = stories.reduce((sum, story) => sum + getStoryStars(story.id), 0);
-  const completedCount = stories.filter(story => completedStoryIds.includes(story.id)).length;
-  const activityCount = Object.keys(activityResults).length;
+  const completedCount = stories.filter(story => isStoryAnswered(story, activityResults)).length;
+  const activityCount = stories.reduce((total, story) => total + story.activities.filter(activity => activityResults[activity.id]).length, 0);
   const earned = [completedCount >= 1, totalStars >= 9, level.level >= 5];
 
   function handleReset() {
@@ -150,7 +150,7 @@ export default function ProgressScreen() {
           {progressUnits.map(unit => {
             const title = PROGRESS_TERM_TITLES[unit.markahan];
             const total = unit.stories.length;
-            const completed = unit.stories.filter(story => completedStoryIds.includes(story.id)).length;
+            const completed = unit.stories.filter(story => isStoryAnswered(story, activityResults)).length;
             const cleared = total > 0 && completed === total;
             return <View key={unit.id} style={[styles.world, !total && styles.upcomingWorld]}>
               <View style={[styles.worldNumber, cleared && styles.worldCleared]}>

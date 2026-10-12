@@ -171,7 +171,7 @@ async function check() {
   assert(stories[2].scenes.flatMap(scene => scene.paragraphs).join(' ').includes('Hindi baleng dropout, basta tao lang ako.'));
   assert(stories[2].activities.every(activity => activity.id.startsWith('utos-ng-hari-')));
   const ugatStory = stories.find(story => story.id === 'm1-story-2');
-  assert.deepEqual(questionScrolls(ugatStory, {}).map(node => node.questionGroup.end - node.questionGroup.start), [4, 3, 3], 'Ugat uses a 4-3-3 question split');
+  assert.deepEqual(questionScrolls(ugatStory, {}).map(node => node.questionGroup.end - node.questionGroup.start), [3, 3, 4], 'Validated Ugat uses the shared 3-3-4 question split');
   assert(ugatStory.activities.every(activity => activity.type === 'multiple_choice'), 'All three themed Ugat scrolls remain multiple-choice games');
   const hubNodes = () => stories.map(story => ({ story, state: !canEnterStory(story.id, store.getState().activityResults) ? "locked" : isStoryAnswered(story, store.getState().activityResults) ? "completed" : "current" }));
   assert(!isWorldChestUnlocked([]), "An empty world must not unlock a chest");
@@ -201,7 +201,7 @@ async function check() {
   assert(canEnterStory(stories[2].id, outOfOrder), "Portal access is independent of previous-story progress for now");
   store.getState().clearGameProgress();
   for (const story of stories) {
-    const expectedGroupSizes = story.id === "m1-story-2" ? [4, 3, 3] : [3, 3, 4];
+    const expectedGroupSizes = [3, 3, 4];
     const expectedQuestionCount = expectedGroupSizes.reduce((sum, size) => sum + size, 0);
     assert(canEnterStory(story.id, store.getState().activityResults));
     assert(!isWorldChestUnlocked(hubNodes()), "Hub chest requires every story, not merely accessible portals");
@@ -279,6 +279,7 @@ async function check() {
   assert(isWorldChestUnlocked(hubNodes()), "Finishing all portals unlocks the hub chest");
   await checkCabinet(stories);
   await checkAssessments(stories);
+  await checkValidatedAssessmentCompatibility(stories);
   await checkWardrobe(stories[0]);
   await checkUtosQuizGames(stories[2]);
   store.getState().clearGameProgress();
@@ -292,12 +293,12 @@ async function checkAssessments(stories) {
     assert.equal(story.activities.length, 10, 'Every assessment has ten questions');
     assert.equal(story.activities.filter(activity => activity.isFinal).length, 1);
     assert(story.activities[9].isFinal);
-    if (story.id !== 'm1-story-2') {
-      assert.deepEqual(story.activities.map(activity => Number(activity.id.split('-q')[1])),
-        [1, 2, 3, 4, 5, 6, 10, 11, 12, 13], 'Keep stable question IDs across the 3-3-4 selection');
-      assert.deepEqual(story.activities.map(activity => activity.title.split(' ').at(-1)),
-        Array.from({ length: 10 }, (_, index) => String(index + 1)), 'Visible question numbers remain sequential');
-    }
+    const prefix = ({ 'm1-story-1': 'sandaang-damit', 'm1-story-2': 'ugat', 'm1-story-3': 'utos-ng-hari' })[story.id];
+    assert.deepEqual(story.activities.map(activity => activity.id),
+      Array.from({ length: 10 }, (_, index) => `${prefix}-validated-v1-q${index + 1}`),
+      'Validated questions use independent IDs so historical answers cannot be reused');
+    assert.deepEqual(story.activities.map(activity => activity.title.split(' ').at(-1)),
+      Array.from({ length: 10 }, (_, index) => String(index + 1)), 'Visible question numbers remain sequential');
     for (const correctCount of [0, 7, 8, 9, 10]) {
       store.getState().clearGameProgress();
       store.getState().completeStoryReading(story.id);
@@ -368,6 +369,95 @@ async function checkAssessments(stories) {
   assert.equal(gradeAssessmentAnswer(sequence, 'a'), null);
   console.log('Scoring: all three 10-item assessments, 0/7/8/9/10 scores, XP, stars, wrong-answer progression, immutable reloads, and legacy migration passed');
 }
+
+async function checkValidatedAssessmentCompatibility(stories) {
+  store.getState().clearAllData();
+  const profile = { fullName: 'Returning reader', pangkat: 'Baitang 8', character: 'student-girl' };
+  store.getState().setProfile(profile);
+  store.getState().completeWelcome();
+  for (const story of stories) {
+    store.getState().completeStoryReading(story.id);
+    store.getState().setStoryScene(story.id, 2);
+    completeCabinet(story);
+  }
+  const oldPrefixes = ['sandaang-damit', 'ugat', 'utos-ng-hari'];
+  const historicalResults = Object.fromEntries(stories.flatMap((story, storyIndex) =>
+    Array.from({ length: 15 }, (_, index) => {
+      const activityId = `${oldPrefixes[storyIndex]}-q${index + 1}`;
+      return [activityId, { storyId: story.id, activityId, correct: true, firstTryCorrect: true,
+        selectedAnswer: `Historical answer ${index + 1}`, attempts: 1, xpEarned: 15, completedAt: '2026-10-01T00:00:00.000Z' }];
+    })));
+  const rewardLedger = stories.map(story => story.id);
+  const collectibles = stories.map(story => story.collectible.id);
+  const historicalXp = 893;
+  store.setState({ activityResults: historicalResults, completedStoryIds: rewardLedger,
+    unlockedCollectibleIds: collectibles, xp: historicalXp });
+  const prior = JSON.parse(savedStorage.get('wikalino-user-store'));
+  assert.equal(prior.version, 7, 'Validated question IDs do not need a save-version migration');
+  store.getState().clearAllData();
+  savedStorage.set('wikalino-user-store', JSON.stringify(prior));
+  await store.persist.rehydrate();
+  const resumed = store.getState();
+  for (const field of ['profile', 'welcomeCompleted', 'readingCompletedStoryIds', 'storySceneIndexes',
+    'cabinetResponses', 'xp', 'activityResults', 'completedStoryIds', 'unlockedCollectibleIds']) {
+    assert.deepEqual(resumed[field], prior.state[field], `${field} is preserved when the question bank changes`);
+  }
+  assert.equal(resumed.getCompletedStoryCountByMarkahan(1), 0, 'Earlier completion rewards do not mark the new assessments complete');
+  assert(!resumed.isStoryCompleted('missing-story'));
+  let newQuestionXp = 0;
+  for (const [storyIndex, story] of stories.entries()) {
+    const summary = getAssessmentSummary(story, store.getState().activityResults);
+    assert.deepEqual([summary.correct, summary.answered, summary.complete], [0, 0, false], 'Historical grades do not grade validated questions');
+    assert.equal(store.getState().getStoryStars(story.id), 0);
+    assert(!store.getState().isStoryCompleted(story.id));
+    assert(!isStoryAnswered(story, store.getState().activityResults));
+    assert.deepEqual(questionScrolls(story, store.getState().activityResults).map(node => node.state),
+      ['current', 'locked', 'locked'], 'Historical answers cannot unlock later validated levels');
+    assert(!isWorldChestUnlocked(questionScrolls(story, store.getState().activityResults)));
+    assert(canAnswerQuestion(story, 0, store.getState().activityResults));
+    for (const index of [1, 3, 6, 9]) assert(!canAnswerQuestion(story, index, store.getState().activityResults));
+    const xpBefore = store.getState().xp;
+    store.getState().completeStoryReading(story.id);
+    store.getState().completeStory(story.id);
+    store.getState().completeActivity({ storyId: story.id, activityId: `${oldPrefixes[storyIndex]}-q1`, answer: 'Historical answer 1' });
+    store.getState().completeActivity({ storyId: story.id, activityId: story.activities[1].id, answer: story.activities[1].answer });
+    assert.equal(store.getState().xp, xpBefore, 'Historical IDs, later questions and already-earned rewards cannot award XP');
+    assert.equal(store.getState().activityResults[story.activities[1].id], undefined);
+
+    for (const [index, activity] of story.activities.entries()) {
+      completeUtosPregame(story, index);
+      const answer = index === 0 ? activity.choices.find(choice => choice !== activity.answer) : activity.answer;
+      store.getState().completeActivity({ storyId: story.id, activityId: activity.id, answer });
+      const result = store.getState().activityResults[activity.id];
+      assert(result, 'The new assessment can be completed independently of historical results');
+      newQuestionXp += result.xpEarned;
+      if (index === 0) {
+        assert.equal(result.correct, false);
+        const firstResult = JSON.stringify(result);
+        await store.persist.rehydrate();
+        store.getState().completeActivity({ storyId: story.id, activityId: activity.id, answer: activity.answer });
+        assert.equal(JSON.stringify(store.getState().activityResults[activity.id]), firstResult,
+          'A wrong validated answer stays immutable after reload alongside historical results');
+      }
+    }
+    assert.equal(getAssessmentSummary(story, store.getState().activityResults).correct, 9);
+    assert(store.getState().isStoryCompleted(story.id), 'Current results now satisfy completion without altering the reward ledger');
+    const beforeReward = store.getState().xp;
+    store.getState().completeStory(story.id);
+    store.getState().completeStory(story.id);
+    assert.equal(store.getState().xp, beforeReward, 'Completing the validated replacement never reawards historical completion XP');
+    assert.equal(store.getState().getCompletedStoryCountByMarkahan(1), storyIndex + 1);
+    assert.equal(store.getState().xp, historicalXp + newQuestionXp, 'Only newly answered questions can add XP');
+  }
+  await store.persist.rehydrate();
+  for (const [id, result] of Object.entries(historicalResults)) assert.deepEqual(store.getState().activityResults[id], result, 'Historical answers remain intact');
+  for (const field of ['profile', 'welcomeCompleted', 'readingCompletedStoryIds', 'storySceneIndexes',
+    'cabinetResponses', 'completedStoryIds', 'unlockedCollectibleIds']) {
+    assert.deepEqual(store.getState()[field], prior.state[field], `Completing the new assessments preserves ${field}`);
+  }
+  console.log('Validated replacement: unique IDs, preserved profile/reading/Gawain/XP/rewards/history, current-only gates and scores, immutable wrong answers and no repeated completion XP passed');
+}
+
 async function checkUtosQuizGames(story) {
   store.getState().clearGameProgress();
   const initial = createUtosQuizGameState(0);

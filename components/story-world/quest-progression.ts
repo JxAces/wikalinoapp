@@ -48,7 +48,6 @@ export function canAnswerQuestion(story: Story, index: number, answers: Answers)
 
 export const QUESTIONS_PER_SCROLL = 5;
 
-const UGAT_QUESTION_GROUP_SIZES = [4, 3, 3] as const;
 const ASSESSMENT_QUESTION_GROUP_SIZES = [3, 3, 4] as const;
 const ASSESSMENT_LEVEL_TITLES = ["Pamilyar Level", "Suri Level", "Dalubhasa Level"] as const;
 
@@ -67,8 +66,7 @@ function questionGroupStarts(story: Story) {
   const starts: number[] = [];
   let cursor = 0;
 
-  const sizes = story.id === UGAT_STORY ? UGAT_QUESTION_GROUP_SIZES : ASSESSMENT_QUESTION_GROUP_SIZES;
-  for (const size of sizes) {
+  for (const size of ASSESSMENT_QUESTION_GROUP_SIZES) {
     if (cursor >= story.activities.length) break;
     starts.push(cursor);
     cursor += size;

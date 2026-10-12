@@ -12,6 +12,7 @@ import Svg, { Circle, ClipPath, Defs, G, Path } from "react-native-svg";
 
 import { isWardrobeDressed, SANDAANG_OUTFITS } from "../../data/sandaang-wardrobe";
 import type { ChoiceActivity } from "../../data/story-types";
+import { AssessmentInstruction, AssessmentPassage } from "./assessment-passage";
 import { useUserStore, type ActivityResult } from "../../store/useUserStore";
 
 type Point = { x: number; y: number };
@@ -200,8 +201,10 @@ function WardrobeQuestion({ activity, activities, questionIndex, results, onAnsw
       <Text style={s.resultTitle}>{outfitCount === 4 ? "Nasuotan mo ang lahat ng mannequin!" : `${outfitCount} sa 4 mannequin ang nasuotan.`}</Text>
       <Text style={s.explanation}>{score} tamang sagot · {activities.length - score} maling sagot · {outfitCount}/4 damit ang naisuot</Text>
     </View>}
+    <AssessmentInstruction instruction={activity.instruction} />
+    <AssessmentPassage passage={activity.passage} />
     <Text style={s.questionLabel}>TANONG {questionIndex + 1} SA {activities.length}</Text>
-    <Text style={s.question}>{activity.question}</Text>
+    <Text testID="assessment-question" style={s.question}>{activity.question}</Text>
     {!result && <Text style={s.instruction}>I-drag ang sagot sa mannequin {questionIndex + 1}. O piliin ang sagot, saka pindutin ang mannequin.</Text>}
     <View style={s.choices}>{activity.choices.map((choice, index) => {
       const item: DragItem = { kind: "answer", choice }, letter = String.fromCharCode(65 + index);

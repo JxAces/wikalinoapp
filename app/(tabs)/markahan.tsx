@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { WikalinoBrand } from "@/components/ui/WikalinoBrand";
+import { isStoryAnswered } from "@/components/story-world/quest-progression";
 
 import { AppTheme, Colors } from "../../constants/colors";
 import { StoryUnit, storyUnits } from "../../data/stories";
@@ -20,8 +21,8 @@ type IconName = ComponentProps<typeof MaterialCommunityIcons>["name"];
 type UnitStatus = "active" | "completed" | "locked" | "coming-soon";
 
 export default function MarkahanScreen() {
-  const completedStoryIds = useUserStore(
-    (state) => state.completedStoryIds,
+  const activityResults = useUserStore(
+    (state) => state.activityResults,
   );
 
   const getUnitStatus = (
@@ -37,7 +38,7 @@ export default function MarkahanScreen() {
     }
 
     const completedCount = unit.stories.filter((story) =>
-      completedStoryIds.includes(story.id),
+      isStoryAnswered(story, activityResults),
     ).length;
 
     /*
@@ -65,7 +66,7 @@ export default function MarkahanScreen() {
     }
 
     const previousCompleted = previousUnit.stories.every((story) =>
-      completedStoryIds.includes(story.id),
+      isStoryAnswered(story, activityResults),
     );
 
     return previousCompleted ? "active" : "locked";
@@ -133,7 +134,7 @@ export default function MarkahanScreen() {
               const totalStories = unit.stories.length;
 
               const completedCount = unit.stories.filter((story) =>
-                completedStoryIds.includes(story.id),
+                isStoryAnswered(story, activityResults),
               ).length;
 
               const percentage =

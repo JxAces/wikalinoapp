@@ -16,6 +16,7 @@ import {
 import type { ActivityResult } from "../../store/useUserStore";
 import { UtosCharacterPortrait } from "./utos-character-portrait";
 import { useUtosFeedbackSound } from "./use-utos-feedback-sound";
+import { AssessmentInstruction, AssessmentPassage } from "./assessment-passage";
 
 type ChoiceActivity = Extract<StoryActivity, { choices: string[] }>;
 type MemoryCard = { character: typeof UTOS_CHARACTERS[number]; portrait: boolean };
@@ -170,8 +171,10 @@ export function UtosQuizGames({ storyTitle, storyAuthor, level, activity, questi
         </>}
 
         {showQuestions && <View testID="utos-official-question" style={s.panel}>
+          <AssessmentInstruction instruction={activity.instruction} />
+          <AssessmentPassage passage={"passage" in activity ? activity.passage : undefined} />
           <Text style={s.progress}>Tanong {questionIndex + 1}/{totalQuestions}</Text>
-          <Text style={s.question}>{activity.question}</Text>
+          <Text testID="assessment-question" style={s.question}>{activity.question}</Text>
           <Text style={s.scoring}>Isang sagot bawat tanong. Tama: 1 puntos. Mali: 0 puntos.</Text>
           {activity.choices.map((choice, index) => {
             const correct = Boolean(result) && choice === activity.answer;

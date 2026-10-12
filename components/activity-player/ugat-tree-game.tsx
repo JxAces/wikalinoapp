@@ -14,11 +14,12 @@ import type { StoryActivity } from "../../data/story-types";
 import type { ActivityResult } from "../../store/useUserStore";
 import { UgatRunnerChild } from "./other-games";
 import { UgatTreeArt } from "./ugat-tree-art";
+import { AssessmentInstruction, AssessmentPassage } from "./assessment-passage";
 
 type ChoiceActivity = Extract<StoryActivity, { choices: string[] }>;
 type Point = { x: number; y: number };
 type Bounds = Point & { width: number; height: number };
-const THEMES = ["PANANAGUTAN", "PAGBABAGO", "LIPUNAN"];
+const THEMES = ["UNANG SANGA", "IKALAWANG SANGA", "IKATLONG SANGA", "IKAAPAT NA SANGA"];
 const inside = (point: Point, bounds: Bounds) => bounds.width > 0 && bounds.height > 0
   && point.x >= bounds.x && point.x <= bounds.x + bounds.width
   && point.y >= bounds.y && point.y <= bounds.y + bounds.height;
@@ -199,7 +200,7 @@ export function UgatTreeGame({ storyTitle, storyAuthor, activity, activities, qu
                 const saved = results[item.id];
                 const current = index === questionIndex;
                 return <View key={item.id} ref={current ? target : undefined} collapsable={false} onLayout={current ? measureTargets : undefined}
-                  style={[s.plotPosition, { left: `${(index + 1) * 25}%` }]}>
+                  style={[s.plotPosition, { left: `${(index + 1) * 100 / (activities.length + 1)}%` }]}>
                   <Pressable testID={`ugat-tree-plot-${index + 1}`} accessibilityRole="button"
                     accessibilityLabel={`Lupa ${index + 1}: ${THEMES[index]}${saved ? saved.correct ? ", Napalago" : ", Nasagutan" : current ? ", Kasalukuyang taniman" : ", Susunod na taniman"}`}
                     accessibilityHint="Pumili ng binhi, saka pindutin dito upang itanim ang sagot."
@@ -229,9 +230,11 @@ export function UgatTreeGame({ storyTitle, storyAuthor, activity, activities, qu
             </View>}
             <Pressable testID="ugat-tree-continue" accessibilityRole="button" onPress={onContinue} style={s.primaryButton}><Text style={s.primaryButtonText}>{lastQuestion ? "Tapusin ang paglalakbay" : "Susunod na binhi"}</Text><MaterialCommunityIcons name="arrow-right" size={19} color={Colors.surface} /></Pressable>
           </View>}
+          <AssessmentInstruction instruction={activity.instruction} />
+          <AssessmentPassage passage={"passage" in activity ? activity.passage : undefined} />
           <View style={s.questionCard}>
-            <View style={s.questionMeta}><Text style={s.sectionLabel}>BINHI {questionIndex + 1} · {THEMES[questionIndex]}</Text><Text style={s.sectionLabel}>TANONG {questionIndex + 8}/10</Text></View>
-            <Text style={s.questionText}>{activity.question}</Text>
+            <View style={s.questionMeta}><Text style={s.sectionLabel}>BINHI {questionIndex + 1} · {THEMES[questionIndex]}</Text><Text style={s.sectionLabel}>TANONG {questionIndex + 7}/10</Text></View>
+            <Text testID="assessment-question" style={s.questionText}>{activity.question}</Text>
           </View>
           <View style={s.answersHeading}><Text style={s.sectionLabel}>MGA BINHI NG ALAALA</Text><Text style={s.selectHint}>Piliin o hilahin ↑</Text></View>
           {activity.choices.map((choice, index) => <SeedPacket key={choice} choice={choice} index={index}

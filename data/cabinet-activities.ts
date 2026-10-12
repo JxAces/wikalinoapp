@@ -60,7 +60,7 @@ export const cabinetActivities: CabinetActivity[] = [
   },
   {
     id: 'ugat-explore', storyId: 'm1-story-2', title: 'PAGMAMASID', mode: 'individual',
-    description: 'Pumili ng dahon para makita ang mahahalagang pangyayari sa kuwento',
+    description: 'Piliin ang bawat paksa upang makita ang mahahalagang detalye sa kuwento.',
     fields: ugatClues.map(clue => ({ id: `viewed-${clue.id}`, label: clue.title, options: [{ value: 'viewed', label: 'Natingnan' }] })),
   },
   {
@@ -78,13 +78,13 @@ export const cabinetActivities: CabinetActivity[] = [
   },
   {
     id: 'ugat-tree-map', storyId: 'm1-story-2', title: 'Banyuhay', mode: 'group',
-    description: 'I-ugnay ang mga kaisipan sa bawat bahagi ng puno (ugat, sanga, dahon, at bunga). Ipaliwanag ang koneksyon ng bawat isa at magbigay ng pangkalahatang paglalahat.',
+    description: 'Basahin ang mga ideya. Piliin kung ang bawat isa ay suliranin, pangyayari, patunay, o aral. Pagkatapos, ipaliwanag ang inyong mga sagot.',
     fields: [
       ...ugatIdeaCards.map(card => ({ id: `card-${card.id}`, label: card.text, options: ugatZones.map(zone => ({ value: zone.id, label: zone.title })) })),
       ...ugatZones.map(zone => ({ id: `note-${zone.id}`, label: zone.prompt })),
-      { id: 'synthesis-message', label: 'Ipinakikita ng akdang Ugat na…' },
-      { id: 'synthesis-evidence', label: 'Makikita ito sa…' },
-      { id: 'synthesis-insight', label: 'Dahil dito, ipinahihiwatig ng akda na…' },
+      { id: 'synthesis-message', label: 'Ano ang mensahe ng kuwento?', placeholder: 'Ipinakikita ng kuwento na…' },
+      { id: 'synthesis-evidence', label: 'Anong pangyayari sa kuwento ang nagpapakita nito?', placeholder: 'Makikita ito nang…' },
+      { id: 'synthesis-insight', label: 'Ano ang natutuhan ninyo mula rito?', placeholder: 'Natutuhan namin na…' },
     ],
   },
   {

@@ -14,11 +14,12 @@ import { AppTheme, Colors } from "../../constants/colors";
 import type { StoryActivity } from "../../data/story-types";
 import type { ActivityResult } from "../../store/useUserStore";
 import { UgatRunnerChild } from "./other-games";
+import { AssessmentInstruction, AssessmentPassage } from "./assessment-passage";
 
 type Point = { x: number; y: number };
 type Bounds = Point & { width: number; height: number };
 type ChoiceActivity = Extract<StoryActivity, { choices: string[] }>;
-const CHECKPOINTS = ["SIMBOLO", "DAHILAN", "PANANAW"];
+const CHECKPOINTS = ["PAHIWATIG", "TUNGGALIAN", "PAGGUNITA"];
 const inside = (point: Point, bounds: Bounds) => bounds.width > 0 && bounds.height > 0
   && point.x >= bounds.x && point.x <= bounds.x + bounds.width
   && point.y >= bounds.y && point.y <= bounds.y + bounds.height;
@@ -271,9 +272,11 @@ export function UgatPathGame({ storyTitle, storyAuthor, activity, activities, qu
               {lastQuestion && answered === activities.length && <Text style={s.finalScore}>Tapos ang Level 2 · {score}/{activities.length} tamang sagot</Text>}
               <Pressable testID="ugat-path-continue" accessibilityRole="button" onPress={onContinue} style={s.primaryButton}><Text style={s.primaryButtonText}>{lastQuestion ? "Bumalik sa Pagsusulit" : "Susunod na tanong"}</Text><MaterialCommunityIcons name="arrow-right" size={19} color={Colors.surface} /></Pressable>
             </View>}
+            <AssessmentInstruction instruction={activity.instruction} />
+            <AssessmentPassage passage={"passage" in activity ? activity.passage : undefined} />
             <View style={s.questionCard}>
-              <View style={s.questionMeta}><Text style={s.sectionLabel}>HAMON</Text><Text style={s.sectionLabel}>TANONG {questionIndex + 5} / 10</Text></View>
-              <Text style={s.questionText}>{activity.question}</Text>
+              <View style={s.questionMeta}><Text style={s.sectionLabel}>HAMON</Text><Text style={s.sectionLabel}>TANONG {questionIndex + 4} / 10</Text></View>
+              <Text testID="assessment-question" style={s.questionText}>{activity.question}</Text>
             </View>
             <View style={s.answersHeading}><Text style={s.sectionLabel}>MGA SUSI NG LANDAS</Text><Text style={s.selectHint}>Piliin o hilahin ↑</Text></View>
             {activity.choices.map((choice, index) => <AnswerKey

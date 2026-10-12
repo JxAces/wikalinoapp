@@ -3,6 +3,9 @@ import type { ChoiceActivity, ChoiceActivityType } from "../story-types";
 export type QuestionLevel = "pamilyar" | "suri" | "dalubhasa";
 
 export type StoryQuestion = {
+  /** Source excerpt presented separately before the assessment question. */
+  passage?: string;
+  instruction?: string;
   question: string;
   choices: [string, string, string, string];
   answer: 0 | 1 | 2 | 3;
@@ -58,7 +61,8 @@ export function createQuestionActivities(
         id: `${storyPrefix}-q${questionNumber}`,
         type: meta.type,
         title: `${meta.title} ${displayedNumber}`,
-        instruction: meta.instruction,
+        instruction: question.instruction ?? meta.instruction,
+        ...(question.passage ? { passage: question.passage } : {}),
         question: question.question,
         choices: [...question.choices],
         answer,

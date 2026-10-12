@@ -2163,8 +2163,8 @@ const styles = StyleSheet.create({
   ugatRootChoiceText: {
     flex: 1,
     color: Colors.text,
-    fontSize: 9.5,
-    lineHeight: 13,
+    fontSize: 14,
+    lineHeight: 20,
     fontWeight: "800",
   },
 
@@ -2175,6 +2175,7 @@ const styles = StyleSheet.create({
 
   ugatRunnerChoices: {
     gap: 8,
+    marginBottom: 10,
   },
 
   ugatRunnerChoice: {
@@ -2227,8 +2228,8 @@ const styles = StyleSheet.create({
   ugatRunnerChoiceText: {
     flex: 1,
     color: Colors.text,
-    fontSize: 9.5,
-    lineHeight: 14,
+    fontSize: 15,
+    lineHeight: 23,
     fontWeight: "700",
   },
 

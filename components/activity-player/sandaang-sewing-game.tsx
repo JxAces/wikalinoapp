@@ -12,6 +12,7 @@ import Svg, { Circle, Defs, G, Path, Pattern, Polygon, Rect, Text as SvgText } f
 
 import type { ChoiceActivity } from "../../data/story-types";
 import type { ActivityResult } from "../../store/useUserStore";
+import { AssessmentInstruction, AssessmentPassage } from "./assessment-passage";
 
 type Point = { x: number; y: number };
 type Bounds = Point & { width: number; height: number };
@@ -273,8 +274,10 @@ export function SandaangSewingGame({ level, activity, activities, questionIndex,
                 <Text style={s.feedbackText}>{result.correct ? "Natahi ang isang piraso ng damit." : "Naka-highlight ang tamang sagot sa ibaba."}</Text>
                 {showLevelResult && <Text style={s.finalScore}>Tapos ang Level {level} · {score} tamang sagot sa {activities.length}</Text>}
               </View>}
+              <AssessmentInstruction instruction={activity.instruction} />
+              <AssessmentPassage passage={activity.passage} />
               <Text style={s.questionLabel}>TANONG {questionIndex + 1} SA {activities.length}</Text>
-              <Text style={s.question}>{activity.question}</Text>
+              <Text testID="assessment-question" style={s.question}>{activity.question}</Text>
               {!result && <Text style={s.instruction}>I-drag ang sagot sa damit. Maaari ring pumili, saka pindutin ang damit. Isang sagot lamang bawat tanong.</Text>}
               {dropHint && !result && <Text accessibilityLiveRegion="polite" style={s.returnHint}>Ihulog sa loob ng damit. Hindi pa naitala ang sagot.</Text>}
               <View style={s.choices}>{activity.choices.map((choice, index) => <FabricChoice

@@ -11,6 +11,7 @@ export type ChoiceActivity = {
   type: ChoiceActivityType;
   title: string;
   instruction: string;
+  passage?: string;
   question: string;
   choices: string[];
   answer: string;

@@ -1,7 +1,7 @@
 import { AppTheme } from "@/constants/colors";
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { createElement, useMemo, useRef, useState } from 'react';
-import { Animated, Modal, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useRef, useState } from 'react';
+import { Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import Svg, { Ellipse, G, Path } from 'react-native-svg';
 import { ugatClues, ugatIdeaCards, ugatZones, type UgatZoneId } from '@/data/ugat-learning';
 import { getCabinetActivity, isCabinetResponseComplete } from '@/data/cabinet-activities';
@@ -11,6 +11,7 @@ type Props = {
   onChange: (field: string, value: string) => void;
   onComplete: () => void;
   completed: boolean;
+  onViewChange?: () => void;
 };
 
 function TreeArt({ roots = false }: { roots?: boolean }) {
@@ -59,92 +60,146 @@ export function UgatExploreActivity({ responses, onChange, onComplete, completed
   </View>;
 }
 
-type DragProps = { id: string; children: React.ReactNode; onStart: () => void; onDropAt: (id: string, x: number, y: number) => void };
-function DragCard({ id, children, onStart, onDropAt }: DragProps) {
-  const [position] = useState(() => new Animated.ValueXY());
-  const responder = useMemo(() => PanResponder.create({
-    onMoveShouldSetPanResponder: (_, gesture) => Math.abs(gesture.dy) > 8,
-    onPanResponderGrant: onStart,
-    onPanResponderMove: (_, gesture) => position.setValue({ x: gesture.dx, y: gesture.dy }),
-    onPanResponderRelease: (_, gesture) => { position.setValue({ x: 0, y: 0 }); onDropAt(id, gesture.moveX, gesture.moveY); },
-    onPanResponderTerminate: () => position.setValue({ x: 0, y: 0 }),
-  }), [id, onDropAt, onStart, position]);
-  if (Platform.OS === 'web') return createElement('div', {
-    draggable: true, style: { cursor: 'grab' },
-    onDragStart: (event: React.DragEvent<HTMLDivElement>) => { event.dataTransfer.setData('text/plain', id); event.dataTransfer.effectAllowed = 'move'; onStart(); },
-  }, children);
-  return <Animated.View {...responder.panHandlers} style={{ transform: position.getTranslateTransform(), zIndex: 10 }}>{children}</Animated.View>;
+type MapStage = 0 | 1 | 2;
+type NavigationKey = { key: string; preventDefault: () => void };
+const mapStages = ['Piliin', 'Ipaliwanag', 'Buuin ang sagot'] as const;
+
+function keyboardIndex(event: NavigationKey, index: number, length: number) {
+  let next: number;
+  if (event.key === 'ArrowRight' || event.key === 'ArrowDown') next = (index + 1) % length;
+  else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') next = (index + length - 1) % length;
+  else if (event.key === 'Home') next = 0;
+  else if (event.key === 'End') next = length - 1;
+  else if (event.key === ' ' || event.key === 'Spacebar') next = index;
+  else return null;
+  event.preventDefault();
+  return next;
 }
 
-export function UgatTreeMapActivity({ responses, onChange, onComplete, completed }: Props) {
+export function UgatTreeMapActivity({ responses, onChange, onComplete, completed, onViewChange }: Props) {
+  const [stage, setStage] = useState<MapStage>(0);
   const [cardIndex, setCardIndex] = useState(0);
-  const [selectedCard, setSelectedCard] = useState<string | null>(null);
   const [activeZone, setActiveZone] = useState<UgatZoneId>('root');
   const [notice, setNotice] = useState('');
   const [attempted, setAttempted] = useState(false);
-  const targets = useRef<Partial<Record<UgatZoneId, View | null>>>({});
+  const stageRefs = useRef<(View | null)[]>([]);
+  const choiceRefs = useRef<Partial<Record<UgatZoneId, View | null>>>({});
+  const noteTabRefs = useRef<Partial<Record<UgatZoneId, View | null>>>({});
+  const summaryRefs = useRef<Record<string, TextInput | null>>({});
   const currentCard = ugatIdeaCards[cardIndex];
-  const currentZone = ugatZones.find(zone => zone.id === activeZone)!;
+  const zoneIndex = ugatZones.findIndex(zone => zone.id === activeZone);
+  const currentZone = ugatZones[zoneIndex];
   const definition = getCabinetActivity('m1-story-2', 'ugat-tree-map')!;
+  const summaryFields = definition.fields.filter(field => field.id.startsWith('synthesis-'));
   const ready = isCabinetResponseComplete(definition, responses);
   const assigned = ugatIdeaCards.filter(card => ugatZones.some(zone => zone.id === responses[`card-${card.id}`])).length;
-  function place(id: string, zone: UgatZoneId) {
-    if (!ugatIdeaCards.some(card => card.id === id)) return;
-    onChange(`card-${id}`, zone);
-    setActiveZone(zone); setSelectedCard(null);
-    setNotice(`Nailagay ang ideya sa ${ugatZones.find(item => item.id === zone)?.title}. Maaari mo itong ilipat muli.`);
+  const explained = ugatZones.filter(zone => responses[`note-${zone.id}`]?.trim()).length;
+  const summarized = summaryFields.filter(field => responses[field.id]?.trim()).length;
+  const chosenZone = ugatZones.find(zone => zone.id === responses[`card-${currentCard.id}`]);
+  const assignedIdeas = ugatIdeaCards.filter(card => responses[`card-${card.id}`] === activeZone);
+  const missing: { id: string; label: string; stage: MapStage; card?: number; zone?: UgatZoneId }[] = [
+    ...ugatIdeaCards.flatMap((card, index) => ugatZones.some(zone => zone.id === responses[`card-${card.id}`]) ? [] : [{ id: `card-${card.id}`, label: `Ideya ${index + 1}: pumili ng kategorya.`, stage: 0 as MapStage, card: index }]),
+    ...ugatZones.flatMap(zone => [
+      ...(!ugatIdeaCards.some(card => responses[`card-${card.id}`] === zone.id) ? [{ id: `category-${zone.id}`, label: `${zone.title}: maglagay ng kahit isang ideya.`, stage: 0 as MapStage }] : []),
+      ...(!responses[`note-${zone.id}`]?.trim() ? [{ id: `note-${zone.id}`, label: `${zone.title}: isulat ang paliwanag.`, stage: 1 as MapStage, zone: zone.id }] : []),
+    ]),
+    ...summaryFields.filter(field => !responses[field.id]?.trim()).map(field => ({ id: field.id, label: field.label, stage: 2 as MapStage })),
+  ];
+
+  function changeStage(next: MapStage) {
+    if (stage === next) return;
+    setStage(next);
+    setNotice('');
+    onViewChange?.();
   }
-  function dropAt(id: string, x: number, y: number) {
-    for (const zone of ugatZones) targets.current[zone.id]?.measureInWindow((left, top, width, height) => {
-      if (x >= left && x <= left + width && y >= top && y <= top + height) place(id, zone.id);
-    });
+  function place(zone: UgatZoneId) {
+    if (responses[`card-${currentCard.id}`] === zone) return;
+    onChange(`card-${currentCard.id}`, zone);
+    setNotice(`Ideya ${cardIndex + 1}: napili ang ${ugatZones.find(item => item.id === zone)?.title}. Maaari mong baguhin ang pagpili.`);
   }
-  function zoneButton(id: UgatZoneId) {
-    const zone = ugatZones.find(item => item.id === id)!;
-    const count = ugatIdeaCards.filter(card => responses[`card-${card.id}`] === id).length;
-    const button = <View ref={node => { targets.current[id] = node; }} collapsable={false}>
-      <Pressable accessibilityRole="button" accessibilityLabel={`${selectedCard ? 'Ilagay ang napiling ideya sa' : 'Buksan ang'} ${zone.title}, ${count} ideya`} onPress={() => selectedCard ? place(selectedCard, id) : setActiveZone(id)} style={({ pressed }) => [s.zone, activeZone === id && s.selected, pressed && s.pressed]}>
-        <MaterialCommunityIcons name={zone.icon} size={23} color={AppTheme.primary} /><Text style={s.leafLabel}>{zone.title}</Text><Text style={s.zoneCount}>{count} ideya</Text>
-      </Pressable>
-    </View>;
-    return <View style={s.zoneSlot} key={id}>{Platform.OS === 'web' ? createElement('div', {
-      onDragOver: (event: React.DragEvent<HTMLDivElement>) => { event.preventDefault(); event.dataTransfer.dropEffect = 'move'; },
-      onDrop: (event: React.DragEvent<HTMLDivElement>) => { event.preventDefault(); place(event.dataTransfer.getData('text/plain'), id); },
-    }, button) : button}</View>;
+  function moveIdea(next: number) {
+    setCardIndex(next);
+    setNotice('');
   }
+
   return <View style={s.section}>
-    <Text style={s.helper}>I-drag ang ideya papunta sa bahagi ng puno. Maaari ring pindutin ang ideya, saka ang patutunguhan.</Text>
-    <View style={s.pager}>
-      <Pressable testID="ugat-idea-previous" accessibilityRole="button" accessibilityLabel="Nakaraang ideya" accessibilityState={{ disabled: cardIndex === 0 }} disabled={cardIndex === 0} onPress={() => { setCardIndex(i => i - 1); setSelectedCard(null); }} style={[s.ideaArrow, cardIndex === 0 && s.disabled]}><MaterialCommunityIcons name="arrow-left" size={28} color={AppTheme.primary} /></Pressable>
-      <Text style={s.helper}>IDEYA {cardIndex + 1} / {ugatIdeaCards.length}</Text>
-      <Pressable testID="ugat-idea-next" accessibilityRole="button" accessibilityLabel="Susunod na ideya" accessibilityState={{ disabled: cardIndex === ugatIdeaCards.length - 1 }} disabled={cardIndex === ugatIdeaCards.length - 1} onPress={() => { setCardIndex(i => i + 1); setSelectedCard(null); }} style={[s.ideaArrow, cardIndex === ugatIdeaCards.length - 1 && s.disabled]}><MaterialCommunityIcons name="arrow-right" size={28} color={AppTheme.primary} /></Pressable>
+    <View accessibilityRole="tablist" accessibilityLabel="Mga hakbang sa Banyuhay" style={s.stageTabs}>
+      {mapStages.map((label, index) => <Pressable key={label} testID={`ugat-map-stage-${index + 1}`} ref={node => { stageRefs.current[index] = node; }} accessibilityRole="tab" accessibilityLabel={`Hakbang ${index + 1}: ${label}`} accessibilityState={{ selected: stage === index }} aria-selected={stage === index} onPress={() => changeStage(index as MapStage)} {...(Platform.OS === 'web' ? { tabIndex: stage === index ? 0 : -1, onKeyDown: (event: NavigationKey) => {
+        const next = keyboardIndex(event, index, mapStages.length);
+        if (next !== null) { changeStage(next as MapStage); stageRefs.current[next]?.focus(); }
+      } } : {})} style={({ pressed }) => [s.stageTab, stage === index && s.selected, pressed && s.pressed]}>
+        <Text style={s.stepNumber}>{index + 1}</Text><Text style={s.stageLabel}>{label}</Text>
+      </Pressable>)}
     </View>
-    <DragCard id={currentCard.id} onStart={() => setSelectedCard(currentCard.id)} onDropAt={dropAt}>
-      <Pressable accessibilityRole="button" accessibilityLabel={`Piliin ang ideya: ${currentCard.text}`} accessibilityState={{ selected: selectedCard === currentCard.id }} onPress={() => setSelectedCard(selectedCard === currentCard.id ? null : currentCard.id)} style={[s.idea, selectedCard === currentCard.id && s.ideaSelected]}>
-        <Text style={s.paperText}>{currentCard.text}</Text><Text style={s.paperSmall}>{ugatZones.find(zone => zone.id === responses[`card-${currentCard.id}`])?.title ?? 'Hindi pa nailalagay'} · {selectedCard === currentCard.id ? 'Piliin ang bahagi ng puno ↓' : 'Pindutin o i-drag'}</Text>
-      </Pressable>
-    </DragCard>
-    <Text accessibilityLiveRegion="polite" style={s.helper}>{assigned}/{ugatIdeaCards.length} ideya ang nailagay</Text>
-    {selectedCard && <Pressable accessibilityRole="button" onPress={() => setSelectedCard(null)} style={s.cancel}><Text style={s.light}>Kanselahin ang pagpili</Text></Pressable>}
-    <View style={s.mapTree}>
-      <TreeArt roots />
-      <View style={s.zoneRow}>{zoneButton('leaf')}{zoneButton('fruit')}</View>
-      <View style={s.branchZone}>{zoneButton('branch')}</View>
-      <View style={s.rootZone}>{zoneButton('root')}</View>
+
+    {stage === 0 && <View testID="ugat-map-stage-panel-1" style={s.stageContent}>
+      <Text accessibilityRole="header" style={s.panelTitle}>1. Piliin</Text>
+      <Text style={s.light}>Basahin ang ideya. Pumili ng kategoryang babagay dito.</Text>
+      <View style={s.pager}>
+        <Pressable testID="ugat-idea-previous" accessibilityRole="button" accessibilityLabel="Nakaraang ideya" accessibilityState={{ disabled: cardIndex === 0 }} disabled={cardIndex === 0} onPress={() => moveIdea(cardIndex - 1)} style={[s.ideaArrow, cardIndex === 0 && s.disabled]}><MaterialCommunityIcons name="arrow-left" size={25} color={AppTheme.primary} /></Pressable>
+        <Text accessibilityLiveRegion="polite" style={s.progressLabel}>IDEYA {cardIndex + 1} / {ugatIdeaCards.length}</Text>
+        <Pressable testID="ugat-idea-next" accessibilityRole="button" accessibilityLabel="Susunod na ideya" accessibilityState={{ disabled: cardIndex === ugatIdeaCards.length - 1 }} disabled={cardIndex === ugatIdeaCards.length - 1} onPress={() => moveIdea(cardIndex + 1)} style={[s.ideaArrow, cardIndex === ugatIdeaCards.length - 1 && s.disabled]}><MaterialCommunityIcons name="arrow-right" size={25} color={AppTheme.primary} /></Pressable>
+      </View>
+      <View testID="ugat-map-current-idea" style={s.idea}><Text style={s.paperText}>{currentCard.text}</Text><Text style={s.paperSmall}>{chosenZone ? `Napili: ${chosenZone.title}` : 'Wala pang napipiling kategorya.'}</Text></View>
+      <View accessibilityRole="radiogroup" accessibilityLabel={`Kategorya para sa Ideya ${cardIndex + 1}`} style={s.categoryChoices}>
+        {ugatZones.map((zone, index) => <Pressable key={zone.id} testID={`ugat-map-category-${zone.id}`} ref={node => { choiceRefs.current[zone.id] = node; }} accessibilityRole="radio" accessibilityLabel={`${zone.title}. ${zone.helper}`} accessibilityState={{ checked: chosenZone?.id === zone.id }} aria-checked={chosenZone?.id === zone.id} onPress={() => place(zone.id)} {...(Platform.OS === 'web' ? { tabIndex: chosenZone ? chosenZone.id === zone.id ? 0 : -1 : index === 0 ? 0 : -1, onKeyDown: (event: NavigationKey) => {
+          const next = keyboardIndex(event, index, ugatZones.length);
+          if (next !== null) { place(ugatZones[next].id); choiceRefs.current[ugatZones[next].id]?.focus(); }
+        } } : {})} style={({ pressed }) => [s.categoryChoice, chosenZone?.id === zone.id && s.selected, pressed && s.pressed]}>
+          <MaterialCommunityIcons name={chosenZone?.id === zone.id ? 'radiobox-marked' : 'radiobox-blank'} size={24} color={AppTheme.primary} />
+          <View style={s.choiceCopy}><Text style={s.choiceTitle}>{zone.title}</Text><Text style={[s.helper, s.categoryHelp]}>{zone.helper}</Text></View>
+        </Pressable>)}
+      </View>
+      <Text accessibilityLiveRegion="polite" style={s.helper}>{notice || `${assigned}/${ugatIdeaCards.length} ideya ang may kategorya. Maaari mong baguhin ang pagpili.`}</Text>
+    </View>}
+
+    {stage === 1 && <View testID="ugat-map-stage-panel-2" style={s.stageContent}>
+      <Text accessibilityRole="header" style={s.panelTitle}>2. Ipaliwanag</Text>
+      <Text style={s.light}>Basahin ang mga ideyang inilagay ninyo. Sagutin ang tanong sa bawat kategorya.</Text>
+      <View accessibilityRole="tablist" accessibilityLabel="Mga kategoryang ipaliliwanag" style={s.noteTabs}>
+        {ugatZones.map((zone, index) => <Pressable key={zone.id} testID={`ugat-map-note-tab-${zone.id}`} ref={node => { noteTabRefs.current[zone.id] = node; }} accessibilityRole="tab" accessibilityLabel={`${index + 1}. ${zone.title}`} accessibilityState={{ selected: activeZone === zone.id }} aria-selected={activeZone === zone.id} onPress={() => setActiveZone(zone.id)} {...(Platform.OS === 'web' ? { tabIndex: activeZone === zone.id ? 0 : -1, onKeyDown: (event: NavigationKey) => {
+          const next = keyboardIndex(event, index, ugatZones.length);
+          if (next !== null) { setActiveZone(ugatZones[next].id); noteTabRefs.current[ugatZones[next].id]?.focus(); }
+        } } : {})} style={({ pressed }) => [s.noteTab, activeZone === zone.id && s.selected, pressed && s.pressed]}><Text style={s.stageLabel}>{index + 1}. {zone.title}</Text></Pressable>)}
+      </View>
+      <View style={s.panel}>
+        <Text accessibilityRole="header" style={s.panelTitle}>{zoneIndex + 1}. {currentZone.title}</Text>
+        <Text style={s.light}>{currentZone.prompt}</Text>
+        <Text style={s.progressLabel}>MGA IDEYANG INILAGAY NINYO</Text>
+        {assignedIdeas.map(card => <View key={card.id} style={s.assignedCard}><Text style={s.paperText}>{card.text}</Text></View>)}
+        {!assignedIdeas.length && <Text style={s.helper}>Wala pang ideya sa {currentZone.title}. Bumalik sa Piliin upang maglagay ng ideya.</Text>}
+        <Pressable accessibilityRole="button" onPress={() => changeStage(0)} style={s.textButton}><Text style={s.linkText}>Baguhin ang paglalagay ng mga ideya</Text></Pressable>
+        <TextInput key={activeZone} testID={`ugat-map-note-${activeZone}`} accessibilityLabel={`Paliwanag sa ${currentZone.title}. ${currentZone.prompt}`} multiline textAlignVertical="top" value={responses[`note-${activeZone}`] ?? ''} onChangeText={text => onChange(`note-${activeZone}`, text)} placeholder={currentZone.placeholder} placeholderTextColor={AppTheme.muted} style={s.input} />
+        {attempted && !responses[`note-${activeZone}`]?.trim() && <Text style={s.error}>Isulat ang paliwanag sa {currentZone.title}.</Text>}
+      </View>
+      <View style={s.pager}>
+        <Pressable testID="ugat-map-note-previous" accessibilityRole="button" accessibilityLabel="Nakaraang kategorya" accessibilityState={{ disabled: zoneIndex === 0 }} disabled={zoneIndex === 0} onPress={() => setActiveZone(ugatZones[zoneIndex - 1].id)} style={[s.secondary, zoneIndex === 0 && s.disabled]}><MaterialCommunityIcons name="arrow-left" size={20} color={AppTheme.primary} /><Text style={s.linkText}>Nauna</Text></Pressable>
+        <Text style={s.helper}>{zoneIndex + 1} / {ugatZones.length}</Text>
+        <Pressable testID="ugat-map-note-next" accessibilityRole="button" accessibilityLabel="Susunod na kategorya" accessibilityState={{ disabled: zoneIndex === ugatZones.length - 1 }} disabled={zoneIndex === ugatZones.length - 1} onPress={() => setActiveZone(ugatZones[zoneIndex + 1].id)} style={[s.secondary, zoneIndex === ugatZones.length - 1 && s.disabled]}><Text style={s.linkText}>Susunod</Text><MaterialCommunityIcons name="arrow-right" size={20} color={AppTheme.primary} /></Pressable>
+      </View>
+      <Text style={s.helper}>{explained}/{ugatZones.length} paliwanag ang naisulat.</Text>
+    </View>}
+
+    {stage === 2 && <View testID="ugat-map-stage-panel-3" style={s.stageContent}>
+      <Text accessibilityRole="header" style={s.panelTitle}>3. Buuin ang sagot</Text>
+      <Text style={s.light}>Gamitin ang inyong mga ideya at paliwanag upang sagutin ang tatlong tanong.</Text>
+      {summaryFields.map((field, index) => <View key={field.id} style={s.field}><Text style={s.choiceTitle}>{index + 1}. {field.label}</Text><TextInput ref={node => { summaryRefs.current[field.id] = node; }} testID={`ugat-map-${field.id}`} accessibilityLabel={field.label} multiline textAlignVertical="top" value={responses[field.id] ?? ''} onChangeText={text => onChange(field.id, text)} placeholder={field.placeholder} placeholderTextColor={AppTheme.muted} style={s.input} />{attempted && !responses[field.id]?.trim() && <Text style={s.error}>Sagutin ang tanong na ito.</Text>}</View>)}
+      <View testID="ugat-map-review" style={s.panel}>
+        <Text accessibilityRole="header" style={s.panelTitle}>Bago ipasa</Text>
+        <Text style={s.helper}>{assigned}/{ugatIdeaCards.length} ideya · {explained}/{ugatZones.length} paliwanag · {summarized}/{summaryFields.length} sagot</Text>
+        {missing.length ? <>
+          <Text style={s.light}>Kailangan pang sagutan:</Text>
+          {missing.map(item => <Pressable key={item.id} testID={`ugat-map-missing-${item.id}`} accessibilityRole="button" onPress={() => { if (item.card !== undefined) setCardIndex(item.card); if (item.zone) setActiveZone(item.zone); changeStage(item.stage); if (item.stage === 2) summaryRefs.current[item.id]?.focus(); }} style={s.missingItem}><MaterialCommunityIcons name="circle-outline" size={18} color={AppTheme.primary} /><Text style={[s.light, s.choiceCopy]}>{item.label}</Text><MaterialCommunityIcons name="chevron-right" size={20} color={AppTheme.primary} /></Pressable>)}
+        </> : <Text style={s.light}>✓ Kumpleto ang mga sagot. Maaari nang ipakita sa guro.</Text>}
+      </View>
+      {attempted && !ready && <Text accessibilityRole="alert" style={s.error}>May kulang pa. Tingnan ang listahan sa “Bago ipasa”.</Text>}
+      <Pressable testID="ugat-map-submit" accessibilityRole="button" accessibilityLabel="Ipasa" accessibilityState={{ disabled: completed }} disabled={completed} onPress={() => { setAttempted(true); if (ready) onComplete(); }} style={[s.primary, completed && s.disabled]}><Text style={s.primaryText}>{completed ? 'Naipasa na' : 'Ipasa'}</Text></Pressable>
+    </View>}
+
+    <View style={s.stageNavigation}>
+      {stage > 0 && <Pressable testID="ugat-map-previous-stage" accessibilityRole="button" accessibilityLabel={`Bumalik sa hakbang ${stage}: ${mapStages[stage - 1]}`} onPress={() => changeStage((stage - 1) as MapStage)} style={s.secondary}><MaterialCommunityIcons name="arrow-left" size={20} color={AppTheme.primary} /><Text style={s.linkText}>Bumalik</Text></Pressable>}
+      {stage < 2 && <Pressable testID="ugat-map-next-stage" accessibilityRole="button" accessibilityLabel={`Susunod: ${mapStages[stage + 1]}`} onPress={() => changeStage((stage + 1) as MapStage)} style={[s.secondary, s.nextStage]}><Text style={[s.linkText, s.choiceCopy]}>Susunod: {mapStages[stage + 1]}</Text><MaterialCommunityIcons name="arrow-right" size={20} color={AppTheme.primary} /></Pressable>}
     </View>
-    <Text accessibilityLiveRegion="polite" style={s.helper}>{notice || 'Piliin ang bahagi ng puno upang ipaliwanag ang mga ideyang inilagay.'}</Text>
-    <View style={s.panel}>
-      <Text accessibilityRole="header" style={s.panelTitle}>{currentZone.title}</Text><Text style={s.helper}>{currentZone.prompt}</Text>
-      {ugatIdeaCards.filter(card => responses[`card-${card.id}`] === activeZone).map(card => <View key={card.id} style={s.assignedCard}><Text style={[s.light, { flex: 1 }]}>{card.text}</Text><Pressable accessibilityRole="button" accessibilityLabel={`Alisin ang ideya: ${card.text}`} onPress={() => { onChange(`card-${card.id}`, ''); setNotice('Ibinalik ang ideya sa mga hindi pa nailalagay.'); }} style={s.close}><MaterialCommunityIcons name="close" color={AppTheme.primary} size={20} /></Pressable></View>)}
-      {!ugatIdeaCards.some(card => responses[`card-${card.id}`] === activeZone) && <Text style={s.helper}>Wala pang ideya rito.</Text>}
-      <TextInput accessibilityLabel={`Paliwanag sa ${currentZone.title}`} multiline textAlignVertical="top" value={responses[`note-${activeZone}`] ?? ''} onChangeText={text => onChange(`note-${activeZone}`, text)} placeholder="Ipaliwanag ang ugnayan ng mga ideya sa bahaging ito…" placeholderTextColor={AppTheme.muted} style={s.input} />
-      {attempted && !responses[`note-${activeZone}`]?.trim() && <Text style={s.error}>Isulat ang paliwanag sa bahaging ito.</Text>}
-    </View>
-    <Text accessibilityRole="header" style={s.panelTitle}>Buuin ang sintesis</Text>
-    {definition.fields.filter(field => field.id.startsWith('synthesis-')).map(field => <View key={field.id} style={s.field}><Text style={s.light}>{field.label}</Text><TextInput accessibilityLabel={field.label} multiline textAlignVertical="top" value={responses[field.id] ?? ''} onChangeText={text => onChange(field.id, text)} placeholder="Isulat ang sagot ng pangkat…" placeholderTextColor={AppTheme.muted} style={s.input} />{attempted && !responses[field.id]?.trim() && <Text style={s.error}>Kailangan ang sagot dito.</Text>}</View>)}
-    <View style={s.panel}><Text style={s.light}>Pagsusuri bago tapusin</Text>{ugatZones.map(zone => <Text key={zone.id} style={s.helper}>{ugatIdeaCards.some(card => responses[`card-${card.id}`] === zone.id) && responses[`note-${zone.id}`]?.trim() ? '✓' : '○'} {zone.title} · ideya at paliwanag</Text>)}</View>
-    {attempted && !ready && <Text accessibilityRole="alert" style={s.error}>Ilagay ang anim na ideya, maglaan ng kahit isang ideya at paliwanag sa bawat bahagi, at punan ang tatlong bahagi ng sintesis.</Text>}
-    <Pressable accessibilityRole="button" accessibilityLabel="Ipasa" accessibilityState={{ disabled: completed }} disabled={completed} onPress={() => { setAttempted(true); if (ready) onComplete(); }} style={[s.primary, completed && s.disabled]}><Text style={s.primaryText}>Ipasa</Text></Pressable>
   </View>;
 }
 
@@ -160,11 +215,13 @@ const s = StyleSheet.create({
   dialog: { width: '100%', maxWidth: 620, maxHeight: '90%', backgroundColor: AppTheme.surface, borderRadius: 20, padding: 16, borderWidth: 2, borderColor: AppTheme.border, flexShrink: 1 },
   dialogHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }, paperTitle: { color: AppTheme.text, fontSize: 24, fontWeight: '900', flex: 1 },
   close: { minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' }, paperBody: { paddingVertical: 14, gap: 14 }, paperText: { fontSize: 15, lineHeight: 25, color: AppTheme.text }, paperSmall: { color: AppTheme.muted, fontSize: 12, lineHeight: 19, marginTop: 8 },
-  pager: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }, ideaArrow: { minWidth: 48, minHeight: 48, alignItems: 'center', justifyContent: 'center', borderRadius: 12, backgroundColor: AppTheme.surfaceSoft, borderWidth: 1, borderColor: AppTheme.border }, idea: { backgroundColor: AppTheme.surfaceSoft, borderRadius: 14, padding: 16, borderWidth: 3, borderColor: AppTheme.border, minHeight: 132 }, ideaSelected: { borderColor: AppTheme.primary, backgroundColor: AppTheme.selected },
-  mapTree: { borderRadius: 20, overflow: 'hidden', backgroundColor: AppTheme.surfaceSoft, padding: 12, gap: 13 }, zoneRow: { flexDirection: 'row', gap: 12 }, zoneSlot: { flex: 1, minWidth: 0 },
-  zone: { minHeight: 87, backgroundColor: AppTheme.surfaceSoft, borderColor: AppTheme.border, borderWidth: 2, borderRadius: 15, alignItems: 'center', justifyContent: 'center', padding: 8, gap: 3 },
-  zoneCount: { color: AppTheme.muted, fontSize: 11 }, branchZone: { width: '47%', marginVertical: 5 }, rootZone: { width: '57%', alignSelf: 'center', marginTop: 8 },
+  pager: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 }, ideaArrow: { minWidth: 48, minHeight: 48, alignItems: 'center', justifyContent: 'center', borderRadius: 12, backgroundColor: AppTheme.surfaceSoft, borderWidth: 1, borderColor: AppTheme.border }, idea: { backgroundColor: AppTheme.surfaceSoft, borderRadius: 14, padding: 16, borderWidth: 2, borderColor: AppTheme.border },
+  stageTabs: { flexDirection: 'row', gap: 7 }, stageTab: { flex: 1, minWidth: 0, minHeight: 80, paddingVertical: 10, paddingHorizontal: 5, borderWidth: 2, borderColor: AppTheme.border, borderRadius: 12, backgroundColor: AppTheme.surfaceSoft, alignItems: 'center', justifyContent: 'center', gap: 5 },
+  stepNumber: { color: AppTheme.primary, fontSize: 18, fontWeight: '900' }, stageLabel: { color: AppTheme.text, fontSize: 14, lineHeight: 20, fontWeight: '800', textAlign: 'center' }, stageContent: { gap: 14 }, progressLabel: { color: AppTheme.muted, fontSize: 12, lineHeight: 19, fontWeight: '800' },
+  categoryChoices: { gap: 10 }, categoryChoice: { minHeight: 76, flexDirection: 'row', alignItems: 'center', gap: 12, padding: 13, borderWidth: 2, borderColor: AppTheme.border, borderRadius: 13, backgroundColor: AppTheme.surfaceSoft }, choiceCopy: { flex: 1, minWidth: 0 }, choiceTitle: { color: AppTheme.text, fontSize: 16, lineHeight: 24, fontWeight: '800' }, categoryHelp: { fontSize: 14, lineHeight: 22, marginTop: 2 },
+  noteTabs: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 }, noteTab: { minWidth: 0, width: '47%', flexGrow: 1, minHeight: 48, padding: 10, borderWidth: 2, borderColor: AppTheme.border, borderRadius: 11, backgroundColor: AppTheme.surfaceSoft, justifyContent: 'center' },
+  secondary: { minHeight: 48, minWidth: 0, padding: 10, borderRadius: 11, borderWidth: 1, borderColor: AppTheme.border, backgroundColor: AppTheme.surfaceSoft, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, flexShrink: 1 }, linkText: { color: AppTheme.primary, fontSize: 14, lineHeight: 22, fontWeight: '800' }, textButton: { alignSelf: 'flex-start', paddingVertical: 8, minHeight: 44, justifyContent: 'center' }, stageNavigation: { flexDirection: 'row', alignItems: 'center', gap: 10 }, nextStage: { flex: 1 }, missingItem: { minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 6 },
   panel: { padding: 15, backgroundColor: AppTheme.panel, borderWidth: 1, borderColor: AppTheme.border, borderRadius: 14, gap: 10 }, panelTitle: { color: AppTheme.text, fontSize: 19, fontWeight: '800' },
-  assignedCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: AppTheme.surface, borderRadius: 10, paddingLeft: 10 },
-  input: { backgroundColor: AppTheme.surface, color: AppTheme.text, fontSize: 16, lineHeight: 24, minHeight: 100, borderRadius: 10, padding: 12, borderWidth: 1, borderColor: AppTheme.border }, field: { gap: 8 }, error: { color: AppTheme.error, fontSize: 12, lineHeight: 20 }, cancel: { padding: 10, alignSelf: 'flex-start' },
+  assignedCard: { backgroundColor: AppTheme.surface, borderRadius: 10, padding: 12 },
+  input: { backgroundColor: AppTheme.surface, color: AppTheme.text, fontSize: 16, lineHeight: 24, minHeight: 100, borderRadius: 10, padding: 12, borderWidth: 1, borderColor: AppTheme.border }, field: { gap: 8 }, error: { color: AppTheme.error, fontSize: 12, lineHeight: 20 },
 });
