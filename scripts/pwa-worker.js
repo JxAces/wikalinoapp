@@ -32,6 +32,12 @@ self.addEventListener("fetch", event => {
       response = await cache.match(html) || await cache.match("/index.html");
     }
     if (!response) return fetch(event.request);
+    // Static hosts can redirect exported .html URLs to clean routes. A cached
+    // followed redirect cannot satisfy a navigation's manual redirect mode.
+    // Recreate its readable response so offline navigation has no URL history.
+    if (event.request.mode === "navigate" && response.redirected) {
+      response = new Response(response.body, { status: response.status, statusText: response.statusText, headers: response.headers });
+    }
     // Safari requests byte ranges for audio. Serve them from the cached file.
     const range = event.request.headers.get("range");
     if (range) {

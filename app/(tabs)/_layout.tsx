@@ -203,6 +203,7 @@ export default function TabsLayout() {
       <Tabs.Screen name="quest-world" options={{ href: null, tabBarStyle: { display: "none" } }} />
       <Tabs.Screen name="story-room" options={{ href: null, tabBarStyle: { display: "none" } }} />
       <Tabs.Screen name="story-cabinet" options={{ href: null, tabBarStyle: { display: "none" } }} />
+      <Tabs.Screen name="student-records" options={{ href: null, tabBarStyle: { display: "none" } }} />
 
       <Tabs.Screen
         name="story-result"

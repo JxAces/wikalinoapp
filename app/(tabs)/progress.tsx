@@ -129,6 +129,13 @@ export default function ProgressScreen() {
           <Stat icon="star-four-points" value={String(totalStars)} label="NAIPONG TALA" />
         </View>
 
+        <Pressable accessibilityRole="button" accessibilityLabel="Buksan ang Aking mga Tala: mga iskor at sagot sa Gawain" onPress={() => router.push("/student-records")}
+          style={({ pressed }) => [styles.collection, pressed && styles.pressed]}>
+          <MaterialCommunityIcons name="notebook-check-outline" color={Colors.secondary} size={30} />
+          <View style={styles.flex}><Text style={styles.collectionTitle}>Aking mga Tala</Text><Text style={styles.collectionHint}>Mga iskor sa pagsusulit at sagot sa Gawain, bawat kuwento</Text></View>
+          <MaterialCommunityIcons name="chevron-right" color={Colors.secondary} size={24} />
+        </Pressable>
+
         <Pressable accessibilityRole="button" onPress={() => router.replace("/landing")} style={({ pressed }) => [styles.playButton, pressed && styles.pressed]}>
           <View style={styles.playIcon}><MaterialCommunityIcons name="map-marker-path" size={26} color={Colors.accent} /></View>
           <View style={styles.flex}>

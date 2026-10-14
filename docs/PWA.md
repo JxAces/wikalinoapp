@@ -23,11 +23,21 @@ On Android, use the browser's Install app/Add to Home screen action. An HTTPS
 deployment is needed before sharing an install link; the build alone does not
 publish the app.
 
+The public app is available at https://wikalinggo.jadeaceflor.chatgpt.site.
+
 The first online visit downloads all exported routes, bundles, images, fonts,
 music, and eight runtime GLBs into a versioned service-worker cache. Keep the
 app online until that download completes before using it offline. A failed
 download does not activate a partially cached update. After an update is ready,
 close all Wikalino tabs/windows and reopen to use the new version.
+
+The PWA build moves Expo dependency assets from `assets/node_modules` to
+`assets/vendor` and updates their exported references before caching. This
+keeps fonts and icons available on hosts that exclude `node_modules` paths.
+Expo's server-only `_expo/.routes.json` metadata is excluded from the offline
+cache. Cached navigation also supports hosts that redirect `.html` URLs to
+extensionless routes. Run `node scripts/check-pwa-export.mjs` to check the
+export step and `node scripts/check-pwa-worker.mjs` to check cached requests.
 
 Music starts after a tap or key press to meet browser autoplay rules, pauses
 when the app is hidden, and supports offline byte-range playback. Progress and
