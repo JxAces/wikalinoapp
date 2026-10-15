@@ -3,10 +3,11 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { Redirect, router, useIsFocused, useLocalSearchParams } from "expo-router";
 import { useRef, useState } from "react";
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Keyboard, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { ActivityCabinetCard } from "@/components/story-cabinet/ActivityCabinetCard";
+import { ActivityCompletionDialog } from "@/components/story-cabinet/ActivityCompletionDialog";
 import { CharacterTransformationMap } from "@/components/story-cabinet/CharacterTransformationMap";
 import { DetectiveActivity } from "@/components/story-cabinet/DetectiveActivity";
 import { UgatCheckActivity } from "@/components/story-cabinet/UgatCheckActivity";
@@ -107,11 +108,17 @@ function CabinetEditor({ activity, story, onBack, onNext, onFocusActivity }: { a
   const [showErrors, setShowErrors] = useState(false);
   const [showExample, setShowExample] = useState(false);
   const [message, setMessage] = useState("");
+  const [showCompletion, setShowCompletion] = useState(false);
+  const completionPending = useRef(false);
   const isTransformation = activity.id === "damit-transformation";
   const isUgatCheck = activity.id === "ugat-check";
   const isUgatExplore = activity.id === 'ugat-explore';
   const isUgatTreeMap = activity.id === 'ugat-tree-map';
   const isDetective = activity.id === "damit-detective";
+  const completed = Boolean(saved?.completedAt) && isCabinetResponseComplete(activity, responses);
+  const successMessage = isUgatExplore
+    ? 'Naka-save sa device na ito ang mga pahiwatig na natingnan. Maaari mong balikan ang mga ito anumang oras.'
+    : 'Naka-save sa device na ito ang iyong mga sagot. Maaari nang ipakita sa guro para sa pagsusuri.';
 
   function changeAnswer(fieldId: string, value: string) {
     // Puzzle checks may save several fields during one event before React renders.
@@ -119,29 +126,45 @@ function CabinetEditor({ activity, story, onBack, onNext, onFocusActivity }: { a
     responsesRef.current = next;
     setResponses(next);
     setMessage("");
+    completionPending.current = false;
     saveResponse({ storyId: activity.storyId, activityId: activity.id, responses: next, groupName });
   }
   function complete() {
+    if (completionPending.current || completed) return;
     const currentResponses = responsesRef.current;
     if (!isCabinetResponseComplete(activity, currentResponses)) { setShowErrors(true); setMessage(activity.id === 'utos-sequence' ? 'Ayusin ang anim na pangyayari sa tamang pagkakasunod-sunod. Gamitin ang bawat story card nang isang beses lamang.' : activity.storyId === 'm1-story-3' ? 'Tapusin ang bawat bahagi at suriin ang iyong mga sagot bago ipasa.' : "Punan ang lahat ng sagot at patunay bago tapusin ang gawain."); return; }
+    completionPending.current = true;
     saveResponse({ storyId: activity.storyId, activityId: activity.id, responses: currentResponses, groupName, complete: true });
+    const result = useUserStore.getState().cabinetResponses[activity.id];
+    if (!result?.completedAt || result.storyId !== activity.storyId || !isCabinetResponseComplete(activity, result.responses)) {
+      completionPending.current = false;
+      setShowErrors(true);
+      setMessage('Hindi nakumpleto ang gawain. Suriin ang iyong mga sagot at subukang muli.');
+      return;
+    }
+    Keyboard.dismiss();
     setShowErrors(false);
-    setMessage(isUgatExplore ? 'Tapos na ang paggalugad. Maaari mong balikan ang mga pahiwatig anumang oras.' : isDetective ? "Kumpleto ang ulat. Naka-save sa device na ito; ipakita ito sa guro." : "Kumpleto at naka-save sa device na ito. Maaari nang ipakita sa guro.");
+    setMessage(`Kumpleto na ang gawain! ${successMessage}`);
+    setShowCompletion(true);
   }
 
-  if (activity.id === 'utos-conflict') return <UtosConflictActivity
+  const completionDialog = <ActivityCompletionDialog visible={showCompletion} activityTitle={activity.title} message={successMessage}
+    onReview={() => setShowCompletion(false)} onBack={() => { setShowCompletion(false); onBack(); }} />;
+
+  if (activity.id === 'utos-conflict') return <><UtosConflictActivity
     activity={activity} responses={responses} onChange={changeAnswer} onComplete={complete}
-    completed={Boolean(saved?.completedAt) && isCabinetResponseComplete(activity, responses)} hasDraft={Boolean(saved)} onBack={onBack}
+    completed={completed} hasDraft={Boolean(saved)} onBack={onBack}
     onViewChange={() => onFocusActivity(0)}
-  />;
+  />{completionDialog}</>;
 
   const UtosActivity = activity.id === 'utos-meanings' ? UtosMeaningsActivity :
     activity.id === 'utos-sequence' ? UtosSequenceActivity : activity.id === 'utos-stand-up' ? UtosReflectionActivity : null;
   if (UtosActivity) return <View style={styles.inner}>
     <UtosActivity activity={activity} responses={responses} onChange={changeAnswer} onComplete={complete}
-      completed={Boolean(saved?.completedAt) && isCabinetResponseComplete(activity, responses)} showErrors={showErrors} />
+      completed={completed} showErrors={showErrors} />
     {message ? <Text accessibilityRole={showErrors ? "alert" : "text"} accessibilityLiveRegion="polite" style={[styles.message, showErrors && styles.error]}>{message}</Text> : null}
     <Pressable accessibilityRole="button" onPress={onBack} style={[styles.secondary, styles.utosBack]}><Text style={styles.secondaryText}>Bumalik sa korona</Text></Pressable>
+    {completionDialog}
   </View>;
 
   return <View style={styles.inner}>
@@ -150,16 +173,16 @@ function CabinetEditor({ activity, story, onBack, onNext, onFocusActivity }: { a
       <Text accessibilityRole="header" style={styles.title}>{activity.title}</Text>
       <Text style={styles.subtitle}>{activity.description}</Text>
     </>}
-    <View style={styles.savedStatus} accessibilityLiveRegion="polite"><MaterialCommunityIcons name={saved?.completedAt ? isDetective ? "file-document-outline" : "check-circle-outline" : "content-save-outline"} size={17} color={AppTheme.primary} /><Text style={styles.savedText}>{saved?.completedAt ? "Kumpleto · Naka-save sa device" : saved ? "Draft · Naka-save sa device" : "Awtomatikong mase-save ang iyong sagot"}</Text></View>
+    <View style={styles.savedStatus} accessibilityLiveRegion="polite"><MaterialCommunityIcons name={completed ? isDetective ? "file-document-outline" : "check-circle-outline" : "content-save-outline"} size={17} color={AppTheme.primary} /><Text style={styles.savedText}>{completed ? "Kumpleto · Naka-save sa device" : saved ? "Draft · Naka-save sa device" : "Awtomatikong mase-save ang iyong sagot"}</Text></View>
     {activity.mode === "group" && <>
       <Text nativeID="cabinet-group-label" style={styles.label}>Pangalan ng pangkat (opsyonal)</Text>
-      <TextInput accessibilityLabel="Pangalan ng pangkat (opsyonal)" accessibilityLabelledBy="cabinet-group-label" value={groupName} onChangeText={value => { setGroupName(value); saveResponse({ storyId: activity.storyId, activityId: activity.id, responses, groupName: value }); setMessage(""); }} placeholder="Pangalan ng inyong pangkat" placeholderTextColor={AppTheme.muted} style={styles.input} />
+      <TextInput accessibilityLabel="Pangalan ng pangkat (opsyonal)" accessibilityLabelledBy="cabinet-group-label" value={groupName} onChangeText={value => { setGroupName(value); completionPending.current = false; saveResponse({ storyId: activity.storyId, activityId: activity.id, responses, groupName: value }); setMessage(""); }} placeholder="Pangalan ng inyong pangkat" placeholderTextColor={AppTheme.muted} style={styles.input} />
     </>}
     {activity.example && !isDetective && <View style={styles.example}>
       <Pressable accessibilityRole="button" accessibilityState={{ expanded: showExample }} onPress={() => setShowExample(value => !value)} style={styles.exampleButton}><MaterialCommunityIcons name="lightbulb-outline" size={18} color={AppTheme.primary} /><Text style={styles.exampleTitle}>{showExample ? "Itago ang halimbawa" : "Tingnan ang halimbawa"}</Text></Pressable>
       {showExample && <Text style={styles.exampleText}>Pangunahing Tauhan: {activity.example.answer}{"\n"}Patunay: {activity.example.evidence}</Text>}
     </View>}
-    {isUgatExplore ? <UgatExploreActivity responses={responses} onChange={changeAnswer} onComplete={complete} completed={Boolean(saved?.completedAt)} /> : isUgatTreeMap ? <View onLayout={event => { ugatMapTop.current = event.nativeEvent.layout.y; }}><UgatTreeMapActivity responses={responses} onChange={changeAnswer} onComplete={complete} completed={Boolean(saved?.completedAt)} onViewChange={() => requestAnimationFrame(() => onFocusActivity(ugatMapTop.current))} /></View> : isDetective ? <View onLayout={event => { detectiveTop.current = event.nativeEvent.layout.y; }}><DetectiveActivity activity={activity} story={story} responses={responses} groupName={groupName} onChange={changeAnswer} onComplete={complete} showErrors={showErrors} completed={Boolean(saved?.completedAt)} onViewChange={() => requestAnimationFrame(() => onFocusActivity(detectiveTop.current))} /></View> : isTransformation ? <CharacterTransformationMap fields={activity.fields} responses={responses} onChange={changeAnswer} onComplete={complete} showErrors={showErrors} completed={Boolean(saved?.completedAt)} /> : isUgatCheck ? <UgatCheckActivity activity={activity} responses={responses} onChange={changeAnswer} onComplete={complete} showErrors={showErrors} completed={Boolean(saved?.completedAt)} /> : activity.fields.map((field, index) => {
+    {isUgatExplore ? <UgatExploreActivity responses={responses} onChange={changeAnswer} onComplete={complete} completed={completed} /> : isUgatTreeMap ? <View onLayout={event => { ugatMapTop.current = event.nativeEvent.layout.y; }}><UgatTreeMapActivity responses={responses} onChange={changeAnswer} onComplete={complete} completed={completed} onViewChange={() => requestAnimationFrame(() => onFocusActivity(ugatMapTop.current))} /></View> : isDetective ? <View onLayout={event => { detectiveTop.current = event.nativeEvent.layout.y; }}><DetectiveActivity activity={activity} story={story} responses={responses} groupName={groupName} onChange={changeAnswer} onComplete={complete} showErrors={showErrors} completed={completed} onViewChange={() => requestAnimationFrame(() => onFocusActivity(detectiveTop.current))} /></View> : isTransformation ? <CharacterTransformationMap fields={activity.fields} responses={responses} onChange={changeAnswer} onComplete={complete} showErrors={showErrors} completed={completed} /> : isUgatCheck ? <UgatCheckActivity activity={activity} responses={responses} onChange={changeAnswer} onComplete={complete} showErrors={showErrors} completed={completed} /> : activity.fields.map((field, index) => {
       const value = responses[field.id] ?? "";
       const invalid = showErrors && (!value.trim() || Boolean(field.options && !field.options.some(option => option.value === value)));
       return <View key={field.id} style={styles.field}>
@@ -178,9 +201,10 @@ function CabinetEditor({ activity, story, onBack, onNext, onFocusActivity }: { a
     <View style={styles.actions}>
       <Pressable accessibilityRole="button" onPress={onBack} style={styles.secondary}><Text style={styles.secondaryText}>{story.id === 'm1-story-3' ? 'Bumalik sa korona ng mga gawain' : story.id === 'm1-story-2' ? 'Bumalik sa puno ng gawain' : 'Bumalik'}</Text></Pressable>
       {onNext && <Pressable accessibilityRole="button" onPress={onNext} style={styles.secondary}><Text style={styles.secondaryText}>Susunod na gawain →</Text></Pressable>}
-      {!isDetective && !isTransformation && !isUgatCheck && !isUgatExplore && !isUgatTreeMap && <Pressable accessibilityRole="button" accessibilityLabel="Ipasa" onPress={complete} style={styles.primary}><Text style={styles.primaryText}>Ipasa</Text></Pressable>}
+      {!isDetective && !isTransformation && !isUgatCheck && !isUgatExplore && !isUgatTreeMap && <Pressable accessibilityRole="button" accessibilityLabel={completed ? 'Kumpleto na' : 'Ipasa'} accessibilityState={{ disabled: completed }} disabled={completed} onPress={complete} style={[styles.primary, completed && styles.disabled]}><Text style={styles.primaryText}>{completed ? 'Kumpleto na' : 'Ipasa'}</Text></Pressable>}
     </View>
     <Text style={styles.storageNote}>{isUgatExplore ? 'Naka-save sa device ang mga pahiwatig na natingnan. Walang marka ang paggalugad na ito.' : 'Ang “kumpleto” ay nangangahulugang napunan ang gawain. Ang guro ang susuri sa nilalaman; wala pang awtomatikong marka o pagpapasa online.'}</Text>
+    {completionDialog}
   </View>;
 }
 
@@ -218,7 +242,7 @@ const styles = StyleSheet.create({
   activityTitle: { color: AppTheme.text, fontSize: 21, lineHeight: 28, fontWeight: "800" },
   activityMode: { color: AppTheme.muted, fontSize: 12, marginTop: 7 },
   compartmentBottom: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 19 },
-  activityStatus: { color: AppTheme.muted, fontSize: 12 }, pressed: { opacity: 0.75 },
+  activityStatus: { color: AppTheme.muted, fontSize: 12 }, pressed: { opacity: 0.75 }, disabled: { opacity: 0.5 },
   storageNote: { fontSize: 12, lineHeight: 20, color: AppTheme.muted, marginTop: 23 },
   notice: { padding: 20, backgroundColor: AppTheme.surfaceSoft, borderRadius: 14, marginTop: 25 }, noticeText: { fontSize: 15, lineHeight: 23, color: AppTheme.success, marginBottom: 18 },
   savedStatus: { flexDirection: "row", alignItems: "center", gap: 8, marginVertical: 19 }, savedText: { flex: 1, color: AppTheme.success, fontSize: 12 },

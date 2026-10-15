@@ -1,4 +1,4 @@
-import { ugatClues, ugatIdeaCards, ugatZones } from './ugat-learning';
+import { ugatClues, ugatIdeaCards, ugatMapZones, ugatZones } from './ugat-learning';
 import { utosActivities } from './utos-learning';
 
 export type CabinetField = {
@@ -78,9 +78,11 @@ export const cabinetActivities: CabinetActivity[] = [
   },
   {
     id: 'ugat-tree-map', storyId: 'm1-story-2', title: 'Banyuhay', mode: 'group',
-    description: 'Basahin ang mga ideya. Piliin kung ang bawat isa ay suliranin, pangyayari, patunay, o aral. Pagkatapos, ipaliwanag ang inyong mga sagot.',
+    description: 'Pumili ng isang ideya at tukuyin kung ito ay suliranin, pangyayari, o aral. Pagkatapos, magbigay ng patunay mula sa kuwento.',
     fields: [
-      ...ugatIdeaCards.map(card => ({ id: `card-${card.id}`, label: card.text, options: ugatZones.map(zone => ({ value: zone.id, label: zone.title })) })),
+      { id: 'selected-idea', label: 'Ang napiling ideya', options: ugatIdeaCards.map(card => ({ value: card.id, label: card.text })) },
+      ...ugatIdeaCards.map(card => ({ id: `card-${card.id}`, label: card.text, options: ugatMapZones.map(zone => ({ value: zone.id, label: zone.title })) })),
+      // Retain earlier keys so autosaving the shorter activity does not erase past work.
       ...ugatZones.map(zone => ({ id: `note-${zone.id}`, label: zone.prompt })),
       { id: 'synthesis-message', label: 'Ano ang mensahe ng kuwento?', placeholder: 'Ipinakikita ng kuwento na…' },
       { id: 'synthesis-evidence', label: 'Anong pangyayari sa kuwento ang nagpapakita nito?', placeholder: 'Makikita ito nang…' },
@@ -114,8 +116,33 @@ export function getCabinetActivity(storyId: string, activityId: string) {
   return cabinetActivities.find(activity => activity.storyId === storyId && activity.id === activityId);
 }
 
+/** Resolve one effective choice without rewriting saved legacy assignments. */
+export function getUgatMapSelection(responses: Record<string, string> | null | undefined): {
+  card: typeof ugatIdeaCards[number];
+  zone: typeof ugatMapZones[number];
+} | null {
+  if (!responses || typeof responses !== 'object' || Array.isArray(responses)) return null;
+  if (Object.prototype.hasOwnProperty.call(responses, 'selected-idea')) {
+    const card = ugatIdeaCards.find(item => item.id === responses['selected-idea']);
+    const zone = card && ugatMapZones.find(item => item.id === responses[`card-${card.id}`]);
+    return card && zone ? { card, zone } : null;
+  }
+  // Old versions stored several assignments. Their first supported idea becomes
+  // the current selection; the remaining saved answers stay available in storage.
+  for (const card of ugatIdeaCards) {
+    const zone = ugatMapZones.find(item => item.id === responses[`card-${card.id}`]);
+    if (zone) return { card, zone };
+  }
+  return null;
+}
+
 export function isCabinetResponseComplete(activity: CabinetActivity, responses: Record<string, string> | null | undefined) {
   if (!responses || typeof responses !== 'object' || Array.isArray(responses)) return false;
+  if (activity.id === 'ugat-tree-map') {
+    const selection = getUgatMapSelection(responses);
+    const evidence = selection && responses[`note-${selection.zone.id}`];
+    return typeof evidence === 'string' && evidence.trim().length > 0;
+  }
   if (activity.id === 'utos-conflict' &&
     (responses['jumble-jojo'] !== 'JOJO' || responses['jumble-minyong'] !== 'MINYONG')) return false;
   if (activity.id === 'utos-meanings' &&
@@ -126,7 +153,6 @@ export function isCabinetResponseComplete(activity: CabinetActivity, responses: 
   }
   if (activity.id === 'utos-stand-up' &&
     (responses.meaning !== 'A' || !Array.from({ length: 6 }, (_, index) => responses[`minyong-face-${index}`] === String(index)).every(Boolean))) return false;
-  if (activity.id === 'ugat-tree-map' && !ugatZones.every(zone => ugatIdeaCards.some(card => responses[`card-${card.id}`] === zone.id))) return false;
   return activity.fields.every(field => {
     const value = responses[field.id];
     return typeof value === "string" && value.trim().length > 0 && (!field.options || field.options.some(option => option.value === value));

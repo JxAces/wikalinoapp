@@ -139,7 +139,7 @@ export function UtosConflictActivity({ activity, responses, onChange, onComplete
           {button(`Baguhin ang Yugto ${index + 1}`, () => goTo(index), false, true)}
         </View>)}
         {completed && <Text accessibilityLiveRegion="polite" style={styles.savedNotice}>Naka-save na ang iyong mga sagot. Handa nang ipakita sa guro.</Text>}
-        <View style={styles.actions}>{button('Ipasa', onComplete, !ready || completed)}</View>
+        <View style={styles.actions}>{button(completed ? 'Kumpleto na' : 'Ipasa', onComplete, !ready || completed)}</View>
       </> : <>
         <View style={styles.roundHeading}><Text style={styles.eyebrow}>YUGTO {step + 1} / 3</Text><View style={[styles.roundBadge, step === 2 && styles.bossBadge]}><MaterialCommunityIcons name={step === 2 ? 'crown' : 'book-open-page-variant-outline'} size={16} color={step === 2 ? AppTheme.buttonText : AppTheme.primary} /><Text style={[styles.badgeText, step === 2 && styles.bossText]}>{step === 2 ? 'BOSS LEVEL' : round.title}</Text></View></View>
         <Text accessibilityRole="header" style={styles.roundTitle}>{round.theme}</Text>

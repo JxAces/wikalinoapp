@@ -1,5 +1,6 @@
 import {
   getCabinetActivities,
+  getUgatMapSelection,
   isCabinetResponseComplete,
   type CabinetActivity,
 } from "../data/cabinet-activities";
@@ -46,7 +47,7 @@ export function getStudentStoryRecord(
     const response = saved?.storyId === story.id && saved.activityId === activity.id
       ? saved
       : undefined;
-    const fields = activity.fields.map(field => {
+    let fields = activity.fields.map(field => {
       const value = response?.responses?.[field.id];
       const trimmed = typeof value === "string" ? value.trim() : "";
       // Keep paragraphs intact and retain readable answers from older saves.
@@ -55,6 +56,15 @@ export function getStudentStoryRecord(
         : null;
       return { id: field.id, label: field.label, answer };
     });
+    if (activity.id === 'ugat-tree-map') {
+      const selection = getUgatMapSelection(response?.responses);
+      const value = selection && response?.responses?.[`note-${selection.zone.id}`];
+      fields = [
+        { id: 'selected-idea', label: 'Ang napiling ideya', answer: selection?.card.text ?? null },
+        { id: selection ? `card-${selection.card.id}` : 'selected-category', label: 'Kategorya', answer: selection?.zone.title ?? null },
+        { id: selection ? `note-${selection.zone.id}` : 'selected-evidence', label: 'Patunay mula sa kuwento', answer: typeof value === 'string' && value.trim() ? value.trim() : null },
+      ];
+    }
 
     return {
       activity,

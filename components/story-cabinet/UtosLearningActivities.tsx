@@ -130,7 +130,7 @@ export function UtosMeaningsActivity({ activity, responses, onChange, onComplete
       <View style={s.actions}>
         {step > 0 && <Action secondary onPress={() => setStep(step - 1)}>Nakaraang tanong</Action>}
         {step < 2 ? <Action testID="utos-meanings-next" disabled={!correct[step]} onPress={() => setStep(step + 1)}>Susunod na tanong</Action>
-          : <Action testID="utos-meanings-submit" disabled={!ready || completed} onPress={onComplete}>Ipasa</Action>}
+          : <Action testID="utos-meanings-submit" disabled={!ready || completed} onPress={onComplete}>{completed ? 'Kumpleto na' : 'Ipasa'}</Action>}
       </View>
       {showErrors && !ready && <Text style={s.errorText}>Sagutin nang tama ang lahat ng tanong upang makumpleto ang gawain.</Text>}
     </View>
@@ -176,7 +176,7 @@ export function UtosSequenceActivity({ activity, responses, onChange, onComplete
       <View style={s.actions}>
         {step > 0 && <Action secondary onPress={() => setStep(step - 1)}>Nakaraang bilang</Action>}
         {step < fields.length - 1 && <Action testID="utos-sequence-next" disabled={!responses[field.id]} onPress={() => setStep(step + 1)}>Susunod na bilang</Action>}
-        <Action testID="utos-sequence-submit" disabled={!ready || completed} onPress={onComplete}>Ipasa</Action>
+        <Action testID="utos-sequence-submit" disabled={!ready || completed} onPress={onComplete}>{completed ? 'Kumpleto na' : 'Ipasa'}</Action>
       </View>
       {showErrors && !ready && <Text style={s.errorText}>Ayusin ang anim na pangyayari bago ipasa ang gawain.</Text>}
     </View>
@@ -308,7 +308,7 @@ export function UtosReflectionActivity({ activity, responses, onChange, onComple
         onChangeText={value => onChange('reflection', value)} placeholder="Isulat at ipaliwanag ang iyong paninindigan…" placeholderTextColor={AppTheme.muted}
         style={[s.reflectionInput, showErrors && !responses.reflection?.trim() && s.invalidInput]} />
       {showErrors && !responses.reflection?.trim() && <Text style={s.errorText}>Ipaliwanag muna ang iyong paninindigan.</Text>}
-      <View style={s.actions}><Action testID="utos-reflection-submit" disabled={!ready || completed} onPress={onComplete}>Ipasa</Action></View>
+      <View style={s.actions}><Action testID="utos-reflection-submit" disabled={!ready || completed} onPress={onComplete}>{completed ? 'Kumpleto na' : 'Ipasa'}</Action></View>
       <Text style={s.footer}>Naka-save sa device ang iyong sagot. Ang guro ang susuri sa iyong paliwanag.</Text>
     </View>}
   </View>;

@@ -24,7 +24,7 @@ const placeholders = [
 ];
 
 /** Four garments share the original response keys; persistence stays in the cabinet editor. */
-export function CharacterTransformationMap({ fields, responses, onChange, onComplete, showErrors }: Props) {
+export function CharacterTransformationMap({ fields, responses, onChange, onComplete, showErrors, completed }: Props) {
   const [active, setActive] = useState(0);
   const [width, setWidth] = useState(0);
   const input = useRef<TextInput>(null);
@@ -106,8 +106,8 @@ export function CharacterTransformationMap({ fields, responses, onChange, onComp
       <Text style={styles.fieldNote}>Ibatay ang sagot sa mga pangyayari at detalye sa kuwento.</Text>
       <View style={styles.actions}>
         {active > 0 ? <Pressable accessibilityRole="button" accessibilityLabel="Nauna" onPress={() => setActive(index => index - 1)} style={({ pressed }) => [styles.previous, pressed && styles.pressed]}><MaterialCommunityIcons name="arrow-left" size={16} color={AppTheme.primary} /><Text style={styles.previousText}>Nauna</Text></Pressable> : <View style={styles.autoSave}><MaterialCommunityIcons name="content-save-check-outline" size={15} color={AppTheme.primary} /><Text style={styles.autoSaveText}>Awtomatikong save</Text></View>}
-        <Pressable accessibilityRole="button" accessibilityLabel={lastStage ? "Ipasa" : `Susunod: ${stageNames[active + 1]}`} onPress={lastStage ? finish : () => setActive(index => index + 1)} style={({ pressed }) => [styles.next, pressed && styles.pressed]}>
-          <Text style={styles.nextText}>{lastStage ? "Ipasa" : `Susunod: ${stageNames[active + 1]}`}</Text>
+        <Pressable accessibilityRole="button" accessibilityLabel={lastStage ? completed ? 'Kumpleto na' : "Ipasa" : `Susunod: ${stageNames[active + 1]}`} accessibilityState={{ disabled: lastStage && completed }} disabled={lastStage && completed} onPress={lastStage ? finish : () => setActive(index => index + 1)} style={({ pressed }) => [styles.next, lastStage && completed && styles.disabled, pressed && styles.pressed]}>
+          <Text style={styles.nextText}>{lastStage ? completed ? 'Kumpleto na' : "Ipasa" : `Susunod: ${stageNames[active + 1]}`}</Text>
           <MaterialCommunityIcons name={lastStage ? "check" : "arrow-right"} size={17} color={AppTheme.buttonText} />
         </Pressable>
       </View>
@@ -149,5 +149,5 @@ const styles = StyleSheet.create({
   autoSaveText: { color: AppTheme.success, fontSize: 11 },
   next: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, minHeight: 46, padding: 12, backgroundColor: AppTheme.primary, borderRadius: 11 },
   nextText: { flexShrink: 1, color: AppTheme.buttonText, fontSize: 13, fontWeight: "800" },
-  pressed: { opacity: 0.75 },
+  pressed: { opacity: 0.75 }, disabled: { opacity: 0.5 },
 });

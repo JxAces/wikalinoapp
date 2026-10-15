@@ -72,6 +72,33 @@ assert.equal(record.response, undefined, "Ignore mismatched activity records");
 
 record = activityRecord(ugat, "ugat-tree-map", response(ugat, "ugat-tree-map", { "card-corruption": "root" }));
 assert.equal(record.fields.find(field => field.id === "card-corruption").answer, "Suliranin", "Show category names instead of internal zone IDs");
+assert.equal(record.fields.length, 3, 'Banyuhay records contain one idea, its category, and its evidence');
+assert.equal(record.fields.find(field => field.id === 'selected-idea').answer, 'Nananatili ang katiwalian at pansariling interes sa lipunan at maging sa tao.');
+assert.equal(record.completed, false);
+const banyuhay = response(ugat, 'ugat-tree-map', {
+  'selected-idea': 'edsa', 'card-edsa': 'branch', 'note-branch': paragraphs,
+  'card-corruption': 'root', 'note-root': 'Mas lumang paliwanag.',
+  'note-leaf': 'Mas lumang patunay.', 'synthesis-insight': 'Mas lumang aral.',
+}, timestamp);
+record = activityRecord(ugat, banyuhay.activityId, banyuhay);
+assert.equal(record.completed, true, 'One chosen idea and its evidence complete Banyuhay');
+assert.equal(record.answered, 3);
+assert.equal(record.fields[0].answer, 'Lumahok si Anastacio sa EDSA dahil umaasa siya sa pagbabago.');
+assert.equal(record.fields[1].answer, 'Pangyayari');
+assert.equal(record.fields[2].answer, 'Unang talata.\n\nIkalawang talata.');
+assert(!record.fields.some(field => field.id === 'card-corruption' || field.id.startsWith('synthesis-') || field.id === 'note-leaf'), 'Hidden legacy work is not displayed as current answers or missing requirements');
+const legacyBanyuhay = { ...banyuhay, responses: { ...banyuhay.responses } };
+delete legacyBanyuhay.responses['selected-idea'];
+record = activityRecord(ugat, legacyBanyuhay.activityId, legacyBanyuhay);
+assert.equal(record.completed, true, 'Earlier completed multiple-choice work remains readable');
+assert.equal(record.fields[1].id, 'card-corruption', 'Legacy records resolve the same deterministic choice as the activity');
+assert.equal(record.fields[2].answer, 'Mas lumang paliwanag.');
+record = activityRecord(ugat, banyuhay.activityId, { ...banyuhay, responses: { ...banyuhay.responses, 'note-branch': ' ' } });
+assert.equal(record.completed, false);
+assert.equal(record.answered, 2, 'Unrelated legacy evidence does not fill the current evidence field');
+const banyuhaySnapshot = JSON.stringify(banyuhay);
+getStudentStoryRecord(ugat, {}, { [banyuhay.activityId]: banyuhay });
+assert.equal(JSON.stringify(banyuhay), banyuhaySnapshot, 'Reading the single-choice record preserves all historical answers');
 record = activityRecord(ugat, "ugat-explore", response(ugat, "ugat-explore", { "viewed-events": "viewed" }));
 assert.equal(record.fields[0].answer, "Natingnan");
 

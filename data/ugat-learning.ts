@@ -33,6 +33,9 @@ export const ugatZones = [
 ] as const;
 export type UgatZoneId = typeof ugatZones[number]['id'];
 
+/** Current Banyuhay categories; keep the legacy Patunay zone above for old saves. */
+export const ugatMapZones = ugatZones.filter(zone => zone.id !== 'leaf');
+
 /** Movable ideas, not an automatic answer key. */
 export const ugatIdeaCards = [
   { id: 'corruption', text: 'Nananatili ang katiwalian at pansariling interes sa lipunan at maging sa tao.' },

@@ -29,8 +29,8 @@ function load(file) {
 }
 
 const { getAllStories } = load(path.join(root, "data/stories.ts"));
-const { cabinetActivities, getCabinetActivities, isCabinetResponseComplete } = load(path.join(root, "data/cabinet-activities.ts"));
-const { ugatIdeaCards, ugatZones } = load(path.join(root, 'data/ugat-learning.ts'));
+const { cabinetActivities, getCabinetActivities, getUgatMapSelection, isCabinetResponseComplete } = load(path.join(root, "data/cabinet-activities.ts"));
+const { ugatIdeaCards, ugatMapZones, ugatZones } = load(path.join(root, 'data/ugat-learning.ts'));
 const { questionScrolls, questionGroup, canAnswerQuestion, canEnterStory, canOpenStoryActivities, canOpenStoryQuiz, isStoryAnswered, isWorldChestUnlocked } = load(path.join(root, "components/story-world/quest-progression.ts"));
 const { worldChestPosition, STORY_INTERACTION_DISTANCE, STORY_WORLD_POSITIONS } = load(path.join(root, "components/story-world/story-world.constants.ts"));
 const { useUserStore: store } = load(path.join(root, "store/useUserStore.ts"));
@@ -40,6 +40,9 @@ const { isWardrobeDressed, needsWardrobeDressing } = load(path.join(root, "data/
 const { createUtosQuizGameState, findUtosMatchMove, swapUtosMatchTiles, UTOS_CHARACTERS, UTOS_RIDDLES, isUtosQuizGameComplete } = load(path.join(root, "data/utos-quiz-games.ts"));
 
 function cabinetAnswers(activity) {
+  if (activity.id === 'ugat-tree-map') return {
+    'selected-idea': 'corruption', 'card-corruption': 'root', 'note-root': 'Patunay mula sa kuwento.',
+  };
   return Object.fromEntries(activity.fields.map((field, index) => [field.id,
     field.id === 'jumble-jojo' ? 'JOJO'
       : field.id === 'jumble-minyong' ? 'MINYONG'
@@ -47,9 +50,7 @@ function cabinetAnswers(activity) {
       : activity.id === 'utos-meanings' ? ({ literal: 'B', power: 'A', interpretation: 'A' })[field.id]
       : activity.id === 'utos-conflict' ? ({ 'round-1-character': 'A', 'round-1-reason': 'B', 'round-2': 'B', 'round-3': 'C' })[field.id]
       : activity.id === 'utos-sequence' ? String.fromCharCode(65 + index)
-      : activity.id === 'ugat-tree-map' && field.id.startsWith('card-')
-        ? ugatZones[ugatIdeaCards.findIndex(card => `card-${card.id}` === field.id) % ugatZones.length].id
-        : field.options ? field.options[0].value : "Patunay mula sa kuwento."]));
+      : field.options ? field.options[0].value : "Patunay mula sa kuwento."]));
 }
 
 function completeUtosPregame(story, questionIndex = 0) {
@@ -654,11 +655,36 @@ async function checkCabinet(stories) {
       assert(!isCabinetResponseComplete(activity, { ...responses, 'viewed-decision': '' }), 'All four clues must be viewed');
     }
     if (activity.id === 'ugat-tree-map') {
-      const oneZone = { ...responses, ...Object.fromEntries(ugatIdeaCards.map(card => [`card-${card.id}`, 'root'])) };
-      assert(!isCabinetResponseComplete(activity, oneZone), 'Every zone needs at least one idea');
-      assert(!isCabinetResponseComplete(activity, { ...responses, 'card-change': '' }), 'All cards must be placed');
-      assert(!isCabinetResponseComplete(activity, { ...responses, 'note-leaf': '  ' }), 'Every zone needs an explanation');
-      assert(!isCabinetResponseComplete(activity, { ...responses, 'synthesis-insight': '' }), 'Synthesis is required');
+      assert.deepEqual(ugatMapZones.map(zone => zone.id), ['root', 'branch', 'fruit'], 'Patunay is evidence, not a selectable category');
+      assert.equal(ugatZones.length, 4, 'Retain the old zone definition for historical saves');
+      assert.equal(getUgatMapSelection(responses).card.id, 'corruption');
+      assert.equal(getUgatMapSelection(undefined), null);
+      assert.equal(getUgatMapSelection([]), null);
+      assert(!isCabinetResponseComplete(activity, { 'note-root': 'May patunay.' }), 'Evidence alone cannot select an idea');
+      assert(!isCabinetResponseComplete(activity, { ...responses, 'selected-idea': '' }), 'Clearing the selection cannot revive a saved assignment');
+      assert(!isCabinetResponseComplete(activity, { ...responses, 'selected-idea': 'unknown' }), 'Invalid explicit selections cannot fall back to legacy assignments');
+      assert(!isCabinetResponseComplete(activity, { ...responses, 'card-corruption': 'leaf' }), 'Removed Patunay category cannot complete new work');
+      assert(!isCabinetResponseComplete(activity, { ...responses, 'card-corruption': '' }), 'The chosen idea needs a category');
+      assert(!isCabinetResponseComplete(activity, { ...responses, 'note-root': '  ' }), 'The chosen category needs evidence');
+      const chosenOnly = { ...responses, 'selected-idea': 'edsa', 'card-edsa': 'branch' };
+      assert.equal(getUgatMapSelection(chosenOnly).card.id, 'edsa', 'Explicit choice overrides earlier hidden assignments');
+      assert(!isCabinetResponseComplete(activity, chosenOnly), 'Hidden evidence for another category cannot complete the chosen idea');
+      assert(isCabinetResponseComplete(activity, { ...chosenOnly, 'note-branch': 'Lumahok siya sa EDSA.' }), 'Only the selected idea and its evidence are required');
+      const legacy = {
+        ...Object.fromEntries(ugatIdeaCards.map((card, index) => [`card-${card.id}`, ugatZones[index % ugatZones.length].id])),
+        ...Object.fromEntries(ugatZones.map(zone => [`note-${zone.id}`, `Naunang sagot: ${zone.title}`])),
+        'synthesis-message': 'Naunang mensahe', 'synthesis-evidence': 'Naunang patunay', 'synthesis-insight': 'Naunang aral',
+      };
+      assert.equal(getUgatMapSelection(legacy).card.id, 'corruption', 'Old multiple assignments resolve to one deterministic choice');
+      assert(isCabinetResponseComplete(activity, legacy), 'Earlier completed answers remain valid');
+      assert.equal(getUgatMapSelection({ 'card-corruption': 'leaf', 'card-edsa': 'branch' }).card.id, 'edsa', 'Legacy fallback skips the retired category');
+      assert.equal(getUgatMapSelection({ 'card-corruption': 'leaf' }), null, 'A retired category alone cannot become a current selection');
+      store.getState().saveCabinetResponse({ ...payload, responses: legacy, complete: true });
+      const savedLegacy = store.getState().cabinetResponses[activity.id];
+      assert(savedLegacy.completedAt, 'A legacy payload can still complete through the store');
+      assert(!Object.prototype.hasOwnProperty.call(savedLegacy.responses, 'selected-idea'), 'Autosave preserves absent legacy markers');
+      assert.equal(savedLegacy.responses['note-leaf'], legacy['note-leaf'], 'Earlier Patunay text stays saved');
+      assert.equal(savedLegacy.responses['synthesis-insight'], legacy['synthesis-insight'], 'Earlier synthesis text stays saved');
     }
     const choice = activity.fields.find(field => field.options);
     if (choice) assert(!isCabinetResponseComplete(activity, { ...responses, [choice.id]: "invalid-choice" }), "Unknown choices are rejected");

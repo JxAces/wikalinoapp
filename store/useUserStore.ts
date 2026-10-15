@@ -308,7 +308,11 @@ export const useUserStore =
             const activity = getCabinetActivity(storyId, activityId);
             if (!activity || !canOpenStoryActivities(storyId, state.readingCompletedStoryIds, state.activityResults) ||
               !canOpenCabinetActivity(activity, state.cabinetResponses)) return state;
-            const cleaned = Object.fromEntries(activity.fields.map(field => [field.id, typeof responses[field.id] === "string" ? responses[field.id] : ""]));
+            const cleaned = Object.fromEntries(activity.fields
+              // A missing marker identifies legacy Banyuhay work; an explicit
+              // empty marker means the student cleared their current selection.
+              .filter(field => field.id !== 'selected-idea' || Object.prototype.hasOwnProperty.call(responses, field.id))
+              .map(field => [field.id, typeof responses[field.id] === "string" ? responses[field.id] : ""]));
             if (complete && !isCabinetResponseComplete(activity, cleaned)) return state;
             return {
               cabinetResponses: {

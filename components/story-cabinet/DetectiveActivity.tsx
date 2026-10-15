@@ -170,7 +170,7 @@ export function DetectiveActivity({ activity, story, responses, groupName, onCha
           <Text style={styles.reportLabel}>PATUNAY</Text><Text selectable style={styles.reportText}>{responses[`proof-${index}`]?.trim() || "Wala pang patunay."}</Text>
           <Pressable accessibilityRole="button" accessibilityLabel={`Baguhin: ${item.title}`} onPress={() => openMission(index)} style={styles.editButton}><MaterialCommunityIcons name="pencil-outline" size={16} color={AppTheme.primary} /><Text style={styles.toolText}>Baguhin ang tala</Text></Pressable>
         </View>)}
-        {!completed && <Pressable accessibilityRole="button" accessibilityLabel="Ipasa" onPress={finish} style={({ pressed }) => [styles.primary, pressed && styles.pressed]}><Text style={styles.primaryText}>Ipasa</Text><MaterialCommunityIcons name="arrow-right" size={18} color={AppTheme.buttonText} /></Pressable>}
+        <Pressable accessibilityRole="button" accessibilityLabel={completed ? 'Kumpleto na' : 'Ipasa'} accessibilityState={{ disabled: completed }} disabled={completed} onPress={finish} style={({ pressed }) => [styles.primary, completed && styles.disabled, pressed && styles.pressed]}><Text style={styles.primaryText}>{completed ? 'Kumpleto na' : 'Ipasa'}</Text><MaterialCommunityIcons name={completed ? 'check' : 'arrow-right'} size={18} color={AppTheme.buttonText} /></Pressable>
         <Text style={styles.reportNote}>{completed ? "Naka-save sa device na ito. Maaari pa ring baguhin ang mga tala." : "Punan ang limang sagot at patunay bago ihanda ang ulat."}</Text>
       </View>
     </>}
