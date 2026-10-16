@@ -2,6 +2,21 @@
 
 This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
 
+## Production PWA connection
+
+The app uses [the Wikalino backend](https://wikalino-backend.onrender.com) for student uploads and class rankings. The [backend repository](https://github.com/Makemaks/wikalino-backend) is deployed separately.
+
+Production exports load the committed `.env.production`, which contains only public client settings. Local `.env.local` files and shell environment variables can override those values; remove old localhost overrides before exporting for deployment. Supabase secret keys and dashboard passwords belong only on the backend.
+
+Build the deployable PWA, including its offline assets, with:
+
+```bash
+npm ci
+npm run build:pwa
+```
+
+Deploy the resulting `dist` directory to the existing PWA host. Students keep their work on the device; when the app is open and a connection is available, it uploads the latest save under their class code. Browser background execution while the app is closed is not guaranteed. Render Free can take about a minute to wake after inactivity; pending uploads retry automatically.
+
 ## Get started
 
 1. Install dependencies

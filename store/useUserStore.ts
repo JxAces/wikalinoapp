@@ -3,6 +3,8 @@ import { isWardrobeDressed } from "../data/sandaang-wardrobe";
 import { canOpenCabinetActivity, getCabinetActivity, isCabinetResponseComplete } from "../data/cabinet-activities";
 import { isUtosQuizGameComplete, normalizeUtosQuizGameState, type UtosQuizGameState } from "../data/utos-quiz-games";
 import { getAssessmentSummary, gradeAssessmentAnswer, type AssessmentAnswer } from "../utils/assessment";
+import { normalizeClassCode } from "../utils/class-code";
+import { notifyLocalSave, prepareRemoteAccountDeletion, finishRemoteAccountDeletion } from "../services/local-save-events";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { create } from "zustand";
 import {
@@ -75,6 +77,8 @@ export type LastPlayed = {
 export type UserProfile = {
   fullName: string;
   pangkat: string;
+  // Optional for older saves; groups uploaded records into the student's class.
+  classCode?: string;
   avatar?: string;
   character: PlayerCharacterId;
 };
@@ -123,6 +127,8 @@ type UserStore = {
   updateProfile: (
     payload: Partial<UserProfile>,
   ) => void;
+
+  saveClassCode: (code: string) => Promise<void>;
 
   clearProfile: () => void;
 
@@ -267,6 +273,27 @@ export const useUserStore =
                 }
               : null,
           })),
+
+        saveClassCode: async (value) => {
+          const code = normalizeClassCode(value);
+          const profile = get().profile;
+          if (!code) throw new Error("Ilagay ang class code mula sa iyong guro.");
+          if (!profile) throw new Error("Gumawa muna ng iyong profile.");
+          try {
+            // Persist's set returns the storage promise. Wait before dismissing
+            // the dialog so a failed device write can be retried.
+            await set(state => ({ profile: state.profile ? { ...state.profile, classCode: code } : null }));
+          } catch (error) {
+            try {
+              await set(state => state.profile?.classCode === code
+                ? { profile: { ...state.profile, classCode: profile.classCode } }
+                : state);
+            } catch {
+              // The in-memory rollback still runs when storage is unavailable.
+            }
+            throw error;
+          }
+        },
 
         clearProfile: () =>
           set({
@@ -652,21 +679,30 @@ export const useUserStore =
           set(emptyUserData()),
 
         deleteAccount: async () => {
-          set(emptyUserData());
+          // Queue server deletion durably before removing the device profile.
+          await prepareRemoteAccountDeletion();
+          await set(emptyUserData());
 
           await AsyncStorage.removeItem(
             USER_STORE_STORAGE_KEY,
           );
+          await finishRemoteAccountDeletion();
         },
       }),
 
       {
         name: USER_STORE_STORAGE_KEY,
 
-        version: 7,
+        version: 8,
 
         storage: createJSONStorage(
-          () => AsyncStorage,
+          () => ({
+            ...AsyncStorage,
+            setItem: async (key, value) => {
+              await AsyncStorage.setItem(key, value);
+              if (key === USER_STORE_STORAGE_KEY) notifyLocalSave();
+            },
+          }),
         ),
 
         migrate: (
@@ -706,6 +742,8 @@ export const useUserStore =
                   pangkat:
                     oldProfile.pangkat ??
                     "",
+
+                  classCode: normalizeClassCode(oldProfile.classCode),
 
                   avatar:
                     oldProfile.avatar,

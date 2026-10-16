@@ -6,16 +6,22 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { StudentStoryCard } from "@/components/student-records/StudentStoryCard";
+import { ClassRankings } from "@/components/student-records/ClassRankings";
+import { SyncStatus } from "@/components/student-records/SyncStatus";
+import { useClassCodeDialog } from "@/components/class-code/ClassCodeProvider";
 import { WikalinoBrand } from "@/components/ui/WikalinoBrand";
 import { AppTheme } from "@/constants/colors";
 import { getAllStories } from "@/data/stories";
 import { useUserStore } from "@/store/useUserStore";
 import { getStudentStoryRecord } from "@/utils/student-records";
+import { normalizeClassCode } from "@/utils/class-code";
 
 const stories = getAllStories();
 
 export default function StudentRecordsScreen() {
   const profile = useUserStore(state => state.profile);
+  const openClassCode = useClassCodeDialog();
+  const classCode = normalizeClassCode(profile?.classCode);
   const activityResults = useUserStore(state => state.activityResults);
   const cabinetResponses = useUserStore(state => state.cabinetResponses);
   const records = useMemo(() => stories.map(story => getStudentStoryRecord(story, activityResults, cabinetResponses)), [activityResults, cabinetResponses]);
@@ -50,7 +56,22 @@ export default function StudentRecordsScreen() {
           </View>
         </View>
 
+        {profile && <View style={styles.classCard}>
+          <MaterialCommunityIcons name="school-outline" size={24} color={AppTheme.primary} />
+          <View style={styles.flex}>
+            <Text style={styles.classLabel}>CLASS CODE</Text>
+            <Text selectable style={styles.classCode}>{classCode ?? "Wala pang code"}</Text>
+            <Text style={styles.classHint}>{classCode ? "Naka-save sa device na ito" : "Idagdag ang code mula sa iyong guro"}</Text>
+          </View>
+          <Pressable onPress={openClassCode} accessibilityRole="button" accessibilityLabel={classCode ? "Palitan ang class code" : "Ilagay ang class code"}
+            style={({ pressed }) => [styles.classButton, pressed && styles.pressed]}>
+            <Text style={styles.classButtonText}>{classCode ? "Palitan" : "Ilagay"}</Text>
+          </Pressable>
+        </View>}
+
         <Text accessibilityRole="header" style={styles.sectionLabel}>IYONG MGA KUWENTO · {stories.length} KUWENTO</Text>
+        <SyncStatus />
+        <ClassRankings />
         <View style={styles.cards}>
           {stories.map((story, index) => <StudentStoryCard key={story.id} story={story} index={index} record={records[index]} initiallyExpanded={index === 0} />)}
         </View>
@@ -79,6 +100,12 @@ const styles = StyleSheet.create({
   initials: { color: AppTheme.buttonText, fontSize: 16, fontWeight: "800" },
   studentName: { color: AppTheme.text, fontSize: 16, lineHeight: 23, fontWeight: "800" },
   grade: { color: AppTheme.muted, fontSize: 12, lineHeight: 19, marginTop: 3 },
+  classCard: { flexDirection: "row", alignItems: "center", gap: 11, borderRadius: 18, backgroundColor: AppTheme.surfaceSoft, borderWidth: 1, borderColor: AppTheme.border, padding: 15, marginBottom: 23 },
+  classLabel: { color: AppTheme.muted, fontSize: 10, fontWeight: "800", letterSpacing: 1 },
+  classCode: { color: AppTheme.text, fontWeight: "800", fontSize: 16, lineHeight: 23, marginTop: 4 },
+  classHint: { color: AppTheme.muted, fontSize: 11, lineHeight: 17, marginTop: 3 },
+  classButton: { minHeight: 44, justifyContent: "center", paddingHorizontal: 12, borderRadius: 12, backgroundColor: AppTheme.selected },
+  classButtonText: { color: AppTheme.text, fontSize: 12, fontWeight: "800" },
   sectionLabel: { color: AppTheme.muted, fontSize: 11, lineHeight: 18, fontWeight: "800", letterSpacing: 1, marginBottom: 13 },
   cards: { gap: 13 },
   note: { flexDirection: "row", alignItems: "flex-start", gap: 9, marginTop: 22 },

@@ -8,7 +8,9 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { WikalinoBrand } from "@/components/ui/WikalinoBrand";
+import { ClassCodeField } from "@/components/class-code/ClassCodeField";
 import { AppTheme, Colors } from "@/constants/colors";
+import { normalizeClassCode } from "@/utils/class-code";
 
 import { CharacterLineup } from "../../components/character-select/CharacterLineup";
 import { PANGKAT_OPTIONS, type PangkatOption } from "../../data/pangkat";
@@ -35,8 +37,9 @@ export default function OnboardingScreen() {
   const [choosingCharacter, setChoosingCharacter] = useState(false);
   const [fullName, setFullName] = useState("");
   const [grade, setGrade] = useState<PangkatOption | null>(null);
+  const [classCode, setClassCode] = useState("");
   const [character, setCharacter] = useState<PlayerCharacterId>(DEFAULT_PLAYER_CHARACTER);
-  const canContinue = fullName.trim().length >= 2 && grade !== null;
+  const canContinue = fullName.trim().length >= 2 && grade !== null && Boolean(normalizeClassCode(classCode));
 
   useEffect(() => {
     if (!focused || !choosingCharacter) return;
@@ -59,6 +62,7 @@ export default function OnboardingScreen() {
       fullName: fullName.trim(),
       // Keep the existing saved-profile field compatible with older players.
       pangkat: grade.replace("Pangkat", "Baitang"),
+      classCode: normalizeClassCode(classCode),
       avatar: "reader",
       character,
     });
@@ -111,6 +115,7 @@ export default function OnboardingScreen() {
                   </Pressable>;
                 })}
               </View>
+              <ClassCodeField value={classCode} onChangeText={setClassCode} onSubmitEditing={chooseCharacter} style={styles.input} />
               <Pressable onPress={chooseCharacter} disabled={!canContinue}
                 accessibilityRole="button" accessibilityState={{ disabled: !canContinue }}
                 style={({ pressed }) => [styles.continue, !canContinue && styles.disabled, pressed && styles.pressed]}>
